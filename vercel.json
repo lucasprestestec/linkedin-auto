@@ -1,0 +1,3 @@
+{
+  "comment": "Sem cron nativo da Vercel aqui de propósito — no plano Hobby ele só roda 1x/dia. A checagem periódica de /api/cron/poll é disparada por um agendador externo gratuito (ex.: cron-job.org) chamando essa rota a cada poucos minutos com o header Authorization: Bearer CRON_SECRET."
+}

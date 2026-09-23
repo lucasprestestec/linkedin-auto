@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LeadStatus {
+  INVITE_SENT      // convite mandado, aguardando aceite
+  CONVERSATION_OPEN // aceitou, agente conversando
+  NEEDS_HUMAN      // agente pediu handoff
+  QUALIFIED        // pronto para fechar
+  LOST             // sem resposta / recusou
+}
+
+enum MessageSender {
+  LEAD
+  AGENT
+  HUMAN
+}
+
+model Lead {
+  id                String    @id @default(cuid())
+  linkedinProfileUrl String   @unique
+  linkedinProfileId  String?
+  firstName         String?
+  lastName          String?
+  jobTitle          String?
+  status            LeadStatus @default(INVITE_SENT)
+  linkedinThreadId  String?   @unique
+  needsHumanReason  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  messages          Message[]
+}
+
+model Message {
+  id        String        @id @default(cuid())
+  lead      Lead          @relation(fields: [leadId], references: [id])
+  leadId    String
+  sender    MessageSender
+  content   String
+  linkedinMessageId String? @unique
+  deliveredAt DateTime
+  createdAt DateTime      @default(now())
+}
+
+model Settings {
+  id                String  @id @default("singleton")
+  automationPaused  Boolean @default(true)
+  dailyInviteLimit  Int     @default(18)
+  dailyMessageLimit Int     @default(25)
+}
