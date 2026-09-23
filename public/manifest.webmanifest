@@ -1,0 +1,11 @@
+{
+  "name": "LinkedIn Leads",
+  "short_name": "Leads",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#1c3d5a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
