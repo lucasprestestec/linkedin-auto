@@ -61,7 +61,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       </header>
 
       <div style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        {lead.messages.map((message) => {
+        {lead.messages.map((message: { id: string; sender: string; content: string }) => {
           const fromLead = message.sender === "LEAD";
           return (
             <div

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { STATUS_LABEL, STATUS_ORDER, statusColors } from "@/lib/status";
 import { toggleAutomation, logout } from "./actions";
+import type { Lead, Message } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ async function getData() {
     where: { sender: { not: "LEAD" }, createdAt: { gte: startOfDay } },
   });
 
-  leads.sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  leads.sort((a: Lead, b: Lead) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
 
   return { settings, leads, sentToday };
 }
@@ -94,7 +95,7 @@ export default async function HomePage() {
         </p>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {leads.map((lead) => {
+          {leads.map((lead: Lead & { messages: Message[] }) => {
             const colors = statusColors(lead.status);
             const lastMessage = lead.messages[0];
             return (
