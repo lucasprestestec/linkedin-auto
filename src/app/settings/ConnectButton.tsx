@@ -12,7 +12,7 @@ export function ConnectButton() {
     startTransition(async () => {
       try {
         const link = await getOrCreateIdentityLoginLink();
-        window.location.href = link;
+        window.open(link, "_blank", "noopener,noreferrer");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Falha ao gerar link de conexão.");
       }
@@ -38,6 +38,9 @@ export function ConnectButton() {
       >
         {pending ? "Gerando link..." : "Conectar minha conta do LinkedIn"}
       </button>
+      <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 8 }}>
+        Abre em uma nova aba. Depois de entrar com o LinkedIn, pode fechar aquela aba e voltar aqui.
+      </p>
       {error && (
         <p style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 8 }}>{error}</p>
       )}

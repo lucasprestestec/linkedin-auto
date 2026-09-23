@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getIdentity } from "@/lib/edges";
 import { logout } from "../actions";
 import { ConnectButton } from "./ConnectButton";
+import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,9 @@ export default async function SettingsPage() {
                 Conecte a conta pessoal do LinkedIn para o sistema começar a operar.
               </p>
               <ConnectButton />
+              <div style={{ marginTop: 10 }}>
+                <RefreshStatusButton />
+              </div>
             </div>
           )}
         </section>
