@@ -8,22 +8,27 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
   LOST: "Sem resposta",
 };
 
-export const STATUS_ORDER: LeadStatus[] = [
-  "NEEDS_HUMAN",
-  "CONVERSATION_OPEN",
-  "QUALIFIED",
-  "INVITE_SENT",
-  "LOST",
-];
-
-export function statusColors(status: LeadStatus) {
+export function statusColor(status: LeadStatus): string {
   switch (status) {
     case "NEEDS_HUMAN":
-      return { fg: "var(--accent-urgent)", bg: "var(--accent-urgent-bg)" };
+      return "var(--accent-urgent)";
     case "CONVERSATION_OPEN":
     case "QUALIFIED":
-      return { fg: "var(--accent-open)", bg: "var(--accent-open-bg)" };
+      return "var(--accent-open)";
     default:
-      return { fg: "var(--accent-idle)", bg: "var(--accent-idle-bg)" };
+      return "var(--accent-idle)";
   }
 }
+
+export interface LeadSection {
+  key: string;
+  label: string;
+  statuses: LeadStatus[];
+}
+
+export const LEAD_SECTIONS: LeadSection[] = [
+  { key: "urgent", label: "Precisa de você", statuses: ["NEEDS_HUMAN"] },
+  { key: "open", label: "Conversando", statuses: ["CONVERSATION_OPEN", "QUALIFIED"] },
+  { key: "invited", label: "Convite enviado", statuses: ["INVITE_SENT"] },
+  { key: "lost", label: "Sem resposta", statuses: ["LOST"] },
+];

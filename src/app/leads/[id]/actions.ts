@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
+import { getActiveIdentityId } from "@/lib/identity";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -11,7 +12,8 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
 
   try {
-    const result = await sendMessage(lead.linkedinProfileUrl, content);
+    const identityId = await getActiveIdentityId();
+    const result = await sendMessage(identityId, lead.linkedinProfileUrl, content);
     await prisma.message.create({
       data: {
         leadId: lead.id,

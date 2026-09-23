@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extractConversations } from "@/lib/edges";
+import { getActiveIdentityId } from "@/lib/identity";
 
-// Vercel Cron chama este endpoint periodicamente (ver vercel.json).
+// Agendador externo chama este endpoint periodicamente (ver vercel.json).
 // Só sincroniza o estado das conversas no banco — nunca envia nada.
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -10,7 +11,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const conversations = await extractConversations();
+  const identityId = await getActiveIdentityId();
+  const conversations = await extractConversations(identityId);
   let updatedLeads = 0;
   let newIncomingMessages = 0;
 

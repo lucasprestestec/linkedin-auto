@@ -47,8 +47,9 @@ model Message {
 }
 
 model Settings {
-  id                String  @id @default("singleton")
-  automationPaused  Boolean @default(true)
-  dailyInviteLimit  Int     @default(18)
-  dailyMessageLimit Int     @default(25)
+  id                  String  @id @default("singleton")
+  automationPaused    Boolean @default(true)
+  dailyInviteLimit    Int     @default(18)
+  dailyMessageLimit   Int     @default(25)
+  linkedinIdentityId  String?
 }

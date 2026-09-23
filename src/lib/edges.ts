@@ -1,30 +1,51 @@
 const EDGES_API_BASE = "https://api.edges.run/v1";
 
-function getConfig() {
+function getApiKey() {
   const apiKey = process.env.EDGES_API_KEY;
-  const identityId = process.env.EDGES_IDENTITY_ID;
-  if (!apiKey || !identityId) {
-    throw new Error("EDGES_API_KEY / EDGES_IDENTITY_ID não configurados.");
-  }
-  return { apiKey, identityId };
+  if (!apiKey) throw new Error("EDGES_API_KEY não configurado.");
+  return apiKey;
 }
 
-async function callAction<T>(actionSlug: string, payload: Record<string, unknown>): Promise<T> {
-  const { apiKey } = getConfig();
-  const res = await fetch(`${EDGES_API_BASE}/actions/${actionSlug}/run/live`, {
-    method: "POST",
+async function edgesFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${EDGES_API_BASE}${path}`, {
+    ...init,
     headers: {
-      "X-API-Key": apiKey,
+      "X-API-Key": getApiKey(),
       "Content-Type": "application/json",
+      ...init?.headers,
     },
-    body: JSON.stringify(payload),
   });
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(`Edges action "${actionSlug}" falhou: ${data?.message ?? res.statusText}`);
+    throw new Error(`Edges request "${path}" falhou: ${data?.message ?? res.statusText}`);
   }
   return data as T;
+}
+
+async function callAction<T>(actionSlug: string, payload: Record<string, unknown>): Promise<T> {
+  return edgesFetch<T>(`/actions/${actionSlug}/run/live`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface EdgesIdentity {
+  uid: string;
+  name: string;
+  integrations: string[];
+  identity_login_links?: { linkedin?: string };
+}
+
+export async function createIdentity(name: string, timezone: string) {
+  return edgesFetch<EdgesIdentity>("/identities", {
+    method: "POST",
+    body: JSON.stringify({ name, timezone, type: "engagement" }),
+  });
+}
+
+export async function getIdentity(identityId: string) {
+  return edgesFetch<EdgesIdentity>(`/identities/${identityId}`);
 }
 
 export interface EdgesMessageResult {
@@ -56,8 +77,7 @@ export interface EdgesConversation {
   };
 }
 
-export async function sendConnectionInvite(profileUrl: string, note: string) {
-  const { identityId } = getConfig();
+export async function sendConnectionInvite(identityId: string, profileUrl: string, note: string) {
   return callAction<EdgesConnectResult>("linkedin-connect-profile", {
     identity_ids: [identityId],
     input: { linkedin_profile_url: profileUrl },
@@ -65,8 +85,7 @@ export async function sendConnectionInvite(profileUrl: string, note: string) {
   });
 }
 
-export async function sendMessage(profileUrl: string, message: string) {
-  const { identityId } = getConfig();
+export async function sendMessage(identityId: string, profileUrl: string, message: string) {
   return callAction<EdgesMessageResult>("linkedin-message-profile", {
     identity_ids: [identityId],
     input: { linkedin_profile_url: profileUrl },
@@ -74,8 +93,7 @@ export async function sendMessage(profileUrl: string, message: string) {
   });
 }
 
-export async function extractConversations() {
-  const { identityId } = getConfig();
+export async function extractConversations(identityId: string) {
   return callAction<EdgesConversation[]>("linkedin-extract-conversations", {
     identity_ids: [identityId],
     parameters: { read: true },

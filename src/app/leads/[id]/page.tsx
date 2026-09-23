@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { STATUS_LABEL, statusColors } from "@/lib/status";
+import { relativeTime } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
 import { ReplyForm } from "./ReplyForm";
 
 export const dynamic = "force-dynamic";
@@ -15,53 +16,69 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   if (!lead) notFound();
 
-  const colors = statusColors(lead.status);
+  const needsHuman = lead.status === "NEEDS_HUMAN";
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 57px)" }}>
       <header
         style={{
           position: "sticky",
           top: 0,
           background: "var(--bg)",
           borderBottom: "1px solid var(--border)",
-          padding: "14px 16px",
+          padding: "12px 16px",
           display: "flex",
           alignItems: "center",
           gap: 12,
           zIndex: 10,
         }}
       >
-        <Link href="/" style={{ color: "var(--text-muted)", fontSize: 20, textDecoration: "none" }} aria-label="Voltar">
+        <Link href="/" style={{ color: "var(--text-muted)", fontSize: 20, textDecoration: "none", lineHeight: 1 }} aria-label="Voltar">
           ←
         </Link>
+        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={36} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>
             {lead.firstName} {lead.lastName}
           </div>
           {lead.jobTitle && (
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {lead.jobTitle}
             </div>
           )}
         </div>
-        <span
-          style={{
-            flexShrink: 0,
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: 999,
-            color: colors.fg,
-            background: colors.bg,
-          }}
+        <a
+          href={lead.linkedinProfileUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Ver perfil no LinkedIn"
+          style={{ color: "var(--text-faint)", fontSize: 18, flexShrink: 0 }}
         >
-          {STATUS_LABEL[lead.status]}
-        </span>
+          ↗
+        </a>
       </header>
 
+      {needsHuman && (
+        <div
+          style={{
+            margin: "12px 16px 0",
+            padding: "10px 12px",
+            borderRadius: 8,
+            background: "var(--accent-urgent-bg)",
+            color: "var(--accent-urgent)",
+            fontSize: 13,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <span>{lead.needsHumanReason ?? "Precisa de resposta"}</span>
+          <span style={{ flexShrink: 0, opacity: 0.8 }}>{relativeTime(lead.updatedAt)}</span>
+        </div>
+      )}
+
       <div style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        {lead.messages.map((message: { id: string; sender: string; content: string }) => {
+        {lead.messages.map((message) => {
           const fromLead = message.sender === "LEAD";
           return (
             <div
@@ -78,12 +95,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               }}
             >
               {message.content}
+              <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 4, textAlign: "right" }}>
+                {relativeTime(message.deliveredAt)}
+              </div>
             </div>
           );
         })}
       </div>
 
       <ReplyForm leadId={lead.id} />
-    </main>
+    </div>
   );
 }
