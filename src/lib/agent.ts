@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import type { Message as DbMessage } from "@prisma/client";
 
 const DEFAULT_INSTRUCTIONS = `Você é um assistente comercial respondendo por um corretor de seguros no LinkedIn.
@@ -9,27 +9,30 @@ export type AgentDecision =
   | { action: "reply"; message: string; qualified: boolean }
   | { action: "handoff"; reason: string };
 
-const RESPOND_TOOL: Anthropic.Tool = {
-  name: "respond_to_lead",
-  description: "Decide como agir na conversa com o lead: responder diretamente ou pedir para um humano assumir.",
-  input_schema: {
-    type: "object",
-    properties: {
-      action: { type: "string", enum: ["reply", "handoff"] },
-      message: {
-        type: "string",
-        description: "Mensagem a enviar ao lead. Obrigatório quando action = reply. Tom natural de LinkedIn, direto, sem parecer robótico.",
+const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "respond_to_lead",
+    description: "Decide como agir na conversa com o lead: responder diretamente ou pedir para um humano assumir.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["reply", "handoff"] },
+        message: {
+          type: "string",
+          description: "Mensagem a enviar ao lead. Obrigatório quando action = reply. Tom natural de LinkedIn, direto, sem parecer robótico.",
+        },
+        qualified: {
+          type: "boolean",
+          description: "true se o lead parece pronto para fechar / muito interessado. Só use com action = reply.",
+        },
+        handoff_reason: {
+          type: "string",
+          description: "Motivo curto e específico do handoff (ex: 'Pediu valor exato do plano'). Obrigatório quando action = handoff.",
+        },
       },
-      qualified: {
-        type: "boolean",
-        description: "true se o lead parece pronto para fechar / muito interessado. Só use com action = reply.",
-      },
-      handoff_reason: {
-        type: "string",
-        description: "Motivo curto e específico do handoff (ex: 'Pediu valor exato do plano'). Obrigatório quando action = handoff.",
-      },
+      required: ["action"],
     },
-    required: ["action"],
   },
 };
 
@@ -44,33 +47,43 @@ Regras fixas, sempre válidas, independente do material acima:
 - Use a ferramenta respond_to_lead para toda resposta. Nunca responda em texto livre fora da ferramenta.`;
 }
 
+function getClient() {
+  const apiKey = process.env.NOUS_API_KEY;
+  if (!apiKey) throw new Error("NOUS_API_KEY não configurado.");
+  return new OpenAI({
+    apiKey,
+    baseURL: process.env.NOUS_BASE_URL || "https://inference-api.nousresearch.com/v1",
+  });
+}
+
 export async function decideResponse(
   history: Pick<DbMessage, "sender" | "content">[],
   instructions: string | null,
 ): Promise<AgentDecision> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurado.");
+  const client = getClient();
+  const model = process.env.NOUS_MODEL || "Hermes-4-70B";
 
-  const client = new Anthropic({ apiKey });
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt(instructions) },
+    ...history.map((m): OpenAI.Chat.Completions.ChatCompletionMessageParam => ({
+      role: m.sender === "LEAD" ? "user" : "assistant",
+      content: m.content,
+    })),
+  ];
 
-  const messages: Anthropic.MessageParam[] = history.map((m) => ({
-    role: m.sender === "LEAD" ? "user" : "assistant",
-    content: m.content,
-  }));
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 1024,
-    system: systemPrompt(instructions),
-    tools: [RESPOND_TOOL],
-    tool_choice: { type: "tool", name: "respond_to_lead" },
+  const response = await client.chat.completions.create({
+    model,
     messages,
+    tools: [RESPOND_TOOL],
+    tool_choice: { type: "function", function: { name: "respond_to_lead" } },
   });
 
-  const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-  if (!toolUse) throw new Error("O agente não retornou uma decisão válida.");
+  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== "function") {
+    throw new Error("O agente não retornou uma decisão válida.");
+  }
 
-  const input = toolUse.input as {
+  const input = JSON.parse(toolCall.function.arguments) as {
     action: "reply" | "handoff";
     message?: string;
     qualified?: boolean;
