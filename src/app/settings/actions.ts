@@ -48,3 +48,15 @@ export async function updateLimits(_prevState: unknown, formData: FormData) {
   revalidatePath("/settings");
   return { error: undefined, saved: true };
 }
+
+export async function updateAgentInstructions(_prevState: unknown, formData: FormData) {
+  const agentInstructions = String(formData.get("agentInstructions") ?? "").trim();
+
+  await prisma.settings.update({
+    where: { id: "singleton" },
+    data: { agentInstructions: agentInstructions || null },
+  });
+
+  revalidatePath("/settings");
+  return { saved: true };
+}

@@ -52,4 +52,5 @@ model Settings {
   dailyInviteLimit    Int     @default(18)
   dailyMessageLimit   Int     @default(25)
   linkedinIdentityId  String?
+  agentInstructions   String? @db.Text
 }

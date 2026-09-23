@@ -4,6 +4,7 @@ import { logout } from "../actions";
 import { ConnectButton } from "./ConnectButton";
 import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
+import { AgentInstructionsForm } from "./AgentInstructionsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,16 @@ export default async function SettingsPage() {
             Limite diário
           </h2>
           <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
+        </section>
+
+        <section style={card}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            Agente de IA
+          </h2>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 12px" }}>
+            O que o agente sabe pra responder: produtos, público, objeções, quando parar e chamar você.
+          </p>
+          <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
         </section>
 
         <form action={logout}>

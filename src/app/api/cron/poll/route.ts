@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extractConversations } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
+import { handleIncomingMessage } from "@/lib/respond";
 
 // Agendador externo chama este endpoint periodicamente (ver vercel.json).
-// Só sincroniza o estado das conversas no banco — nunca envia nada.
+// Sincroniza as conversas e, para cada mensagem nova do lead, aciona o
+// agente de IA (que decide responder ou pedir handoff humano).
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -54,12 +56,7 @@ export async function GET(request: Request) {
 
       if (isFromLead) {
         newIncomingMessages++;
-        // Fase 1: sem agente de IA ainda, toda mensagem nova do lead
-        // precisa de humano até a Fase 3 estar pronta.
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: { status: "NEEDS_HUMAN", needsHumanReason: "Nova mensagem recebida" },
-        });
+        await handleIncomingMessage(lead, identityId);
       }
     }
   }
