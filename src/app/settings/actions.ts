@@ -2,15 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { createIdentity } from "@/lib/edges";
+import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
 
 export async function getOrCreateIdentityLoginLink(): Promise<string> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   if (settings.linkedinIdentityId) {
-    // Já existe identidade: não dá para gerar novo link por API para uma
-    // identidade existente. Orientamos a reconectar via suporte se necessário.
-    throw new Error("ALREADY_HAS_IDENTITY");
+    // A Edges só devolve o link de login no momento da criação. Se já existe
+    // uma identidade mas ela nunca chegou a conectar (usuário fechou a aba,
+    // por exemplo), apaga essa e cria outra para gerar um link novo — evita
+    // acumular identidades órfãs (cada uma tem custo mensal).
+    const existing = await getIdentity(settings.linkedinIdentityId).catch(() => null);
+    if (existing?.integrations.includes("linkedin")) {
+      throw new Error("Essa conta já está conectada.");
+    }
+    await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
   }
 
   const identity = await createIdentity("Cliente", "America/Sao_Paulo");

@@ -48,6 +48,10 @@ export async function getIdentity(identityId: string) {
   return edgesFetch<EdgesIdentity>(`/identities/${identityId}`);
 }
 
+export async function deleteIdentity(identityId: string) {
+  return edgesFetch<Record<string, never>>(`/identities/${identityId}`, { method: "DELETE" });
+}
+
 export interface EdgesMessageResult {
   is_sent: boolean;
   linkedin_thread_id: string;
