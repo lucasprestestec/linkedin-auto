@@ -61,7 +61,7 @@ export async function decideResponse(
   instructions: string | null,
 ): Promise<AgentDecision> {
   const client = getClient();
-  const model = process.env.NOUS_MODEL || "Hermes-4-70B";
+  const model = process.env.NOUS_MODEL || "deepseek/deepseek-v4-flash";
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt(instructions) },
