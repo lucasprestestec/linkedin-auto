@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { IconRefresh } from "@/components/Icons";
 
 export function RefreshStatusButton() {
   const router = useRouter();
@@ -9,18 +10,13 @@ export function RefreshStatusButton() {
 
   return (
     <button
+      type="button"
       onClick={() => startTransition(() => router.refresh())}
       disabled={pending}
-      style={{
-        background: "none",
-        border: "none",
-        color: "var(--primary)",
-        fontSize: 13,
-        cursor: "pointer",
-        padding: 0,
-      }}
+      className="btn btn-secondary btn-block btn-sm"
     >
-      {pending ? "Atualizando..." : "Já entrei — atualizar status"}
+      <IconRefresh size={15} style={pending ? { animation: "spin 0.8s linear infinite" } : undefined} />
+      {pending ? "Atualizando…" : "Já entrei — atualizar status"}
     </button>
   );
 }

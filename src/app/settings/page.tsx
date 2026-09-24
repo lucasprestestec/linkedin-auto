@@ -5,6 +5,7 @@ import { ConnectButton } from "./ConnectButton";
 import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
+import { IconChevronRight, IconLinkedin, IconLogout } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -18,98 +19,80 @@ async function getConnectionStatus(identityId: string | null) {
   }
 }
 
-const card: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  padding: 18,
-};
-
 export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const status = await getConnectionStatus(settings.linkedinIdentityId);
+  const connected = status.connected && !settings.linkedinNeedsReconnect;
 
   return (
-    <>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
-          padding: "16px",
-          zIndex: 10,
-        }}
-      >
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: -0.2 }}>Configurações</h1>
+    <main className="page">
+      <header className="topbar">
+        <div className="topbar-titles">
+          <div className="eyebrow">Conta e automação</div>
+          <h1 className="title-xl">Ajustes</h1>
+        </div>
       </header>
 
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-        <section style={card}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            Conta do LinkedIn
-          </h2>
+      <section className="card card-pad connection rise" aria-label="Conta do LinkedIn">
+        <div className="row" style={{ gap: 14 }}>
+          <span className="li-mark">
+            <IconLinkedin size={26} />
+          </span>
+          <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
+            <span className="title-md">Conta do LinkedIn</span>
+            {connected ? (
+              <span className="row small" style={{ gap: 8, color: "var(--success-ink)", fontWeight: 700 }}>
+                <span className="pulse" />
+                Conectado{status.name ? ` · ${status.name}` : ""}
+              </span>
+            ) : (
+              <span className="row small" style={{ gap: 8, color: "var(--urgent-ink)", fontWeight: 700 }}>
+                <span className="pulse" />
+                {settings.linkedinNeedsReconnect ? "Sessão expirou" : "Não conectado"}
+              </span>
+            )}
+          </div>
+        </div>
 
-          {status.connected ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent-open)", flexShrink: 0 }} />
-              <span style={{ fontSize: 14.5 }}>Conectado{status.name ? ` — ${status.name}` : ""}</span>
-            </div>
-          ) : (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent-urgent)", flexShrink: 0 }} />
-                <span style={{ fontSize: 14.5, color: "var(--text-muted)" }}>Não conectado</span>
-              </div>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 14px" }}>
-                Conecte a conta pessoal do LinkedIn para o sistema começar a operar.
-              </p>
-              <ConnectButton />
-              <div style={{ marginTop: 10 }}>
-                <RefreshStatusButton />
-              </div>
-            </div>
-          )}
-        </section>
+        {!connected && (
+          <>
+            <p className="small muted">
+              {settings.linkedinNeedsReconnect
+                ? `${settings.linkedinReconnectReason ?? "A sessão do LinkedIn caiu"}. Reconecte para a automação voltar a funcionar.`
+                : "Conecte sua conta pessoal do LinkedIn para o sistema começar a convidar e responder por você."}
+            </p>
+            <ConnectButton />
+            <RefreshStatusButton />
+          </>
+        )}
+      </section>
 
-        <section style={card}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            Limite diário
-          </h2>
-          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 12px" }}>
-            Isso protege a conta do LinkedIn: mandar convite ou mensagem demais por dia é o principal motivo de conta ser restringida. O próprio LinkedIn permite no máximo ~25-30 convites por dia numa conta sem Sales Navigator — não adianta colocar um número maior aqui, ele vai ser recusado de qualquer forma.
-          </p>
-          <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-        </section>
+      <section className="group rise" style={{ "--i": 1 } as React.CSSProperties}>
+        <h2 className="group-title">Limites diários</h2>
+        <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
+      </section>
 
-        <section style={card}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            Agente de IA
-          </h2>
-          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 12px" }}>
-            O que o agente sabe pra responder: produtos, público, objeções, quando parar e chamar você.
-          </p>
-          <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
-        </section>
+      <section className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
+        <h2 className="group-title">Agente de IA</h2>
+        <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
+      </section>
 
-        <form action={logout}>
-          <button
-            type="submit"
-            style={{
-              width: "100%",
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              color: "var(--text-muted)",
-              fontSize: 14,
-              cursor: "pointer",
-            }}
-          >
-            Sair
+      <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
+        <h2 className="group-title">Sessão</h2>
+        <form action={logout} className="card" style={{ overflow: "hidden" }}>
+          <button type="submit" className="setting-row" style={{ width: "100%", border: "none", background: "none", textAlign: "left" }}>
+            <span className="setting-icon" style={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}>
+              <IconLogout size={19} />
+            </span>
+            <span style={{ flex: 1, fontWeight: 700, color: "var(--urgent-ink)" }}>Sair da conta</span>
+            <IconChevronRight size={18} className="chev" />
           </button>
         </form>
-      </div>
-    </>
+      </section>
+
+      <p className="tiny faint" style={{ textAlign: "center" }}>
+        LinkedIn Leads · v0.1
+      </p>
+    </main>
   );
 }

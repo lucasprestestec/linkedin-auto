@@ -1,6 +1,8 @@
 import { ProspectSearch } from "./ProspectSearch";
 import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { prisma } from "@/lib/prisma";
+import { ProgressRing } from "@/components/ProgressRing";
+import { IconShield } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -10,33 +12,33 @@ export default async function ProspectPage() {
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
   ]);
   const usedToday = Math.max(0, settings.dailyInviteLimit - remaining);
+  const left = Math.max(0, remaining);
 
   return (
-    <>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
-          padding: "16px",
-          zIndex: 10,
-        }}
-      >
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: -0.2 }}>Prospecção</h1>
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
-          Busque quem você quiser e mande convite na hora.
+    <main className="page">
+      <header className="topbar">
+        <div className="topbar-titles">
+          <div className="eyebrow">Encontre novos clientes</div>
+          <h1 className="title-xl">Prospecção</h1>
         </div>
       </header>
 
-      <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: 6 }}>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-          Convites hoje: <strong style={{ color: "var(--text)" }}>{usedToday}/{settings.dailyInviteLimit}</strong>
-          {" · "}o LinkedIn restringe a conta acima disso — por isso o limite existe e não dá pra passar dele
-        </p>
-      </div>
+      <section className="card card-pad rise row" style={{ gap: 16 }} aria-label="Convites de hoje">
+        <ProgressRing value={usedToday} max={settings.dailyInviteLimit} caption={`de ${settings.dailyInviteLimit}`} />
+        <div className="stack" style={{ gap: 4, flex: 1, minWidth: 0 }}>
+          <div className="title-md">
+            {left > 0 ? `${left} convite${left !== 1 ? "s" : ""} disponíve${left !== 1 ? "is" : "l"} hoje` : "Limite de hoje atingido"}
+          </div>
+          <p className="small muted">
+            {left > 0 ? "Enviados hoje contam para o limite diário." : "Amanhã o contador zera e você pode convidar de novo."}
+          </p>
+          <span className="row tiny" style={{ gap: 5, color: "var(--success-ink)", fontWeight: 700, marginTop: 4 }}>
+            <IconShield size={14} /> Limite protege sua conta do LinkedIn
+          </span>
+        </div>
+      </section>
 
       <ProspectSearch />
-    </>
+    </main>
   );
 }
