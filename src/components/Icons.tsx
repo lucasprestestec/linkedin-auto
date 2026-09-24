@@ -238,6 +238,13 @@ export const IconInbox = (p: IconProps) => (
   </Svg>
 );
 
+export const IconClock = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Svg>
+);
+
 export const IconX = (p: IconProps) => (
   <Svg {...p}>
     <path d="M18 6 6 18" />

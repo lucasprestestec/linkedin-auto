@@ -72,6 +72,7 @@ export interface EdgesConnectResult {
 
 export interface EdgesConversation {
   linkedin_thread_id: string;
+  linkedin_thread_url?: string;
   linkedin_profile_url: string;
   first_name: string;
   last_name: string;
@@ -84,6 +85,21 @@ export interface EdgesConversation {
     message_id: string;
     first_name: string;
   };
+}
+
+// Uma mensagem do histórico de uma conversa (ação "Extract LinkedIn Messages").
+// linkedin_profile_id é de quem ENVIOU a mensagem — é o que diz se foi o lead.
+export interface EdgesThreadMessage {
+  linkedin_thread_id: string;
+  position: number;
+  delivered_at: string;
+  created_at?: string;
+  first_name: string;
+  last_name: string;
+  linkedin_profile_id: number;
+  content: string;
+  message_id: string;
+  attachments?: object[];
 }
 
 export interface EdgesAsyncRun {
@@ -127,4 +143,44 @@ export async function extractConversations(identityId: string) {
     identity_ids: [identityId],
     parameters: { read: true },
   });
+}
+
+// A conversa é identificada pela URL da thread. A listagem de conversas pode já
+// trazer essa URL; se não trouxer, montamos a URL padrão do LinkedIn pelo ID.
+export function threadUrl(conv: Pick<EdgesConversation, "linkedin_thread_id" | "linkedin_thread_url">): string {
+  return conv.linkedin_thread_url || `https://www.linkedin.com/messaging/thread/${conv.linkedin_thread_id}/`;
+}
+
+// Histórico completo de uma conversa, em ordem. extractConversations só traz a
+// última mensagem de cada conversa — se o lead manda duas seguidas entre uma
+// rodada do cron e outra, a primeira se perderia sem isso.
+export async function extractThreadMessages(identityId: string, linkedinThreadUrl: string) {
+  const data = await callAction<EdgesThreadMessage[]>("linkedin-extract-messages", {
+    identity_ids: [identityId],
+    input: { linkedin_thread_url: linkedinThreadUrl },
+  });
+  if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-messages.");
+  return data;
+}
+
+// Conexões mais recentes da conta (ação "Extract LinkedIn Connections", tipo
+// Engagement). É como detectamos que um convite foi aceito: aceitar convite sem
+// nota não cria conversa no LinkedIn, então extract-conversations não enxerga.
+export interface EdgesConnection {
+  connected_at?: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  job_title?: string;
+  linkedin_profile_handle?: string;
+  linkedin_profile_url?: string;
+  linkedin_profile_id?: number;
+}
+
+export async function extractConnections(identityId: string): Promise<EdgesConnection[]> {
+  const data = await callAction<EdgesConnection[]>("linkedin-extract-connections", {
+    identity_ids: [identityId],
+  });
+  if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-connections.");
+  return data;
 }

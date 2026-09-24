@@ -4,6 +4,7 @@ import { greeting, relativeTime, todayLabel } from "@/lib/format";
 import { IconAlert, IconChevronRight, IconPlus, IconZap } from "@/components/Icons";
 import { AutomationSwitch } from "./AutomationSwitch";
 import { LeadList, type LeadItem } from "./LeadList";
+import { FunnelCard, type FunnelStep } from "./FunnelCard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,21 @@ async function getData() {
     where: { sender: { not: "LEAD" }, createdAt: { gte: startOfDay } },
   });
 
-  return { settings, leads, sentToday };
+  // Funil: contatado = recebeu alguma mensagem nossa; respondeu = mandou
+  // alguma mensagem. Taxa de resposta = responderam / contatados.
+  const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] } } };
+  const inbound = { some: { sender: "LEAD" as const } };
+  const [contacted, repliedAfterContact, replied] = await Promise.all([
+    prisma.lead.count({ where: { messages: outbound } }),
+    prisma.lead.count({ where: { AND: [{ messages: outbound }, { messages: inbound }] } }),
+    prisma.lead.count({ where: { messages: inbound } }),
+  ]);
+
+  return { settings, leads, sentToday, funnel: { contacted, repliedAfterContact, replied } };
 }
 
 export default async function HomePage() {
-  const { settings, leads, sentToday } = await getData();
+  const { settings, leads, sentToday, funnel } = await getData();
 
   const items: LeadItem[] = leads
     .map((lead) => {
@@ -39,6 +50,7 @@ export default async function HomePage() {
           jobTitle: lead.jobTitle,
           status: lead.status,
           needsHumanReason: lead.needsHumanReason,
+          followUpsSent: lead.followUpsSent,
           lastMessage: last ? { content: last.content, sender: last.sender } : null,
           when: relativeTime(when),
         },
@@ -50,7 +62,16 @@ export default async function HomePage() {
 
   const needYou = leads.filter((l) => l.status === "NEEDS_HUMAN").length;
   const talking = leads.filter((l) => l.status === "CONVERSATION_OPEN").length;
+  const waiting = leads.filter((l) => l.status === "WAITING_REPLY").length;
   const qualified = leads.filter((l) => l.status === "QUALIFIED").length;
+  const connected = leads.filter((l) => l.status !== "INVITE_SENT").length;
+  const funnelSteps: FunnelStep[] = [
+    { label: "Leads", value: leads.length },
+    { label: "Conectados", value: connected },
+    { label: "Contatados", value: funnel.contacted },
+    { label: "Responderam", value: funnel.replied },
+    { label: "Qualificados", value: qualified },
+  ];
   const usage = Math.min(100, Math.round((sentToday / Math.max(1, settings.dailyMessageLimit)) * 100));
 
   return (
@@ -115,9 +136,9 @@ export default async function HomePage() {
               <span>Conversando</span>
             </div>
             <div className="hero-stat">
-              <i className="dot" style={{ background: "#4ee0a2" }} />
-              <b>{qualified}</b>
-              <span>Qualificados</span>
+              <i className="dot" style={{ background: "#b7adff" }} />
+              <b>{waiting}</b>
+              <span>Aguardando</span>
             </div>
           </div>
 
@@ -126,7 +147,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <LeadList leads={items} />
+      {leads.length > 0 && (
+        <FunnelCard steps={funnelSteps} contacted={funnel.contacted} replied={funnel.repliedAfterContact} />
+      )}
+
+      <LeadList leads={items} followUpMax={settings.followUpMaxCount} />
     </main>
   );
 }

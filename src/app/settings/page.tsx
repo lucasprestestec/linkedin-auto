@@ -5,6 +5,7 @@ import { ConnectButton } from "./ConnectButton";
 import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
+import { FollowUpForm } from "./FollowUpForm";
 import { IconChevronRight, IconLinkedin, IconLogout } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
@@ -73,11 +74,16 @@ export default async function SettingsPage() {
       </section>
 
       <section className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
+        <h2 className="group-title">Follow-up automático</h2>
+        <FollowUpForm followUpMaxCount={settings.followUpMaxCount} followUpDelayHours={settings.followUpDelayHours} />
+      </section>
+
+      <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
         <h2 className="group-title">Agente de IA</h2>
         <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
       </section>
 
-      <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
+      <section className="group rise" style={{ "--i": 4 } as React.CSSProperties}>
         <h2 className="group-title">Sessão</h2>
         <form action={logout} className="card" style={{ overflow: "hidden" }}>
           <button type="submit" className="setting-row" style={{ width: "100%", border: "none", background: "none", textAlign: "left" }}>

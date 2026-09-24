@@ -844,6 +844,11 @@ p {
   color: var(--success-ink);
 }
 
+.badge-waiting {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
 .badge-invite {
   background: var(--warning-soft);
   color: var(--warning-ink);
@@ -886,6 +891,9 @@ p {
 }
 .status-qualified {
   background: var(--success);
+}
+.status-waiting {
+  background: var(--brand);
 }
 .status-invite {
   background: var(--warning);
@@ -1862,4 +1870,73 @@ p {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ==========================================================================
+   Funil (tela inicial)
+   ========================================================================== */
+
+.funnel-rate {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.funnel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.funnel-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.funnel-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.funnel-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.funnel-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.funnel-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand);
+  transition: width 0.8s var(--ease);
 }
