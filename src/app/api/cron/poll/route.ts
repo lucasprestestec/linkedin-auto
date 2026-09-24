@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { extractConversations } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
 import { handleIncomingMessage } from "@/lib/respond";
+import { isValidBearer } from "@/lib/auth";
+import { syncLeadFromConversation } from "@/lib/leads";
 
 // Agendador externo (cron-job.org) chama este endpoint periodicamente, a cada poucos minutos.
 // Sincroniza as conversas e, para cada mensagem nova do lead, aciona o
 // agente de IA (que decide responder ou pedir handoff humano).
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidBearer(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -17,33 +18,20 @@ export async function GET(request: Request) {
   const conversations = await extractConversations(identityId);
   let updatedLeads = 0;
   let newIncomingMessages = 0;
+  let failed = 0;
 
+  // Uma conversa com problema não pode derrubar a sincronização das outras.
   for (const conv of conversations) {
-    const lead = await prisma.lead.upsert({
-      where: { linkedinThreadId: conv.linkedin_thread_id },
-      update: {
-        firstName: conv.first_name,
-        lastName: conv.last_name,
-        jobTitle: conv.job_title,
-      },
-      create: {
-        linkedinProfileUrl: conv.linkedin_profile_url,
-        linkedinThreadId: conv.linkedin_thread_id,
-        firstName: conv.first_name,
-        lastName: conv.last_name,
-        jobTitle: conv.job_title,
-        status: "CONVERSATION_OPEN",
-      },
-    });
-    updatedLeads++;
+    try {
+      const lead = await syncLeadFromConversation(conv);
+      updatedLeads++;
 
-    const existingMessage = await prisma.message.findUnique({
-      where: { linkedinMessageId: conv.last_message.message_id },
-    });
+      const existingMessage = await prisma.message.findUnique({
+        where: { linkedinMessageId: conv.last_message.message_id },
+      });
+      if (existingMessage) continue;
 
-    if (!existingMessage) {
       const isFromLead = conv.last_message.first_name === conv.first_name;
-
       await prisma.message.create({
         data: {
           leadId: lead.id,
@@ -58,8 +46,11 @@ export async function GET(request: Request) {
         newIncomingMessages++;
         await handleIncomingMessage(lead, identityId);
       }
+    } catch (err) {
+      failed++;
+      console.error("Falha ao sincronizar conversa", conv.linkedin_thread_id, err);
     }
   }
 
-  return NextResponse.json({ updatedLeads, newIncomingMessages });
+  return NextResponse.json({ updatedLeads, newIncomingMessages, failed });
 }

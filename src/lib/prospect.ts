@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { scheduleConnectionInvites } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
-import { normalizeLinkedinUrl } from "@/lib/linkedin";
+import { linkedinProfileSlug, normalizeLinkedinUrl } from "@/lib/linkedin";
 
 // Descoberta fria fica fora da edges.run: buscar perfil novo custa crédito lá
 // (e o piso pago, US$110/mês, não fecha conta pro volume de um corretor só).
@@ -22,10 +22,12 @@ export async function parsePastedProfiles(raw: string): Promise<ProspectResult[]
     if (normalized) urls.add(normalized);
   }
 
+  // Compara pelo perfil, não pela string: leads antigos podem estar gravados
+  // com a URL escrita de outro jeito.
   const existing = await prisma.lead.findMany({ select: { linkedinProfileUrl: true } });
-  const known = new Set(existing.map((l) => l.linkedinProfileUrl));
+  const known = new Set(existing.map((l) => linkedinProfileSlug(l.linkedinProfileUrl)));
 
-  return Array.from(urls).map((url) => ({ linkedinProfileUrl: url, alreadyLead: known.has(url) }));
+  return Array.from(urls).map((url) => ({ linkedinProfileUrl: url, alreadyLead: known.has(linkedinProfileSlug(url)) }));
 }
 
 export async function remainingDailyInviteQuota(): Promise<number> {

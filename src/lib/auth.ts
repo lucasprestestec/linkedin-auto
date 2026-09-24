@@ -29,3 +29,18 @@ export function checkPassword(password: string): boolean {
 }
 
 export { COOKIE_NAME };
+
+// Compara um segredo recebido com o esperado em tempo constante. Sem segredo
+// configurado, recusa sempre: antes, com CRON_SECRET ausente, o header
+// "Bearer undefined" passava.
+export function secretMatches(received: string | null | undefined, expected: string | undefined): boolean {
+  if (!expected || !received) return false;
+  const a = Buffer.from(received);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export function isValidBearer(header: string | null, secret: string | undefined): boolean {
+  if (!header?.startsWith("Bearer ")) return false;
+  return secretMatches(header.slice("Bearer ".length), secret);
+}

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { secretMatches } from "@/lib/auth";
+import { findLeadByProfileUrl } from "@/lib/leads";
+import { normalizeLinkedinUrl } from "@/lib/linkedin";
 
 // Recebe dois tipos de evento da edges.run, configurados no dashboard dela
 // (Developer Settings > Webhooks), ambos POST na mesma URL:
@@ -13,9 +17,10 @@ import { prisma } from "@/lib/prisma";
 // A edges.run permite configurar até 10 headers customizados enviados em toda
 // chamada de webhook; EDGES_WEBHOOK_SECRET precisa estar configurado lá como um
 // desses headers (ex.: X-Webhook-Secret) para essa rota aceitar a chamada.
+// Sem o segredo configurado a rota recusa tudo: ela fica fora do login do
+// painel (a edges.run não tem sessão), então o segredo é a única proteção.
 export async function POST(request: Request) {
-  const secret = process.env.EDGES_WEBHOOK_SECRET;
-  if (secret && request.headers.get("x-webhook-secret") !== secret) {
+  if (!secretMatches(request.headers.get("x-webhook-secret"), process.env.EDGES_WEBHOOK_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -75,16 +80,24 @@ async function handleConnectCallback(payload: {
     return;
   }
 
+  // O lead pode já existir com a URL escrita de outro jeito (ex.: criado pelo
+  // cron a partir de uma conversa) — procura pelo perfil, não pela string exata.
+  if (await findLeadByProfileUrl(profileUrl)) return;
+
   const [firstName, ...rest] = (payload.custom_data?.full_name ?? "").split(" ");
-  await prisma.lead.upsert({
-    where: { linkedinProfileUrl: profileUrl },
-    update: {},
-    create: {
-      linkedinProfileUrl: profileUrl,
-      firstName: firstName || null,
-      lastName: rest.join(" ") || null,
-      jobTitle: payload.custom_data?.job_title ?? null,
-      status: "INVITE_SENT",
-    },
-  });
+  try {
+    await prisma.lead.create({
+      data: {
+        linkedinProfileUrl: normalizeLinkedinUrl(profileUrl) ?? profileUrl,
+        firstName: firstName || null,
+        lastName: rest.join(" ") || null,
+        jobTitle: payload.custom_data?.job_title ?? null,
+        status: "INVITE_SENT",
+      },
+    });
+  } catch (err) {
+    // Callback repetido chegando ao mesmo tempo: o outro já criou o lead.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
+    throw err;
+  }
 }
