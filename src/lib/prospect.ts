@@ -46,7 +46,7 @@ export async function remainingDailyInviteQuota(): Promise<number> {
 // conta própria. Corta a lista no limite diário restante; quem sobra fica de
 // fora silenciosamente (o chamador informa ao usuário quantos ficaram de fora).
 export async function inviteProspects(
-  candidates: { linkedinProfileUrl: string }[],
+  candidates: { linkedinProfileUrl: string; fullName?: string; jobTitle?: string }[],
 ): Promise<{ scheduled: number; skippedForLimit: number }> {
   const remaining = await remainingDailyInviteQuota();
   if (remaining <= 0) {
@@ -65,7 +65,8 @@ export async function inviteProspects(
   const identityId = await getActiveIdentityId();
   await scheduleConnectionInvites(
     identityId,
-    toInvite.map((c) => ({ linkedin_profile_url: c.linkedinProfileUrl })),
+    // Nome e cargo voltam no callback (custom_data) e viram o lead já identificado.
+    toInvite.map((c) => ({ linkedin_profile_url: c.linkedinProfileUrl, full_name: c.fullName, job_title: c.jobTitle })),
     `${appUrl}/api/webhooks/edges`,
   );
 
