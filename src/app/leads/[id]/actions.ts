@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
+import { summarizeConversation, suggestReply } from "@/lib/agent";
+import { instructionsFor } from "@/lib/campaigns";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -62,4 +64,58 @@ export async function updateLeadCampaign(leadId: string, campaignId: string | nu
   await prisma.lead.update({ where: { id: leadId }, data: { campaignId } });
   revalidatePath(`/leads/${leadId}`);
   return { saved: true };
+}
+
+// ---------------------------------------------------------------------------
+// Ações do corretor sobre o lead (menu "Mais ações" e card de handoff).
+// ---------------------------------------------------------------------------
+
+export type LeadActionKind = "qualify" | "takeover" | "handback" | "lost";
+
+export async function leadAction(leadId: string, kind: LeadActionKind) {
+  const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
+  if (kind === "qualify") {
+    await prisma.lead.update({ where: { id: leadId }, data: { status: "QUALIFIED", needsHumanReason: null } });
+  } else if (kind === "takeover") {
+    // Assumir = a IA para de responder esta conversa até você devolver.
+    await prisma.lead.update({ where: { id: leadId }, data: { status: "NEEDS_HUMAN", needsHumanReason: "Você assumiu a conversa" } });
+  } else if (kind === "handback") {
+    const replied = await prisma.message.count({ where: { leadId, sender: "LEAD" } });
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: { status: replied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null, followUpsSent: 0 },
+    });
+  } else if (kind === "lost") {
+    await prisma.lead.update({ where: { id: leadId }, data: { status: "LOST", needsHumanReason: null } });
+  }
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { ok: true, previous: lead.status };
+}
+
+async function leadWithHistory(leadId: string) {
+  return prisma.lead.findUniqueOrThrow({
+    where: { id: leadId },
+    include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true } } },
+  });
+}
+
+export async function summarizeLead(leadId: string): Promise<{ text?: string; error?: string }> {
+  try {
+    const lead = await leadWithHistory(leadId);
+    if (lead.messages.length === 0) return { error: "Ainda não há mensagens pra resumir." };
+    return { text: await summarizeConversation(lead, lead.messages) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível gerar o resumo." };
+  }
+}
+
+export async function suggestLeadReply(leadId: string): Promise<{ text?: string; error?: string }> {
+  try {
+    const lead = await leadWithHistory(leadId);
+    const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+    return { text: await suggestReply(await instructionsFor(lead, settings), lead, lead.messages) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
+  }
 }

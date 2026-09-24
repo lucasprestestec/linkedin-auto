@@ -14,8 +14,11 @@ function date(d: Date | null | undefined): string {
   return d ? d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "";
 }
 
-export async function GET() {
+// ?ids=a,b,c exporta só os leads selecionados na tabela.
+export async function GET(request: Request) {
+  const ids = new URL(request.url).searchParams.get("ids")?.split(",").filter(Boolean);
   const leads = await prisma.lead.findMany({
+    where: ids?.length ? { id: { in: ids } } : undefined,
     orderBy: { createdAt: "desc" },
     include: { campaign: { select: { name: true } }, messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
   });

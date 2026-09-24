@@ -83,6 +83,8 @@ model Message {
 model Settings {
   id                  String  @id @default("singleton")
   automationPaused    Boolean @default(true)
+  // Como o corretor quer ser chamado no painel ("Boa noite, Lucas.").
+  ownerName           String?
   dailyInviteLimit    Int     @default(18)
   dailyMessageLimit   Int     @default(25)
   linkedinIdentityId  String?

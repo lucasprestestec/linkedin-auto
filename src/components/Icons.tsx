@@ -357,13 +357,157 @@ export const IconLinkedin = ({ size = 20, ...props }: IconProps) => (
 );
 
 // Marca do app: bolha de conversa com faísca — "conversas no automático".
+// Marca: uma pílula alta e um círculo sobreposto (como nos mockups).
+// Marca: uma pílula alta e um círculo sobreposto (como nos mockups). Cores
+// sólidas: gradiente com id repetido some quando o primeiro SVG está oculto.
 export const LogoMark = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-    <path
-      d="M16 4C9.37 4 4 8.93 4 15c0 2.6.98 4.98 2.62 6.86L5.5 27l5.3-2.3c1.58.58 3.33.9 5.2.9 6.63 0 12-4.93 12-11S22.63 4 16 4Z"
-      fill="currentColor"
-      fillOpacity="0.95"
-    />
-    <path d="M16.6 9.5 13 16h3.4l-1 5.5L19 15h-3.4l1-5.5Z" fill="#6a5cff" />
+    <rect x="4" y="2" width="12" height="26" rx="6" fill="#6a4ff7" />
+    <circle cx="20.5" cy="20.5" r="8" fill="#a996ff" fillOpacity="0.95" />
+    <circle cx="10" cy="8" r="3" fill="#ffffff" />
   </svg>
+);
+
+export const IconHome = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z" />
+  </Svg>
+);
+
+export const IconHomeFilled = (p: IconProps) => (
+  <Svg {...p} fill="currentColor">
+    <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z" />
+  </Svg>
+);
+
+export const IconBars = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 20v-6M12 20V4M18 20v-10" />
+  </Svg>
+);
+
+export const IconDots = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="5" cy="12" r="1.3" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.3" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.3" fill="currentColor" />
+  </Svg>
+);
+
+export const IconDotsVertical = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="5" r="1.3" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.3" fill="currentColor" />
+    <circle cx="12" cy="19" r="1.3" fill="currentColor" />
+  </Svg>
+);
+
+export const IconMegaphone = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+    <path d="M15 8.5a4.5 4.5 0 0 1 0 7M18 5.5a8.5 8.5 0 0 1 0 13" />
+  </Svg>
+);
+
+export const IconSettings = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+
+export const IconPaperclip = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+  </Svg>
+);
+
+export const IconArrowRight = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </Svg>
+);
+
+export const IconArrowUpRight = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 17 17 7M8 7h9v9" />
+  </Svg>
+);
+
+export const IconArrowDownRight = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 7l10 10M17 8v9H8" />
+  </Svg>
+);
+
+export const IconChevronDown = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+);
+
+export const IconChevronLeft = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m15 18-6-6 6-6" />
+  </Svg>
+);
+
+export const IconFileText = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+    <path d="M14 2v6h6M8 13h8M8 17h6" />
+  </Svg>
+);
+
+export const IconUsers = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+  </Svg>
+);
+
+export const IconRocket = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z" />
+    <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z" />
+    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+  </Svg>
+);
+
+export const IconChartUp = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 3v18h18" />
+    <path d="m7 15 4-4 3 3 6-6" />
+  </Svg>
+);
+
+export const IconMessages = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2Z" />
+    <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
+  </Svg>
+);
+
+export const IconUserSearch = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="10" cy="7" r="4" />
+    <path d="M10.3 15H7a4 4 0 0 0-4 4v2" />
+    <circle cx="17" cy="17" r="3" />
+    <path d="m21 21-1.9-1.9" />
+  </Svg>
+);
+
+export const IconNote = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z" />
+    <path d="M15 3v4a1 1 0 0 0 1 1h5M7 13h10M7 17h6" />
+  </Svg>
+);
+
+export const IconCalendar = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  </Svg>
 );

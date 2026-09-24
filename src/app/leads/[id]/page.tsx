@@ -1,14 +1,62 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { LeadStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { clockTime, dayLabel, relativeTime, sameDay, shortDate } from "@/lib/format";
+import { clockTime, dayLabel, relativeTime, sameDay, shortDate, splitHeadline } from "@/lib/format";
 import { STATUS_LABEL, STATUS_TONE } from "@/lib/status";
+import { EMPTY_SEARCH, buildLinkedinSearchUrl } from "@/lib/linkedin";
 import { Avatar } from "@/components/Avatar";
-import { IconArrowLeft, IconCheckCheck, IconChevronRight, IconHand, IconLinkedin, IconSparkles, IconUser } from "@/components/Icons";
+import { CompanyMark } from "@/components/CompanyMark";
+import {
+  IconArrowLeft,
+  IconArrowUpRight,
+  IconBuilding,
+  IconCheckCheck,
+  IconDots,
+  IconFlame,
+  IconLinkedin,
+  IconSearch,
+  IconSparkles,
+  IconUser,
+} from "@/components/Icons";
 import { ReplyForm } from "./ReplyForm";
-import { LeadCrm } from "./LeadCrm";
+import { LeadTabs } from "./LeadTabs";
+import { LeadTags } from "./LeadTags";
+import { LeadCampaign } from "./LeadCampaign";
+import { LeadNotes } from "./LeadNotes";
+import { LeadActions } from "./LeadActions";
+import { HandoffCard } from "./HandoffCard";
 
 export const dynamic = "force-dynamic";
+
+// Etapas mostradas no "Status do lead". NEEDS_HUMAN é uma conversa em andamento;
+// LOST aparece à parte.
+const STAGES: { label: string; statuses: LeadStatus[] }[] = [
+  { label: "Convite", statuses: ["INVITE_SENT"] },
+  { label: "Conectado", statuses: ["WAITING_REPLY"] },
+  { label: "Em conversa", statuses: ["CONVERSATION_OPEN", "NEEDS_HUMAN"] },
+  { label: "Qualificado", statuses: ["QUALIFIED"] },
+];
+
+function StatusStepper({ status }: { status: LeadStatus }) {
+  const current = STAGES.findIndex((s) => s.statuses.includes(status));
+  return (
+    <section className="side-card">
+      <div className="side-card-head">
+        <h3>Status do lead</h3>
+        {status === "LOST" && <span className="status-pill pill-lost" style={{ height: 28 }}>Sem resposta</span>}
+      </div>
+      <ol className="lead-stepper" aria-label="Etapas do lead">
+        {STAGES.map((s, i) => (
+          <li key={s.label} className={i < current ? "done" : i === current ? "current" : undefined} aria-current={i === current ? "step" : undefined}>
+            <span className="stepper-dot" />
+            <span className="stepper-label">{s.label}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +66,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true } } },
     }),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
-    prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
     prisma.lead.findMany({ where: { tags: { isEmpty: false } }, select: { tags: true } }),
   ]);
 
@@ -26,128 +74,98 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   const tone = STATUS_TONE[lead.status];
   const fullName = `${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim() || "Lead";
+  const firstName = lead.firstName ?? "o lead";
+  const { role, company } = splitHeadline(lead.jobTitle);
   const knownTags = [...new Set(tagRows.flatMap((r) => r.tags))].sort();
-  const crm = (
-    <LeadCrm
-      leadId={lead.id}
-      notes={lead.notes ?? ""}
-      tags={lead.tags}
-      knownTags={knownTags}
-      campaignId={lead.campaignId}
-      campaigns={campaigns}
-    />
-  );
-  const facts = (
-    <dl className="facts">
-      <div>
-        <dt>Status</dt>
-        <dd>
-          <span className={`badge badge-${tone}`}>{STATUS_LABEL[lead.status]}</span>
-        </dd>
-      </div>
-      {lead.icpScore != null && (
-        <div>
-          <dt>Encaixe com o cliente ideal</dt>
-          <dd>{lead.icpScore}%</dd>
-        </div>
+  const author = settings.ownerName?.trim() || "você";
+  const highIntent = lead.icpScore != null && lead.icpScore >= 70;
+
+  // ---- Atividades: linha do tempo montada com o que já está no banco ----
+  const firstOut = lead.messages.find((m) => m.sender !== "LEAD");
+  const firstIn = lead.messages.find((m) => m.sender === "LEAD");
+  const lastMsg = lead.messages.at(-1);
+  const events = [
+    { when: lead.createdAt, text: "Entrou na sua lista de leads" },
+    lead.invitedAt && { when: lead.invitedAt, text: "Convite de conexão enviado" },
+    firstOut && { when: firstOut.deliveredAt, text: firstOut.sender === "AGENT" ? "A IA abriu a conversa" : "Você abriu a conversa" },
+    firstIn && { when: firstIn.deliveredAt, text: `${firstName} respondeu pela primeira vez` },
+    lead.followUpsSent > 0 && lastMsg && { when: lastMsg.deliveredAt, text: `${lead.followUpsSent} follow-up${lead.followUpsSent > 1 ? "s" : ""} sem resposta` },
+    lead.status === "NEEDS_HUMAN" && { when: lead.updatedAt, text: `A IA passou pra você: ${lead.needsHumanReason ?? "precisa de resposta"}` },
+    lead.status === "QUALIFIED" && { when: lead.updatedAt, text: "Marcado como qualificado" },
+    lead.archivedAt && { when: lead.archivedAt, text: "Conversa arquivada no LinkedIn" },
+  ]
+    .filter((e): e is { when: Date; text: string } => Boolean(e))
+    .sort((a, b) => b.when.getTime() - a.when.getTime());
+
+  const profileBadges = (
+    <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+      <span className={`soft-badge pill-${tone}`}>
+        <i className="dot" /> {lead.status === "QUALIFIED" ? "Lead qualificado" : STATUS_LABEL[lead.status]}
+      </span>
+      {highIntent ? (
+        <span className="soft-badge pill-urgent">
+          <IconFlame size={14} /> Alta intenção · {lead.icpScore}%
+        </span>
+      ) : (
+        lead.icpScore != null && <span className="soft-badge pill-lost">{lead.icpScore}% de encaixe</span>
       )}
-      <div>
-        <dt>Campanha</dt>
-        <dd>{lead.campaign?.name ?? "Instruções gerais"}</dd>
-      </div>
-      <div>
-        <dt>Lead desde</dt>
-        <dd>{shortDate(lead.createdAt)}</dd>
-      </div>
-      <div>
-        <dt>Mensagens</dt>
-        <dd>{lead.messages.length}</dd>
-      </div>
-    </dl>
+    </div>
   );
 
-  return (
-    <div className="chat-layout">
-    <div className="chat-page">
-      <header className="chat-header">
-        <Link href="/" className="icon-btn icon-btn-round" aria-label="Voltar" style={{ border: "none", background: "transparent", boxShadow: "none" }}>
-          <IconArrowLeft size={24} />
-        </Link>
-        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={40} status={tone} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="lead-name" style={{ fontSize: 16 }}>
-            {fullName}
-          </div>
-          <div className="tiny faint" style={{ fontWeight: 600 }}>
-            {STATUS_LABEL[lead.status]}
-          </div>
-        </div>
-        <a
-          href={lead.linkedinProfileUrl}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Ver perfil no LinkedIn"
-          className="icon-btn icon-btn-round"
-          style={{ color: "#0a66c2" }}
-        >
-          <IconLinkedin size={18} />
-        </a>
-      </header>
+  const companyRow = company && (
+    <div className="company-row">
+      <span className="company-row-icon">
+        <IconBuilding size={22} />
+      </span>
+      <span className="stack" style={{ minWidth: 0 }}>
+        <b className="truncate">{company}</b>
+        <span className="tiny faint truncate">{role}</span>
+      </span>
+    </div>
+  );
 
-      <div className="chat-intro only-mobile rise">
-        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={76} />
-        <h1 className="title-lg" style={{ marginTop: 8 }}>
-          {fullName}
-        </h1>
-        {lead.jobTitle && (
-          <p className="small muted" style={{ maxWidth: 300 }}>
-            {lead.jobTitle}
-          </p>
-        )}
-        <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
-          <span className={`badge badge-${tone}`}>{STATUS_LABEL[lead.status]}</span>
-          {lead.followUpsSent > 0 && (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN") && (
-            <span className="badge badge-waiting badge-plain">
-              Follow-up {lead.followUpsSent}/{settings.followUpMaxCount}
-            </span>
-          )}
-          <span className="badge badge-plain">Lead desde {shortDate(lead.createdAt)}</span>
-          {lead.tags.map((t) => (
-            <span key={t} className="badge badge-waiting badge-plain">
-              {t}
-            </span>
-          ))}
-        </div>
-      </div>
+  const sideCards = (
+    <>
+      <StatusStepper status={lead.status} />
+      <LeadTags leadId={lead.id} tags={lead.tags} knownTags={knownTags} />
+      <LeadCampaign
+        leadId={lead.id}
+        campaignId={lead.campaignId}
+        campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, since: shortDate(c.createdAt) }))}
+      />
+    </>
+  );
 
-      {/* No celular o CRM fica aqui, recolhido; no computador, no painel lateral. */}
-      <details className="card notice only-mobile" style={{ marginBottom: 8 }}>
-        <summary className="notice-summary">
-          <span style={{ flex: 1, fontWeight: 700 }}>Anotações, etiquetas e campanha</span>
-          {lead.notes && <span className="badge badge-plain">com anotação</span>}
-          <IconChevronRight size={18} className="chev notice-chev" />
-        </summary>
-        <div style={{ padding: "4px 18px 18px" }}>{crm}</div>
-      </details>
+  const conversation = (
+    <div className="thread">
+      {lead.messages.length === 0 && (
+        <p className="small faint" style={{ textAlign: "center", padding: "24px 0" }}>
+          {lead.status === "INVITE_SENT"
+            ? "Nenhuma mensagem ainda. Assim que o convite for aceito, a IA abre a conversa."
+            : "Conexão aceita. A IA vai mandar a mensagem de abertura na próxima rodada."}
+        </p>
+      )}
 
-      <div className="thread">
-        {lead.messages.length === 0 && (
-          <p className="small faint" style={{ textAlign: "center", padding: "24px 0" }}>
-            {lead.status === "INVITE_SENT"
-              ? "Nenhuma mensagem ainda. Assim que o convite for aceito, a IA abre a conversa."
-              : "Conexão aceita. A IA vai mandar a mensagem de abertura na próxima rodada."}
-          </p>
-        )}
-
-        {lead.messages.map((message, i) => {
-          const prev = lead.messages[i - 1];
-          const showDay = !prev || !sameDay(prev.deliveredAt, message.deliveredAt);
-          const fromLead = message.sender === "LEAD";
-          const kind = fromLead ? "msg-in" : message.sender === "AGENT" ? "msg-out msg-agent" : "msg-out msg-human";
-          return (
-            <div key={message.id} style={{ display: "contents" }}>
-              {showDay && <div className="day-sep">{dayLabel(message.deliveredAt)}</div>}
-              <div className={`msg ${kind}`}>
+      {lead.messages.map((message, i) => {
+        const prev = lead.messages[i - 1];
+        const showDay = !prev || !sameDay(prev.deliveredAt, message.deliveredAt);
+        const fromLead = message.sender === "LEAD";
+        const kind = fromLead ? "msg-in" : message.sender === "AGENT" ? "msg-out msg-agent" : "msg-out msg-human";
+        return (
+          <div key={message.id} style={{ display: "contents" }}>
+            {showDay && (
+              <div className="day-sep">
+                {dayLabel(message.deliveredAt)}
+                {dayLabel(message.deliveredAt) === "Hoje" ? `, ${shortDate(message.deliveredAt)}` : ""}
+              </div>
+            )}
+            <div className={`msg ${kind}`}>
+              {fromLead && (
+                <span className="msg-avatar">
+                  <Avatar firstName={lead.firstName} lastName={lead.lastName} size={44} />
+                </span>
+              )}
+              <div className="msg-body">
                 <div className="bubble">{message.content}</div>
                 <div className="msg-meta">
                   {message.sender === "AGENT" && (
@@ -161,49 +179,196 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                     </>
                   )}
                   {clockTime(message.deliveredAt)}
-                  {!fromLead && <IconCheckCheck size={13} style={{ color: "var(--brand)" }} />}
+                  {!fromLead && <IconCheckCheck size={15} style={{ color: "var(--brand)" }} />}
                 </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        );
+      })}
 
-        {lead.status === "NEEDS_HUMAN" && (
-          <div className="handoff rise">
-            <span className="alert-icon">
-              <IconHand size={20} />
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="row" style={{ gap: 8, justifyContent: "space-between" }}>
-                <strong style={{ fontSize: 14 }}>A IA passou a conversa pra você</strong>
-                <span className="tiny faint" style={{ flexShrink: 0 }}>
-                  {relativeTime(lead.updatedAt)}
-                </span>
-              </div>
-              <p className="small" style={{ color: "var(--urgent-ink)", fontWeight: 600, marginTop: 3 }}>
-                {lead.needsHumanReason ?? "Precisa de resposta"}
-              </p>
+      {lead.status === "NEEDS_HUMAN" && (
+        <HandoffCard leadId={lead.id} firstName={firstName} reason={lead.needsHumanReason ?? "A conversa precisa de você"} when={relativeTime(lead.updatedAt)} />
+      )}
+      <div id="thread-end" />
+    </div>
+  );
+
+  const facts = (
+    <dl className="facts">
+      <div>
+        <dt>Cargo</dt>
+        <dd>{lead.jobTitle ?? "—"}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd>
+          <span className={`status-pill pill-${tone}`} style={{ height: 28 }}>
+            {STATUS_LABEL[lead.status]}
+          </span>
+        </dd>
+      </div>
+      {lead.icpScore != null && (
+        <div>
+          <dt>Encaixe com o cliente ideal</dt>
+          <dd>{lead.icpScore}%</dd>
+        </div>
+      )}
+      <div>
+        <dt>Campanha</dt>
+        <dd>{lead.campaign?.name ?? "Instruções gerais"}</dd>
+      </div>
+      {lead.followUpsSent > 0 && (
+        <div>
+          <dt>Follow-ups</dt>
+          <dd>
+            {lead.followUpsSent}/{settings.followUpMaxCount}
+          </dd>
+        </div>
+      )}
+      <div>
+        <dt>Lead desde</dt>
+        <dd>{shortDate(lead.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>Mensagens</dt>
+        <dd>{lead.messages.length}</dd>
+      </div>
+    </dl>
+  );
+
+  const profileTab = (
+    <div className="stack tab-pad" style={{ gap: 14 }}>
+      <div className="only-mobile stack" style={{ gap: 14 }}>
+        {profileBadges}
+        {companyRow}
+        <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
+        {sideCards}
+      </div>
+      <section className="side-card">
+        <div className="side-card-head">
+          <h3>Sobre {firstName}</h3>
+        </div>
+        {facts}
+        <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }}>
+          <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Ver perfil completo no LinkedIn
+        </a>
+      </section>
+    </div>
+  );
+
+  const companyTab = (
+    <div className="stack tab-pad" style={{ gap: 14 }}>
+      {company ? (
+        <section className="side-card">
+          <div className="row" style={{ gap: 14 }}>
+            <CompanyMark name={company} size={56} />
+            <div className="stack" style={{ minWidth: 0 }}>
+              <h3 style={{ fontSize: 20 }}>{company}</h3>
+              <span className="small faint">Tirado do cargo no LinkedIn: {lead.jobTitle}</span>
             </div>
           </div>
-        )}
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            <a
+              href={buildLinkedinSearchUrl({ ...EMPTY_SEARCH, companies: [company] })}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-primary btn-sm"
+            >
+              <IconSearch size={15} /> Outras pessoas da {company}
+            </a>
+            <a
+              href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(company)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-secondary btn-sm"
+            >
+              <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Página da empresa
+            </a>
+          </div>
+        </section>
+      ) : (
+        <p className="small faint" style={{ padding: 8 }}>
+          O cargo de {firstName} no LinkedIn não diz a empresa.
+        </p>
+      )}
+    </div>
+  );
+
+  const activityTab = (
+    <div className="tab-pad">
+      <ol className="timeline">
+        {events.map((e, i) => (
+          <li key={i}>
+            <span className="timeline-dot" />
+            <div className="stack" style={{ gap: 2 }}>
+              <span className="small" style={{ fontWeight: 600 }}>
+                {e.text}
+              </span>
+              <span className="tiny faint">
+                {shortDate(e.when)} · {clockTime(e.when)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+
+  return (
+    <div className="lead-layout">
+      <div className="chat-card">
+        <header className="chat-head">
+          <Link href="/" className="chat-back" aria-label="Voltar">
+            <IconArrowLeft size={22} />
+          </Link>
+          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={64} status={tone} />
+          <div className="chat-head-main">
+            <h1 className="chat-name">
+              <span className="display-desktop">{fullName}</span>
+              <IconLinkedin size={20} className="only-desktop li-badge" />
+            </h1>
+            {lead.jobTitle && <p className="chat-role">{company ? `${role} na ${company}` : lead.jobTitle}</p>}
+          </div>
+          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm only-desktop li-link">
+            Ver no LinkedIn <IconArrowUpRight size={16} />
+          </a>
+          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn">
+            <IconDots size={22} />
+          </a>
+        </header>
+
+        <LeadTabs
+          chat={conversation}
+          profile={profileTab}
+          company={companyTab}
+          notes={
+            <div className="tab-pad">
+              <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} variant="tab" />
+            </div>
+          }
+          activity={activityTab}
+          composer={<ReplyForm key="composer" leadId={lead.id} firstName={firstName} profileUrl={lead.linkedinProfileUrl} />}
+        />
       </div>
 
-      <ReplyForm leadId={lead.id} />
-    </div>
-
-      <aside className="lead-aside" aria-label="Detalhes do lead">
-        <div className="card card-pad stack" style={{ alignItems: "center", textAlign: "center", gap: 6 }}>
-          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={64} />
-          <h2 className="title-md" style={{ marginTop: 6 }}>
-            {fullName}
-          </h2>
-          {lead.jobTitle && <p className="small muted">{lead.jobTitle}</p>}
-          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }}>
-            <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Ver no LinkedIn
-          </a>
-        </div>
-        <div className="card card-pad">{facts}</div>
-        <div className="card card-pad">{crm}</div>
+      <aside className="lead-side only-desktop" aria-label="Detalhes do lead">
+        <section className="side-card">
+          <div className="row" style={{ gap: 16, alignItems: "flex-start" }}>
+            <Avatar firstName={lead.firstName} lastName={lead.lastName} size={76} />
+            <div className="stack" style={{ minWidth: 0, flex: 1, gap: 4 }}>
+              <h2 className="display side-name">
+                {fullName} <IconLinkedin size={20} className="li-badge" />
+              </h2>
+              {lead.jobTitle && <p className="small muted">{lead.jobTitle}</p>}
+            </div>
+          </div>
+          {profileBadges}
+          {companyRow}
+          <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
+        </section>
+        {sideCards}
+        <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
       </aside>
     </div>
   );

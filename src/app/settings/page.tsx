@@ -12,6 +12,8 @@ import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
 import { EngagementForm } from "./EngagementForm";
 import { IdealClientForm } from "./IdealClientForm";
+import { OwnerNameForm } from "./OwnerNameForm";
+import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
 import { IconChevronRight, IconDownload, IconLinkedin, IconLogout } from "@/components/Icons";
 
@@ -37,12 +39,15 @@ export default async function SettingsPage() {
 
   return (
     <main className="page">
-      <header className="topbar">
-        <div className="topbar-titles">
-          <div className="eyebrow">Conta e automação</div>
-          <h1 className="title-xl">Ajustes</h1>
-        </div>
+      <MobileHeader />
+      <header className="page-hero rise">
+        <h1 className="display page-title">
+          Configura<span className="name-grad">ções.</span>
+        </h1>
+        <p className="hero-sub">Sua conta, o agente de IA e os limites da automação.</p>
       </header>
+
+      <OwnerNameForm value={settings.ownerName ?? ""} />
 
       <section className="card card-pad connection rise" aria-label="Conta do LinkedIn">
         <div className="row" style={{ gap: 14 }}>

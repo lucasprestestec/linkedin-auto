@@ -2,47 +2,99 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { NAV_ITEMS, isActive } from "./navItems";
-import { IconDownload, LogoMark } from "./Icons";
+import { Brand } from "./Brand";
+import { IconArrowUpRight, IconChevronLeft, IconDots, IconDownload, IconLogout, IconSparkles } from "./Icons";
+import { useShell } from "./ShellContext";
+import { initials, avatarGradient } from "@/lib/format";
+import { logout } from "@/app/actions";
 
-// Barra lateral fixa do computador — só aparece a partir de 1024px (CSS).
-export function Sidebar() {
+// Barra lateral escura do computador (≥1024px). Pode ser recolhida só pros ícones.
+export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
+  const { ownerName, unanswered } = useShell();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const name = ownerName ?? "Seu perfil";
+  const [first, ...rest] = name.split(/\s+/);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menuOpen]);
 
   return (
     <aside className="sidebar" aria-label="Navegação principal">
-      <Link href="/" className="sidebar-brand">
-        <span className="logo" style={{ width: 38, height: 38, borderRadius: 12 }}>
-          <LogoMark size={22} />
-        </span>
-        <span className="stack">
-          <strong>LinkedIn Leads</strong>
-          <span>Prospecção com IA</span>
-        </span>
-      </Link>
+      <div className="sidebar-top">
+        <Brand size={38} className="sidebar-brand" />
+        <button type="button" className="sidebar-collapse" onClick={onToggle} aria-label={collapsed ? "Expandir menu" : "Recolher menu"}>
+          <IconChevronLeft size={18} />
+        </button>
+      </div>
 
       <nav className="sidebar-nav">
-        <span className="sidebar-section">Menu</span>
-        {NAV_ITEMS.map(({ href, label, Icon, hint }) => {
+        {NAV_ITEMS.map(({ href, label, Icon, badge }) => {
           const active = isActive(pathname, href);
+          const count = badge === "unanswered" ? unanswered : 0;
           return (
-            <Link key={href} href={href} className="sidebar-item" aria-current={active ? "page" : undefined}>
-              <Icon size={20} strokeWidth={active ? 2.3 : 2} />
-              <span className="stack">
-                <span>{label}</span>
-                <small>{hint}</small>
-              </span>
+            <Link key={href} href={href} className="sidebar-item" aria-current={active ? "page" : undefined} title={collapsed ? label : undefined}>
+              <Icon size={21} strokeWidth={active ? 2.2 : 1.9} />
+              <span className="sidebar-label">{label}</span>
+              {count > 0 && <span className="sidebar-badge">{count > 99 ? "99+" : count}</span>}
             </Link>
           );
         })}
       </nav>
 
-      <div className="sidebar-foot">
-        <a href="/api/export/leads" className="sidebar-item" download>
-          <IconDownload size={18} />
-          <span>Exportar CSV</span>
-        </a>
-        <span className="sidebar-version">v0.2 · automação via edges.run</span>
+      <Link href="/prospect" className="sidebar-promo">
+        <span className="promo-tag">
+          <IconSparkles size={12} /> NOVO
+        </span>
+        <strong className="display promo-title">
+          Mais
+          <br />
+          leads,
+          <br />
+          menos
+          <br />
+          esforço.
+        </strong>
+        <span className="promo-text">Conecte seu LinkedIn, defina seu público e deixe a IA trabalhar por você.</span>
+        <span className="promo-arrow" aria-hidden="true">
+          <IconArrowUpRight size={20} />
+        </span>
+      </Link>
+
+      <div className="sidebar-user" ref={menuRef}>
+        <Link href="/settings" className="sidebar-user-link">
+          <span className="avatar" style={{ width: 40, height: 40, background: avatarGradient(name), fontSize: 14 }}>
+            {initials(first, rest.at(-1))}
+          </span>
+          <span className="sidebar-label stack" style={{ minWidth: 0 }}>
+            <strong className="truncate">{name}</strong>
+            <small>Ver perfil</small>
+          </span>
+        </Link>
+        <button type="button" className="sidebar-user-more" onClick={() => setMenuOpen((o) => !o)} aria-label="Mais opções" aria-expanded={menuOpen}>
+          <IconDots size={18} />
+        </button>
+        {menuOpen && (
+          <div className="popover popover-up" role="menu">
+            <a href="/api/export/leads" download className="menu-item" role="menuitem">
+              <IconDownload size={16} /> Exportar leads (CSV)
+            </a>
+            <form action={logout}>
+              <button type="submit" className="menu-item" role="menuitem">
+                <IconLogout size={16} /> Sair
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </aside>
   );

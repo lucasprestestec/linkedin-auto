@@ -13,10 +13,15 @@ export default function LoginPage() {
   return (
     <main className="login">
       <div className="login-hero">
-        <span className="logo">
-          <LogoMark size={30} />
+        <span className="login-brand">
+          <LogoMark size={40} />
+          <span>
+            LinkedIn
+            <br />
+            Leads
+          </span>
         </span>
-        <h1 className="login-title">
+        <h1 className="login-title display">
           Seus leads do LinkedIn, <span>no piloto automático.</span>
         </h1>
         <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 15, maxWidth: 340 }}>

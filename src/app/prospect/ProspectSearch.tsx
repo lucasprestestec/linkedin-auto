@@ -24,7 +24,7 @@ function StepHeader({ n, title, subtitle, done }: { n: number; title: string; su
 
 function LinkedinSearchStep() {
   return (
-    <section className="card card-pad step rise" style={{ "--i": 1 } as React.CSSProperties}>
+    <section id="search-step" className="card card-pad step rise" style={{ "--i": 1, scrollMarginTop: 16 } as React.CSSProperties}>
       <StepHeader n={1} title="Encontre pessoas" subtitle="Monte a busca com os filtros que quiser — é grátis, direto no LinkedIn." />
       <PeopleSearchBuilder />
       <p className="hint">Abre numa aba nova. Escolha quem quiser e copie o link do perfil de cada pessoa.</p>
@@ -212,7 +212,7 @@ export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: s
         <LinkedinSearchStep />
       </div>
       <div className="col">
-        <section className="card card-pad step rise" style={{ "--i": 2 } as React.CSSProperties}>
+        <section id="paste-step" className="card card-pad step rise" style={{ "--i": 2, scrollMarginTop: 16 } as React.CSSProperties}>
           <StepHeader n={2} title="Cole os perfis escolhidos" subtitle="Um link por linha — pode colar vários de uma vez." done={hasResults} />
           <form action={formAction} className="stack" style={{ gap: 12 }}>
             <div className="stack" style={{ gap: 10 }}>

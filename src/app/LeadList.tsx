@@ -1,18 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { LeadStatus, MessageSender } from "@prisma/client";
 import { Avatar } from "@/components/Avatar";
-import { IconCheck, IconChevronRight, IconFilter, IconHand, IconInbox, IconRadar, IconSearch, IconSparkles, IconX } from "@/components/Icons";
-import { LEAD_SECTIONS, STATUS_LABEL, STATUS_TONE, type LeadSection } from "@/lib/status";
-import { useRouter } from "next/navigation";
+import {
+  IconArrowDownRight,
+  IconArrowUpRight,
+  IconCheck,
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDotsVertical,
+  IconDownload,
+  IconExternal,
+  IconFilter,
+  IconInbox,
+  IconRadar,
+  IconSearch,
+  IconSparkles,
+  IconX,
+} from "@/components/Icons";
+import { LEAD_SECTIONS, STATUS_LABEL, STATUS_TONE } from "@/lib/status";
+import { CompanyMark } from "@/components/CompanyMark";
 
 export interface LeadItem {
   id: string;
   firstName: string | null;
   lastName: string | null;
   jobTitle: string | null;
+  role: string | null;
+  company: string | null;
+  linkedinProfileUrl: string;
   status: LeadStatus;
   needsHumanReason: string | null;
   followUpsSent: number;
@@ -22,7 +42,11 @@ export interface LeadItem {
   lastMessage: { content: string; sender: MessageSender } | null;
   // Pré-formatado no servidor: evita divergência de hidratação por relógio.
   when: string;
+  whenTs: number;
 }
+
+const PAGE_SIZE = 8;
+const MOBILE_PREVIEW = 5;
 
 const FIT_OPTIONS = [
   { value: 0, label: "Qualquer" },
@@ -31,6 +55,14 @@ const FIT_OPTIONS = [
   { value: 80, label: "80%+" },
 ];
 const NO_CAMPAIGN = "__none__";
+
+const SORTS = {
+  recent: "Mais recentes",
+  urgent: "Precisa de você primeiro",
+  fit: "Maior encaixe",
+  name: "Nome (A–Z)",
+} as const;
+type SortKey = keyof typeof SORTS;
 
 interface Filters {
   sections: string[];
@@ -44,6 +76,10 @@ function toggle(list: string[], value: string) {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
+function fullName(l: LeadItem) {
+  return [l.firstName, l.lastName].filter(Boolean).join(" ") || "Lead";
+}
+
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -55,10 +91,98 @@ function FilterGroup({ label, children }: { label: string; children: React.React
   );
 }
 
-export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMax: number }) {
-  const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+function FitCell({ score }: { score: number | null }) {
+  if (score == null) return <span className="faint">—</span>;
+  const up = score >= 50;
+  return (
+    <span className="fit-cell">
+      {score}%
+      {up ? <IconArrowUpRight size={16} className="fit-up" /> : <IconArrowDownRight size={16} className="fit-down" />}
+    </span>
+  );
+}
+
+function Preview({ lead }: { lead: LeadItem }) {
+  if (lead.status === "NEEDS_HUMAN" && lead.needsHumanReason) {
+    return <span className="preview-urgent">{lead.needsHumanReason}</span>;
+  }
+  if (lead.lastMessage) {
+    return (
+      <>
+        {lead.lastMessage.sender !== "LEAD" && <b>{lead.lastMessage.sender === "AGENT" ? "IA: " : "Você: "}</b>}
+        {lead.lastMessage.content}
+      </>
+    );
+  }
+  if (lead.status === "INVITE_SENT") return <>Aguardando aceite do convite</>;
+  return <>Conexão aceita · a IA vai abrir a conversa</>;
+}
+
+function RowMenu({ lead }: { lead: LeadItem }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  return (
+    <div className="popover-anchor" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="kebab" aria-label={`Ações de ${fullName(lead)}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <IconDotsVertical size={18} />
+      </button>
+      {open && (
+        <div className="popover" role="menu" style={{ width: 220 }}>
+          <Link href={`/leads/${lead.id}`} className="menu-item" role="menuitem">
+            <IconSparkles size={16} /> Abrir conversa
+          </Link>
+          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="menu-item" role="menuitem">
+            <IconExternal size={16} /> Ver no LinkedIn
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function pageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, 2, total - 1, total, current - 1, current, current + 1].filter((p) => p >= 1 && p <= total));
+  const sorted = [...pages].sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push("…");
+    out.push(p);
+  });
+  return out;
+}
+
+export function LeadList({
+  leads,
+  followUpMax,
+  initialQuery = "",
+  initialSection = "",
+}: {
+  leads: LeadItem[];
+  followUpMax: number;
+  initialQuery?: string;
+  initialSection?: string;
+}) {
+  const router = useRouter();
+  const validSection = LEAD_SECTIONS.some((s) => s.key === initialSection);
+  const [query, setQuery] = useState(initialQuery);
+  const [filters, setFilters] = useState<Filters>(validSection ? { ...NO_FILTERS, sections: [initialSection] } : NO_FILTERS);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Celular: começa mostrando só os mais recentes; "Ver todos" abre busca e filtros.
+  const [expanded, setExpanded] = useState(Boolean(initialQuery || validSection || initialSection === "all"));
+
   const allTags = useMemo(() => [...new Set(leads.flatMap((l) => l.tags))].sort(), [leads]);
   const allCampaigns = useMemo(() => [...new Set(leads.flatMap((l) => (l.campaignName ? [l.campaignName] : [])))].sort(), [leads]);
   const hasNoCampaign = leads.some((l) => !l.campaignName);
@@ -66,23 +190,36 @@ export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMa
 
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const section of LEAD_SECTIONS) {
-      map[section.key] = leads.filter((l) => section.statuses.includes(l.status)).length;
-    }
+    for (const section of LEAD_SECTIONS) map[section.key] = leads.filter((l) => section.statuses.includes(l.status)).length;
     return map;
   }, [leads]);
 
   // Filtros combinam com E entre grupos e OU dentro do mesmo grupo.
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return leads.filter(
+    const statuses = filters.sections.length
+      ? new Set(LEAD_SECTIONS.filter((s) => filters.sections.includes(s.key)).flatMap((s) => s.statuses))
+      : null;
+    const list = leads.filter(
       (l) =>
+        (!statuses || statuses.has(l.status)) &&
         (filters.tags.length === 0 || filters.tags.some((t) => l.tags.includes(t))) &&
         (filters.campaigns.length === 0 || filters.campaigns.includes(l.campaignName ?? NO_CAMPAIGN)) &&
         (filters.minFit === 0 || (l.icpScore ?? -1) >= filters.minFit) &&
         (!q || [l.firstName, l.lastName, l.jobTitle, l.campaignName, ...l.tags].filter(Boolean).join(" ").toLowerCase().includes(q)),
     );
-  }, [leads, query, filters]);
+    const byRecent = (a: LeadItem, b: LeadItem) => b.whenTs - a.whenTs;
+    if (sort === "name") return [...list].sort((a, b) => fullName(a).localeCompare(fullName(b), "pt-BR"));
+    if (sort === "fit") return [...list].sort((a, b) => (b.icpScore ?? -1) - (a.icpScore ?? -1) || byRecent(a, b));
+    if (sort === "urgent")
+      return [...list].sort((a, b) => Number(b.status === "NEEDS_HUMAN") - Number(a.status === "NEEDS_HUMAN") || byRecent(a, b));
+    return [...list].sort(byRecent);
+  }, [leads, query, filters, sort]);
+
+  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const pageItems = visible.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const mobileItems = expanded ? pageItems : visible.slice(0, MOBILE_PREVIEW);
 
   const active: { key: string; label: string; clear: () => void }[] = [
     ...filters.sections.map((k) => ({
@@ -100,14 +237,28 @@ export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMa
       label: `# ${t}`,
       clear: () => setFilters((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) })),
     })),
-    ...(filters.minFit
-      ? [{ key: "fit", label: `Encaixe ${filters.minFit}%+`, clear: () => setFilters((f) => ({ ...f, minFit: 0 })) }]
-      : []),
+    ...(filters.minFit ? [{ key: "fit", label: `Encaixe ${filters.minFit}%+`, clear: () => setFilters((f) => ({ ...f, minFit: 0 })) }] : []),
   ];
+
+  function changeFilters(next: (f: Filters) => Filters) {
+    setFilters(next);
+    setPage(1);
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allOnPageSelected = pageItems.length > 0 && pageItems.every((l) => selected.has(l.id));
 
   if (leads.length === 0) {
     return (
-      <div className="card empty rise">
+      <section id="leads" className="card empty rise">
         <div className="empty-icon">
           <IconInbox size={32} />
         </div>
@@ -119,56 +270,80 @@ export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMa
           <IconRadar size={18} />
           Começar prospecção
         </Link>
-      </div>
+      </section>
     );
   }
 
-  const sections = LEAD_SECTIONS.filter((s) => filters.sections.length === 0 || filters.sections.includes(s.key))
-    .map((s) => ({ ...s, items: visible.filter((l) => s.statuses.includes(l.status)) }))
-    .filter((s) => s.items.length > 0);
-
-  let index = 0;
-
   return (
-    <>
-      <div className="stack" style={{ gap: 12 }}>
-        <div className="input-wrap">
-          <IconSearch size={19} />
-          <input
-            className="input search"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nome, cargo ou empresa"
-            aria-label="Buscar leads"
-          />
-          {query && (
-            <button
-              type="button"
-              className="icon-btn icon-btn-round input-action"
-              style={{ width: 34, height: 34, boxShadow: "none" }}
-              onClick={() => setQuery("")}
-              aria-label="Limpar busca"
-            >
-              <IconX size={16} />
-            </button>
-          )}
-        </div>
+    <section id="leads" className={`leads-card${expanded ? " expanded" : ""}`} aria-labelledby="leads-title">
+      <div className="leads-head">
+        <h2 id="leads-title" className="leads-title">
+          <span className="only-mobile">Leads recentes</span>
+          <span className="only-desktop display">Seus leads recentes</span>
+        </h2>
+        <button type="button" className="link-btn only-mobile" onClick={() => setExpanded((e) => !e)}>
+          {expanded ? "Mostrar menos" : "Ver todos"}
+        </button>
 
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <div className="leads-controls">
+          <label className="pill-input">
+            <IconSearch size={18} />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Filtrar por nome, cargo ou empresa..."
+              aria-label="Filtrar leads"
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca">
+                <IconX size={14} />
+              </button>
+            )}
+          </label>
+          <label className="pill-select">
+            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Ordenar">
+              {Object.entries(SORTS).map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <IconChevronDown size={16} />
+          </label>
           <button
             type="button"
-            className="chip"
+            className="square-btn"
+            aria-label="Filtros"
             aria-expanded={panelOpen}
             aria-controls="lead-filters"
-            aria-pressed={panelOpen}
+            aria-pressed={panelOpen || active.length > 0}
             onClick={() => setPanelOpen((o) => !o)}
           >
-            <IconFilter size={15} /> Filtros
-            {active.length > 0 && <span className="chip-count">{active.length}</span>}
+            <IconFilter size={18} />
+            {active.length > 0 && <span className="square-btn-count">{active.length}</span>}
           </button>
+        </div>
+      </div>
+
+      {(active.length > 0 || selected.size > 0) && (
+        <div className="row leads-chips" style={{ gap: 8, flexWrap: "wrap" }}>
+          {selected.size > 0 && (
+            <span className="bulk-bar">
+              <b>{selected.size} selecionado{selected.size > 1 ? "s" : ""}</b>
+              <a href={`/api/export/leads?ids=${[...selected].join(",")}`} download className="bulk-action">
+                <IconDownload size={15} /> Exportar
+              </a>
+              <button type="button" className="bulk-action" onClick={() => setSelected(new Set())}>
+                Limpar
+              </button>
+            </span>
+          )}
           {active.map((f) => (
-            <span key={f.key} className="tag-pill" style={{ height: 38, borderRadius: 999, paddingLeft: 14 }}>
+            <span key={f.key} className="tag-pill" style={{ height: 34, borderRadius: 999, paddingLeft: 14 }}>
               {f.label}
               <button type="button" onClick={f.clear} aria-label={`Tirar filtro ${f.label}`}>
                 <IconX size={12} strokeWidth={2.6} />
@@ -176,285 +351,256 @@ export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMa
             </span>
           ))}
           {active.length > 1 && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFilters(NO_FILTERS)}>
+            <button type="button" className="link-btn" onClick={() => changeFilters(() => NO_FILTERS)}>
               Limpar tudo
             </button>
           )}
         </div>
+      )}
 
-        {panelOpen && (
-          <div id="lead-filters" className="card card-pad stack filter-panel" style={{ gap: 16 }}>
-            <FilterGroup label="Status">
-              {LEAD_SECTIONS.filter((s) => counts[s.key] > 0).map((s) => (
+      {panelOpen && (
+        <div id="lead-filters" className="filter-panel stack" style={{ gap: 16 }}>
+          <FilterGroup label="Status">
+            {LEAD_SECTIONS.filter((s) => counts[s.key] > 0).map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className="chip"
+                aria-pressed={filters.sections.includes(s.key)}
+                onClick={() => changeFilters((f) => ({ ...f, sections: toggle(f.sections, s.key) }))}
+              >
+                {s.label} <span className="chip-count">{counts[s.key]}</span>
+              </button>
+            ))}
+          </FilterGroup>
+          {allCampaigns.length > 0 && (
+            <FilterGroup label="Campanha">
+              {[...allCampaigns, ...(hasNoCampaign ? [NO_CAMPAIGN] : [])].map((c) => (
                 <button
-                  key={s.key}
+                  key={c}
                   type="button"
                   className="chip"
-                  aria-pressed={filters.sections.includes(s.key)}
-                  onClick={() => setFilters((f) => ({ ...f, sections: toggle(f.sections, s.key) }))}
+                  aria-pressed={filters.campaigns.includes(c)}
+                  onClick={() => changeFilters((f) => ({ ...f, campaigns: toggle(f.campaigns, c) }))}
                 >
-                  {s.label} <span className="chip-count">{counts[s.key]}</span>
+                  {c === NO_CAMPAIGN ? "Sem campanha" : c}
                 </button>
               ))}
             </FilterGroup>
-            {allCampaigns.length > 0 && (
-              <FilterGroup label="Campanha">
-                {[...allCampaigns, ...(hasNoCampaign ? [NO_CAMPAIGN] : [])].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="chip"
-                    aria-pressed={filters.campaigns.includes(c)}
-                    onClick={() => setFilters((f) => ({ ...f, campaigns: toggle(f.campaigns, c) }))}
-                  >
-                    {c === NO_CAMPAIGN ? "Sem campanha" : c}
-                  </button>
-                ))}
-              </FilterGroup>
-            )}
-            {allTags.length > 0 && (
-              <FilterGroup label="Etiquetas">
-                {allTags.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className="chip"
-                    aria-pressed={filters.tags.includes(t)}
-                    onClick={() => setFilters((f) => ({ ...f, tags: toggle(f.tags, t) }))}
-                  >
-                    # {t}
-                  </button>
-                ))}
-              </FilterGroup>
-            )}
-            {hasFit && (
-              <FilterGroup label="Encaixe mínimo com o cliente ideal">
-                {FIT_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    className="chip"
-                    aria-pressed={filters.minFit === o.value}
-                    onClick={() => setFilters((f) => ({ ...f, minFit: o.value }))}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </FilterGroup>
-            )}
-            <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
-              <span className="tiny faint">
-                {visible.length} de {leads.length} leads
-              </span>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPanelOpen(false)}>
-                Pronto
-              </button>
-            </div>
+          )}
+          {allTags.length > 0 && (
+            <FilterGroup label="Etiquetas">
+              {allTags.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="chip"
+                  aria-pressed={filters.tags.includes(t)}
+                  onClick={() => changeFilters((f) => ({ ...f, tags: toggle(f.tags, t) }))}
+                >
+                  # {t}
+                </button>
+              ))}
+            </FilterGroup>
+          )}
+          {hasFit && (
+            <FilterGroup label="Encaixe mínimo com o cliente ideal">
+              {FIT_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  className="chip"
+                  aria-pressed={filters.minFit === o.value}
+                  onClick={() => changeFilters((f) => ({ ...f, minFit: o.value }))}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </FilterGroup>
+          )}
+          <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+            <span className="tiny faint">
+              {visible.length} de {leads.length} leads
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPanelOpen(false)}>
+              Pronto
+            </button>
           </div>
-        )}
-      </div>
-
-      {sections.length === 0 && (
-        <div className="empty">
-          <p className="title-md">Nada encontrado</p>
-          <p className="small muted">Nenhum lead corresponde {query ? <>a &ldquo;{query}&rdquo;</> : "ao filtro"}.</p>
         </div>
       )}
 
-      <LeadTable sections={sections} followUpMax={followUpMax} />
-
-      <div className="only-mobile stack" style={{ gap: 20 }}>
-        {sections.map((section) => (
-          <section key={section.key}>
-            <div className="section-head">
-              <h2 className="section-title" style={section.key === "urgent" ? { color: "var(--urgent-ink)" } : undefined}>
-                {section.key === "urgent" && <IconHand size={16} />}
-                {section.label}
-                <span className="count">{section.items.length}</span>
-              </h2>
-            </div>
-
-            {section.key === "urgent" ? (
-              <div className="stack" style={{ gap: 10 }}>
-                {section.items.map((lead) => (
-                  <Link
-                    key={lead.id}
-                    href={`/leads/${lead.id}`}
-                    className="urgent-card rise"
-                    style={{ "--i": index++ } as React.CSSProperties}
-                  >
-                    <div className="row" style={{ gap: 12 }}>
-                      <Avatar firstName={lead.firstName} lastName={lead.lastName} size={46} status="urgent" />
-                      <div className="lead-main">
-                        <div className="lead-top">
-                          <span className="lead-name">
-                            {lead.firstName} {lead.lastName}
-                          </span>
-                          <span className="lead-time">{lead.when}</span>
+      {visible.length === 0 ? (
+        <div className="empty" style={{ padding: "32px 16px" }}>
+          <p className="title-md">Nada encontrado</p>
+          <p className="small muted">Nenhum lead corresponde {query ? <>a &ldquo;{query}&rdquo;</> : "aos filtros"}.</p>
+        </div>
+      ) : (
+        <>
+          {/* Computador: tabela */}
+          <div className="only-desktop lead-table-scroll">
+            <table className="leads-table">
+              <colgroup>
+                <col style={{ width: 44 }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "21%" }} />
+                <col />
+                <col style={{ width: 176 }} />
+                <col style={{ width: 96 }} />
+                <col style={{ width: 48 }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>
+                    <label className="table-check">
+                      <input
+                        type="checkbox"
+                        checked={allOnPageSelected}
+                        onChange={() =>
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            for (const l of pageItems) {
+                              if (allOnPageSelected) next.delete(l.id);
+                              else next.add(l.id);
+                            }
+                            return next;
+                          })
+                        }
+                        aria-label="Selecionar todos desta página"
+                      />
+                      <span className="checkbox">
+                        <IconCheck size={13} strokeWidth={3.2} />
+                      </span>
+                    </label>
+                  </th>
+                  <th>Perfil</th>
+                  <th>Cargo / Empresa</th>
+                  <th>Última mensagem</th>
+                  <th>Status</th>
+                  <th>Encaixe</th>
+                  <th aria-label="Ações" />
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((lead) => (
+                  <tr key={lead.id} onClick={() => router.push(`/leads/${lead.id}`)} aria-selected={selected.has(lead.id)}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <label className="table-check">
+                        <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggleSelect(lead.id)} aria-label={`Selecionar ${fullName(lead)}`} />
+                        <span className="checkbox">
+                          <IconCheck size={13} strokeWidth={3.2} />
+                        </span>
+                      </label>
+                    </td>
+                    <td>
+                      <div className="row" style={{ gap: 14 }}>
+                        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={52} status={STATUS_TONE[lead.status]} />
+                        <div className="stack" style={{ minWidth: 0 }}>
+                          <Link href={`/leads/${lead.id}`} className="cell-strong truncate" onClick={(e) => e.stopPropagation()}>
+                            {fullName(lead)}
+                          </Link>
+                          <span className="cell-sub">{lead.when}</span>
                         </div>
-                        {lead.jobTitle && <div className="lead-sub">{lead.jobTitle}</div>}
                       </div>
-                    </div>
-                    <div className="reason">
-                      <IconSparkles size={16} />
-                      <span>{lead.needsHumanReason ?? "Precisa da sua resposta"}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <ul className="list">
-                {section.items.map((lead) => (
-                  <li key={lead.id} className="rise" style={{ "--i": index++ } as React.CSSProperties}>
-                    <Link href={`/leads/${lead.id}`} className="lead-row">
-                      <Avatar firstName={lead.firstName} lastName={lead.lastName} size={44} status={STATUS_TONE[lead.status]} />
-                      <div className="lead-main">
-                        <div className="lead-top">
-                          <span className="lead-name">
-                            {lead.firstName} {lead.lastName}
-                          </span>
-                          {lead.status === "QUALIFIED" && (
-                            <span className="qualified-mark" title="Qualificado" aria-label="Qualificado">
-                              <IconCheck size={11} strokeWidth={3.5} />
-                            </span>
-                          )}
-                          <span className="lead-time">{lead.when}</span>
+                    </td>
+                    <td>
+                      <div className="row" style={{ gap: 12 }}>
+                        {lead.company && <CompanyMark name={lead.company} />}
+                        <div className="stack" style={{ minWidth: 0 }}>
+                          <span className="cell-text truncate">{lead.role ?? "—"}</span>
+                          {lead.company && <span className="cell-text truncate">{lead.company}</span>}
                         </div>
-                        {lead.followUpsSent > 0 && (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN") && (
-                          <span className="badge badge-waiting" style={{ alignSelf: "flex-start", height: 22, marginBottom: 1 }}>
-                            Follow-up {lead.followUpsSent}/{followUpMax}
-                          </span>
-                        )}
-                        <div className="lead-sub">
-                          {lead.lastMessage ? (
+                      </div>
+                    </td>
+                    <td>
+                      <p className="cell-msg">
+                        <Preview lead={lead} />
+                      </p>
+                    </td>
+                    <td>
+                      <span className={`status-pill pill-${STATUS_TONE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>
+                      {lead.followUpsSent > 0 && (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN") && (
+                        <span className="cell-sub" style={{ display: "block", marginTop: 4 }}>
+                          Follow-up {lead.followUpsSent}/{followUpMax}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <FitCell score={lead.icpScore} />
+                    </td>
+                    <td>
+                      <RowMenu lead={lead} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Celular: cartões */}
+          <ul className="only-mobile lead-cards">
+            {mobileItems.map((lead, i) => {
+              const unread = lead.lastMessage?.sender === "LEAD";
+              return (
+                <li key={lead.id} className="rise" style={{ "--i": i } as React.CSSProperties}>
+                  <Link href={`/leads/${lead.id}`} className={`lead-card${lead.status === "NEEDS_HUMAN" ? " urgent" : ""}`}>
+                    <Avatar firstName={lead.firstName} lastName={lead.lastName} size={62} status={STATUS_TONE[lead.status]} />
+                    <div className="lead-card-main">
+                      <div className="lead-card-top">
+                        <span className="lead-card-name">{fullName(lead)}</span>
+                        <span className="lead-card-time">{lead.when}</span>
+                      </div>
+                      {lead.jobTitle && (
+                        <div className="lead-card-role">
+                          {lead.role}
+                          {lead.company && (
                             <>
-                              {lead.lastMessage.sender !== "LEAD" && <b>{lead.lastMessage.sender === "AGENT" ? "IA: " : "Você: "}</b>}
-                              {lead.lastMessage.content}
+                              <br />
+                              na {lead.company}
                             </>
-                          ) : lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN" ? (
-                            "Conexão aceita · a IA vai abrir a conversa"
-                          ) : (
-                            (lead.jobTitle ?? (lead.status === "INVITE_SENT" ? "Aguardando aceite do convite" : ""))
                           )}
                         </div>
-                        {lead.tags.length > 0 && (
-                          <div className="row" style={{ gap: 4, flexWrap: "wrap", marginTop: 3 }}>
-                            {lead.tags.slice(0, 3).map((t) => (
-                              <span key={t} className="tag">
-                                # {t}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                      )}
+                      <div className="lead-card-preview">
+                        <Preview lead={lead} />
                       </div>
-                      <IconChevronRight size={18} className="chev" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
-      </div>
-    </>
-  );
-}
-
-// Computador: tabela densa (estilo CRM) com as mesmas seções e filtros da
-// lista do celular. A linha inteira abre a conversa; o link no nome garante
-// teclado e leitor de tela.
-function LeadTable({ sections, followUpMax }: { sections: (LeadSection & { items: LeadItem[] })[]; followUpMax: number }) {
-  const router = useRouter();
-  if (sections.length === 0) return null;
-
-  return (
-    <div className="card only-desktop lead-table-wrap">
-      <table className="lead-table">
-        {/* Larguras fixas; a coluna da mensagem absorve o que sobra. */}
-        <colgroup>
-          <col style={{ width: "24%" }} />
-          <col style={{ width: 170 }} />
-          <col />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 150 }} />
-          <col style={{ width: 84 }} />
-          <col style={{ width: 96 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Lead</th>
-            <th>Status</th>
-            <th>Última mensagem</th>
-            <th>Campanha</th>
-            <th>Etiquetas</th>
-            <th className="num">Encaixe</th>
-            <th className="num">Atividade</th>
-          </tr>
-        </thead>
-        {sections.map((section) => (
-          <tbody key={section.key}>
-            <tr className="lead-table-group">
-              <th colSpan={7}>
-                {section.label} <span className="count">{section.items.length}</span>
-              </th>
-            </tr>
-            {section.items.map((lead) => (
-              <tr
-                key={lead.id}
-                onClick={() => router.push(`/leads/${lead.id}`)}
-                className={lead.status === "NEEDS_HUMAN" ? "urgent" : undefined}
-              >
-                <td>
-                  <div className="row" style={{ gap: 12 }}>
-                    <Avatar firstName={lead.firstName} lastName={lead.lastName} size={36} status={STATUS_TONE[lead.status]} />
-                    <div className="stack" style={{ minWidth: 0 }}>
-                      <Link href={`/leads/${lead.id}`} className="lead-name" style={{ fontSize: 14 }} onClick={(e) => e.stopPropagation()}>
-                        {lead.firstName} {lead.lastName}
-                      </Link>
-                      {lead.jobTitle && <span className="tiny faint truncate">{lead.jobTitle}</span>}
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="stack" style={{ gap: 4, alignItems: "flex-start" }}>
-                    <span className={`badge badge-${STATUS_TONE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>
-                    {lead.followUpsSent > 0 && (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN") && (
-                      <span className="tiny faint">
-                        Follow-up {lead.followUpsSent}/{followUpMax}
+                    {unread && <span className="unread-badge" aria-label="Mensagem nova">1</span>}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          {(expanded || pages > 1) && (
+            <div className={`pager${expanded ? "" : " only-desktop"}`}>
+              <span className="small faint">
+                Mostrando {pageItems.length} de {visible.length} lead{visible.length !== 1 ? "s" : ""}
+              </span>
+              {pages > 1 && (
+                <nav className="pager-pages" aria-label="Páginas">
+                  <button type="button" className="pager-btn" onClick={() => setPage(current - 1)} disabled={current === 1} aria-label="Página anterior">
+                    <IconChevronLeft size={16} />
+                  </button>
+                  {pageNumbers(current, pages).map((p, i) =>
+                    p === "…" ? (
+                      <span key={`gap-${i}`} className="pager-gap">
+                        …
                       </span>
-                    )}
-                  </div>
-                </td>
-                <td className="lead-table-msg">
-                  {lead.status === "NEEDS_HUMAN" && lead.needsHumanReason ? (
-                    <span style={{ color: "var(--urgent-ink)", fontWeight: 600 }}>{lead.needsHumanReason}</span>
-                  ) : lead.lastMessage ? (
-                    <>
-                      {lead.lastMessage.sender !== "LEAD" && <b>{lead.lastMessage.sender === "AGENT" ? "IA: " : "Você: "}</b>}
-                      {lead.lastMessage.content}
-                    </>
-                  ) : (
-                    <span className="faint">—</span>
+                    ) : (
+                      <button key={p} type="button" className="pager-btn" aria-current={p === current ? "page" : undefined} onClick={() => setPage(p)}>
+                        {p}
+                      </button>
+                    ),
                   )}
-                </td>
-                <td>{lead.campaignName ?? <span className="faint">—</span>}</td>
-                <td>
-                  <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-                    {lead.tags.slice(0, 3).map((t) => (
-                      <span key={t} className="tag">
-                        # {t}
-                      </span>
-                    ))}
-                    {lead.tags.length === 0 && <span className="faint">—</span>}
-                  </div>
-                </td>
-                <td className="num">{lead.icpScore != null ? `${lead.icpScore}%` : <span className="faint">—</span>}</td>
-                <td className="num faint">{lead.when}</td>
-              </tr>
-            ))}
-          </tbody>
-        ))}
-      </table>
-    </div>
+                  <button type="button" className="pager-btn" onClick={() => setPage(current + 1)} disabled={current === pages} aria-label="Próxima página">
+                    <IconChevronRight size={16} />
+                  </button>
+                </nav>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
