@@ -2,17 +2,21 @@
 
 import { searchProspects, inviteProspects, type ProspectResult } from "@/lib/prospect";
 
-export type SearchState = { results: ProspectResult[]; query: string; error?: string } | undefined;
+export type SearchState = { results: ProspectResult[]; query: string; searchId: number; error?: string } | undefined;
 
 export async function search(_prevState: SearchState, formData: FormData): Promise<SearchState> {
   const query = String(formData.get("query") ?? "").trim();
-  if (!query) return { results: [], query: "", error: "Escreva o que você está procurando." };
+  const searchId = Date.now();
+  if (!query) return { results: [], query: "", searchId, error: "Escreva o que você está procurando." };
+
+  const rawLimit = Number(formData.get("limit"));
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
 
   try {
-    const results = await searchProspects(query);
-    return { results, query };
+    const results = await searchProspects(query, limit);
+    return { results, query, searchId };
   } catch (err) {
-    return { results: [], query, error: err instanceof Error ? err.message : "Falha na busca." };
+    return { results: [], query, searchId, error: err instanceof Error ? err.message : "Falha na busca." };
   }
 }
 

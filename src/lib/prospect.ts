@@ -9,9 +9,9 @@ import { getActiveIdentityId } from "@/lib/identity";
 
 export type ProspectResult = EdgesSearchPerson & { alreadyLead: boolean };
 
-export async function searchProspects(query: string): Promise<ProspectResult[]> {
+export async function searchProspects(query: string, maxResults?: number): Promise<ProspectResult[]> {
   const identityId = await getActiveIdentityId();
-  const results = await searchPeople(identityId, query);
+  const results = await searchPeople(identityId, query, maxResults);
 
   const existing = await prisma.lead.findMany({ select: { linkedinProfileUrl: true } });
   const known = new Set(existing.map((l) => l.linkedinProfileUrl));

@@ -1,3 +1,5 @@
+import { MAX_SEARCH_RESULTS } from "@/lib/prospect-constants";
+
 const EDGES_API_BASE = "https://api.edges.run/v1";
 
 function getApiKey() {
@@ -6,7 +8,7 @@ function getApiKey() {
   return apiKey;
 }
 
-async function edgesFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function edgesFetchRaw(path: string, init?: RequestInit) {
   const res = await fetch(`${EDGES_API_BASE}${path}`, {
     ...init,
     headers: {
@@ -20,6 +22,11 @@ async function edgesFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new Error(`Edges request "${path}" falhou: ${data?.message ?? res.statusText}`);
   }
+  return { data, headers: res.headers };
+}
+
+async function edgesFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data } = await edgesFetchRaw(path, init);
   return data as T;
 }
 
@@ -96,22 +103,55 @@ export interface EdgesSearchPerson {
   company_name?: string;
   headline?: string;
   location?: string;
+  profile_image_url?: string;
+}
+
+const SEARCH_PAGE_SIZE = 10;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Busca por texto livre (cargo, setor, cidade combinados numa frase) — não usamos
 // geoUrn/filtros estruturados do LinkedIn de propósito: exigiriam uma segunda chamada
 // de lookup de localização, e o critério aqui é uma frase que o corretor escreve, não
-// uma URL de busca do LinkedIn. Suficiente para o volume de um único usuário.
-export async function searchPeople(identityId: string, keywords: string) {
+// uma URL de busca do LinkedIn. Pagina até `maxResults` (arredondado pra cima em
+// blocos de 10), com uma pausa curta entre páginas — ver Live Mode: Safe Practices
+// da edges.run sobre não disparar chamadas em sequência sem espaçamento.
+export async function searchPeople(identityId: string, keywords: string, maxResults = SEARCH_PAGE_SIZE) {
+  const cappedMax = Math.min(maxResults, MAX_SEARCH_RESULTS);
   const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
-  return edgesFetch<EdgesSearchPerson[]>("/actions/linkedin-search-people/run/live", {
-    method: "POST",
-    body: JSON.stringify({
-      identity_mode: "direct",
-      identity_ids: [identityId],
-      input: { linkedin_people_search_url: searchUrl },
-    }),
-  });
+
+  const results: EdgesSearchPerson[] = [];
+  let cursor: string | null = null;
+
+  while (results.length < cappedMax) {
+    const path = cursor
+      ? `/actions/linkedin-search-people/run/live?cursor=${encodeURIComponent(cursor)}`
+      : "/actions/linkedin-search-people/run/live";
+
+    const { data, headers } = await edgesFetchRaw(path, {
+      method: "POST",
+      body: JSON.stringify({
+        identity_mode: "direct",
+        identity_ids: [identityId],
+        input: { linkedin_people_search_url: searchUrl },
+      }),
+    });
+
+    results.push(...(data as EdgesSearchPerson[]));
+    const next = headers.get("x-pagination-next");
+    if (!next) break;
+    // O header vem com a URL absoluta da próxima página (ex: ".../run/live?cursor=XYZ"),
+    // não só o token — extrai o valor do param em vez de reencapsular a URL inteira
+    // dentro de um novo "cursor=" (o que gerava "invalid cursor provided").
+    cursor = next.startsWith("http") ? new URL(next).searchParams.get("cursor") : next;
+    if (!cursor) break;
+
+    await sleep(3000 + Math.floor(Math.random() * 2000));
+  }
+
+  return results.slice(0, cappedMax);
 }
 
 export interface EdgesAsyncRun {
