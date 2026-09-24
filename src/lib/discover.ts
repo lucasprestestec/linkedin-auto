@@ -3,7 +3,7 @@ import { searchPeople, scheduleConnectionInvites } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
 
 // Encontra prospects novos (LinkedIn search) e agenda convite para eles, respeitando
-// o limite diário. Chamado 1x/dia pelo cron externo (ver vercel.json). O convite
+// o limite diário. Chamado 1x/dia pelo cron externo (cron-job.org). O convite
 // sai sem nota — a edges.run derruba nota personalizada silenciosamente depois de
 // 5/mês em conta Classic, então a personalização fica por conta da primeira
 // mensagem do agente de IA depois que o lead aceita (ver lib/respond.ts).

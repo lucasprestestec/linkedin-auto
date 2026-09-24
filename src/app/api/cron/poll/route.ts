@@ -4,7 +4,7 @@ import { extractConversations } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
 import { handleIncomingMessage } from "@/lib/respond";
 
-// Agendador externo chama este endpoint periodicamente (ver vercel.json).
+// Agendador externo (cron-job.org) chama este endpoint periodicamente, a cada poucos minutos.
 // Sincroniza as conversas e, para cada mensagem nova do lead, aciona o
 // agente de IA (que decide responder ou pedir handoff humano).
 export async function GET(request: Request) {
