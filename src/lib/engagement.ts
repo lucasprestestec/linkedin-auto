@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import {
   acceptReceivedInvitations,
   archiveThread,
+  extractConnections,
+  extractSentInvitations,
   followProfile,
-  threadUrl,
   visitProfile,
   withdrawInvitation,
 } from "@/lib/edges";
 import { findLeadByProfileUrl } from "@/lib/leads";
-import { normalizeLinkedinUrl } from "@/lib/linkedin";
+import { linkedinProfileSlug, normalizeLinkedinUrl } from "@/lib/linkedin";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
 
 // Ações Engagement opcionais, cada uma com chave própria em Ajustes (todas
@@ -28,23 +29,34 @@ export interface EngagementResult {
 
 // Convites recebidos viram leads "aguardando resposta": a IA abre a conversa
 // na sequência (mensagem de abertura). No máximo 1x/hora.
+// A ação de aceitar só devolve o ID do convite, não quem convidou — então,
+// depois de aceitar, quem conectou nesta rodada sai da lista de conexões
+// (connected_at a partir do início da rodada).
 async function acceptInvites(identityId: string, settings: Settings): Promise<number> {
   if (!settings.acceptInvitesEnabled) return 0;
   if (Date.now() - (settings.receivedInvitesCheckedAt?.getTime() ?? 0) < HOUR_MS) return 0;
   await prisma.settings.update({ where: { id: "singleton" }, data: { receivedInvitesCheckedAt: new Date() } });
 
+  // Folga pra diferença de relógio entre a edges.run e o servidor.
+  const since = Date.now() - 5 * 60 * 1000;
+  const accepted = await acceptReceivedInvitations(identityId);
+  if (accepted.length === 0) return 0;
+
   const rules = parseExclusionList(settings.exclusionList);
   let created = 0;
-  for (const person of await acceptReceivedInvitations(identityId)) {
+  for (const person of await extractConnections(identityId)) {
+    const connectedAt = person.connected_at ? new Date(person.connected_at).getTime() : NaN;
+    if (!(connectedAt >= since)) continue;
     const url =
       (person.linkedin_profile_url && normalizeLinkedinUrl(person.linkedin_profile_url)) ||
       (person.linkedin_profile_handle ? normalizeLinkedinUrl(`https://www.linkedin.com/in/${person.linkedin_profile_handle}`) : null);
+    // Já é lead: é convite nosso que foi aceito (detectAcceptedInvites cuida).
     if (!url || (await findLeadByProfileUrl(url))) continue;
     const lead = {
       linkedinProfileUrl: url,
       firstName: person.first_name ?? null,
       lastName: person.last_name ?? null,
-      jobTitle: person.job_title ?? person.headline ?? null,
+      jobTitle: person.job_title ?? null,
     };
     // Aceitar a conexão tudo bem; só não entra no funil automático.
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
@@ -63,6 +75,7 @@ async function acceptInvites(identityId: string, settings: Settings): Promise<nu
 
 // Convite sem resposta há muito tempo pesa contra a conta no LinkedIn:
 // retira e marca o lead como sem resposta. No máximo 1x/dia.
+// Retirar exige o URN do convite, que vem da lista de convites enviados.
 async function withdrawStaleInvites(identityId: string, settings: Settings): Promise<number> {
   if (!settings.withdrawInvitesEnabled) return 0;
   if (Date.now() - (settings.withdrawCheckedAt?.getTime() ?? 0) < DAY_MS) return 0;
@@ -74,10 +87,22 @@ async function withdrawStaleInvites(identityId: string, settings: Settings): Pro
     orderBy: { invitedAt: "asc" },
     take: MAX_PER_RUN,
   });
+  if (stale.length === 0) return 0;
+
+  const urnBySlug = new Map<string, string>();
+  for (const inv of await extractSentInvitations(identityId)) {
+    const slug =
+      (inv.linkedin_profile_url && linkedinProfileSlug(inv.linkedin_profile_url)) || inv.linkedin_profile_handle?.trim().toLowerCase();
+    if (slug && inv.linkedin_invitation_urn) urnBySlug.set(slug, inv.linkedin_invitation_urn);
+  }
+
   let withdrawn = 0;
   for (const lead of stale) {
+    const urn = urnBySlug.get(linkedinProfileSlug(lead.linkedinProfileUrl) ?? "");
+    // Sem convite pendente na lista: já foi aceito/recusado — o fluxo normal cuida.
+    if (!urn) continue;
     try {
-      await withdrawInvitation(identityId, lead.linkedinProfileUrl);
+      await withdrawInvitation(identityId, urn);
       await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST", needsHumanReason: null } });
       withdrawn++;
     } catch (err) {
@@ -97,7 +122,7 @@ async function archiveLostThreads(identityId: string, settings: Settings): Promi
   let archived = 0;
   for (const lead of lost) {
     try {
-      await archiveThread(identityId, threadUrl({ linkedin_thread_id: lead.linkedinThreadId! }));
+      await archiveThread(identityId, lead.linkedinThreadId!);
       await prisma.lead.update({ where: { id: lead.id }, data: { archivedAt: new Date() } });
       archived++;
     } catch (err) {

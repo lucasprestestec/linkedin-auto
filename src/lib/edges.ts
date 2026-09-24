@@ -238,30 +238,40 @@ export const ENGAGEMENT_ACTIONS = {
   visitProfile: "linkedin-visit-profile",
   followProfile: "linkedin-follow-profile",
   archiveMessage: "linkedin-archive-message",
+  extractSentInvitations: "linkedin-extract-sent-invitations",
 } as const;
 
-// Pessoa devolvida por ações que listam perfis (formato como o das conexões).
-export interface EdgesPerson {
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  job_title?: string;
-  headline?: string;
-  linkedin_profile_handle?: string;
-  linkedin_profile_url?: string;
-  linkedin_profile_id?: number;
+// Convite (recebido ou enviado) como a edges.run devolve.
+export interface EdgesInvitationRef {
+  linkedin_invitation_id?: string;
+  linkedin_invitation_urn?: string;
 }
 
-// Aceita os convites recebidos e devolve quem foi aceito.
-export async function acceptReceivedInvitations(identityId: string): Promise<EdgesPerson[]> {
+// Aceita os convites recebidos. Input "invitations" é opcional — sem ele,
+// aceita os pendentes. A saída só traz o ID do convite (não quem convidou):
+// quem entrou é descoberto depois, pela lista de conexões.
+export async function acceptReceivedInvitations(identityId: string): Promise<EdgesInvitationRef[]> {
   const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.acceptInvitations, { identity_ids: [identityId] });
-  return Array.isArray(data) ? (data as EdgesPerson[]) : [];
+  return Array.isArray(data) ? (data as EdgesInvitationRef[]) : [];
 }
 
-export async function withdrawInvitation(identityId: string, profileUrl: string) {
+// Convites que a conta enviou e ainda estão pendentes — é daqui que sai o URN
+// que a ação de retirar exige. Formato do item a confirmar no Actions Library.
+export interface EdgesSentInvitation extends EdgesInvitationRef {
+  linkedin_profile_url?: string;
+  linkedin_profile_handle?: string;
+  sent_at?: string;
+}
+
+export async function extractSentInvitations(identityId: string): Promise<EdgesSentInvitation[]> {
+  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.extractSentInvitations, { identity_ids: [identityId] });
+  return Array.isArray(data) ? (data as EdgesSentInvitation[]) : [];
+}
+
+export async function withdrawInvitation(identityId: string, invitationUrn: string) {
   return callAction<unknown>(ENGAGEMENT_ACTIONS.withdrawInvitation, {
     identity_ids: [identityId],
-    input: { linkedin_profile_url: profileUrl },
+    input: { linkedin_invitation_urn: invitationUrn },
   });
 }
 
@@ -279,9 +289,9 @@ export async function followProfile(identityId: string, profileUrl: string) {
   });
 }
 
-export async function archiveThread(identityId: string, linkedinThreadUrl: string) {
+export async function archiveThread(identityId: string, linkedinThreadId: string) {
   return callAction<unknown>(ENGAGEMENT_ACTIONS.archiveMessage, {
     identity_ids: [identityId],
-    input: { linkedin_thread_url: linkedinThreadUrl },
+    input: { linkedin_thread_id: linkedinThreadId },
   });
 }
