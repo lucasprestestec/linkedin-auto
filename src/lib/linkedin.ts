@@ -41,18 +41,20 @@ export function hasAnyFilter(f: PeopleSearchFilters): boolean {
   return [f.titles, f.locations, f.companies, f.industries, f.keywords, f.firstNames, f.lastNames, f.schools].some((v) => v.length > 0);
 }
 
+// Tudo vai no campo "keywords" da busca. Os parâmetros de texto por campo
+// (titleFreeText, company, firstName...) o LinkedIn descarta ao abrir o link —
+// a busca voltava sem filtro nenhum. "keywords" funciona em qualquer conta
+// (grátis ou paga) e aceita OR e parênteses: cada filtro vira um grupo
+// "(a OR b)" e os grupos se somam (E).
 export function buildLinkedinSearchUrl(f: PeopleSearchFilters): string {
   const params = new URLSearchParams();
-  // Cidade e setor não têm campo de texto livre na URL (o LinkedIn filtra por
-  // lista própria de regiões/setores), então entram como palavras-chave.
-  const keywordGroups = [f.keywords, f.locations, f.industries].filter((g) => g.length > 0).map(anyOf);
-  const keywords = keywordGroups.map((g) => (keywordGroups.length > 1 && g.includes(" OR ") ? `(${g})` : g)).join(" ");
-  if (keywords) params.set("keywords", keywords);
-  if (f.titles.length) params.set("titleFreeText", anyOf(f.titles));
-  if (f.companies.length) params.set("company", anyOf(f.companies));
-  if (f.firstNames.length) params.set("firstName", anyOf(f.firstNames));
-  if (f.lastNames.length) params.set("lastName", anyOf(f.lastNames));
-  if (f.schools.length) params.set("schoolFreeText", anyOf(f.schools));
+  const groups = [f.titles, f.companies, f.locations, f.industries, f.keywords, f.schools, f.firstNames, f.lastNames]
+    .filter((g) => g.some((v) => v.trim()))
+    .map((g) => {
+      const any = anyOf(g);
+      return any.includes(" OR ") ? `(${any})` : any;
+    });
+  if (groups.length) params.set("keywords", groups.join(" "));
   if (f.onlyNotConnected) params.set("network", JSON.stringify(["S", "O"]));
   params.set("origin", "FACETED_SEARCH");
   return `https://www.linkedin.com/search/results/people/?${params.toString()}`;
