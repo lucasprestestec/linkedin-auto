@@ -235,7 +235,7 @@ export async function extractFollowers(identityId: string): Promise<EdgesFollowe
 export const ENGAGEMENT_ACTIONS = {
   // Confirmados na documentação: accept-invitation, withdraw-invitation,
   // visit-profile, follow-profile, archive-message, extract-sent-invitations.
-  // extract-received-invitations segue o mesmo padrão da de enviados.
+  // extract-received-invitations também confirmado.
   acceptInvitation: "linkedin-accept-invitation",
   extractReceivedInvitations: "linkedin-extract-received-invitations",
   withdrawInvitation: "linkedin-withdraw-invitation",
@@ -251,18 +251,21 @@ export interface EdgesInvitationRef {
   linkedin_invitation_urn?: string;
 }
 
-// Convite recebido pendente: quem convidou + o que a ação de aceitar exige
-// (urn e secret). Formato espelhado do de convites enviados.
+// Convite recebido pendente (formato confirmado na documentação). Atenção aos
+// nomes: o segredo vem como "invitation_secret" (e a ação de aceitar recebe
+// como "linkedin_invitation_secret"), e o cargo vem em "title".
 export interface EdgesReceivedInvitation extends EdgesInvitationRef {
-  linkedin_invitation_secret?: string;
+  invitation_secret?: string;
+  message?: string;
+  sent_date?: string;
   linkedin_profile_url?: string;
   linkedin_profile_handle?: string;
   linkedin_profile_id?: number;
+  linkedin_profile_image_url?: string;
   first_name?: string;
   last_name?: string;
   full_name?: string;
-  job_title?: string;
-  headline?: string;
+  title?: string;
 }
 
 export async function extractReceivedInvitations(identityId: string): Promise<EdgesReceivedInvitation[]> {

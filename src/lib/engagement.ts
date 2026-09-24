@@ -42,7 +42,7 @@ async function acceptInvites(identityId: string, settings: Settings): Promise<nu
   let attempts = 0;
   for (const inv of await extractReceivedInvitations(identityId)) {
     if (attempts >= MAX_PER_RUN) break;
-    if (!inv.linkedin_invitation_urn || !inv.linkedin_invitation_secret) continue;
+    if (!inv.linkedin_invitation_urn || !inv.invitation_secret) continue;
     const url =
       (inv.linkedin_profile_url && normalizeLinkedinUrl(inv.linkedin_profile_url)) ||
       (inv.linkedin_profile_handle ? normalizeLinkedinUrl(`https://www.linkedin.com/in/${inv.linkedin_profile_handle}`) : null);
@@ -50,13 +50,13 @@ async function acceptInvites(identityId: string, settings: Settings): Promise<nu
       linkedinProfileUrl: url,
       firstName: inv.first_name ?? null,
       lastName: inv.last_name ?? null,
-      jobTitle: inv.job_title ?? inv.headline ?? null,
+      jobTitle: inv.title ?? null,
     };
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
 
     attempts++;
     try {
-      await acceptInvitation(identityId, inv.linkedin_invitation_urn, inv.linkedin_invitation_secret);
+      await acceptInvitation(identityId, inv.linkedin_invitation_urn, inv.invitation_secret);
     } catch (err) {
       console.error("Falha ao aceitar convite", inv.linkedin_invitation_urn, err);
       continue;
@@ -70,6 +70,8 @@ async function acceptInvites(identityId: string, settings: Settings): Promise<nu
         linkedinProfileId: inv.linkedin_profile_id != null ? String(inv.linkedin_profile_id) : null,
         status: "WAITING_REPLY",
         tags: ["convite recebido"],
+        // A mensagem que a pessoa mandou junto com o convite dá contexto ao corretor.
+        notes: inv.message?.trim() ? `Mensagem do convite: "${inv.message.trim()}"` : null,
       },
     });
     created++;
