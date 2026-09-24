@@ -53,4 +53,7 @@ model Settings {
   dailyMessageLimit   Int     @default(25)
   linkedinIdentityId  String?
   agentInstructions   String? @db.Text
+  targetAudience      String? @db.Text
+  linkedinNeedsReconnect Boolean @default(false)
+  linkedinReconnectReason String?
 }

@@ -82,6 +82,30 @@ export default async function HomePage() {
         </form>
       </header>
 
+      {settings.linkedinNeedsReconnect && (
+        <Link
+          href="/settings"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            margin: 16,
+            padding: "12px 14px",
+            borderRadius: 8,
+            border: "1px solid var(--accent-urgent)",
+            background: "var(--surface)",
+            textDecoration: "none",
+            color: "var(--text)",
+          }}
+        >
+          <span style={{ fontSize: 13.5 }}>
+            Sua conta do LinkedIn desconectou{settings.linkedinReconnectReason ? ` — ${settings.linkedinReconnectReason}` : ""}. A automação está parada até reconectar.
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--accent-urgent)", flexShrink: 0 }}>Reconectar</span>
+        </Link>
+      )}
+
       {leads.length === 0 ? (
         <p style={{ padding: 24, color: "var(--text-muted)", fontSize: 14 }}>
           Nenhum lead ainda. Assim que alguém aceitar um convite ou responder, aparece aqui.

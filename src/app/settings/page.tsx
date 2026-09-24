@@ -5,6 +5,7 @@ import { ConnectButton } from "./ConnectButton";
 import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
+import { TargetAudienceForm } from "./TargetAudienceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,16 @@ export default async function SettingsPage() {
               </div>
             </div>
           )}
+        </section>
+
+        <section style={card}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            Quem buscar
+          </h2>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 12px" }}>
+            Descreva o tipo de pessoa que você quer alcançar no LinkedIn. O sistema busca e manda convite sozinho, todo dia, dentro do limite abaixo.
+          </p>
+          <TargetAudienceForm value={settings.targetAudience ?? ""} />
         </section>
 
         <section style={card}>

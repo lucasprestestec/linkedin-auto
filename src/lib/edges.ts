@@ -89,6 +89,59 @@ export async function sendConnectionInvite(identityId: string, profileUrl: strin
   });
 }
 
+export interface EdgesSearchPerson {
+  full_name: string;
+  linkedin_profile_url: string;
+  job_title?: string;
+  company_name?: string;
+  headline?: string;
+  location?: string;
+}
+
+// Busca por texto livre (cargo, setor, cidade combinados numa frase) — não usamos
+// geoUrn/filtros estruturados do LinkedIn de propósito: exigiriam uma segunda chamada
+// de lookup de localização, e o critério aqui é uma frase que o corretor escreve, não
+// uma URL de busca do LinkedIn. Suficiente para o volume de um único usuário.
+export async function searchPeople(identityId: string, keywords: string) {
+  const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
+  return edgesFetch<EdgesSearchPerson[]>("/actions/linkedin-search-people/run/live", {
+    method: "POST",
+    body: JSON.stringify({
+      identity_mode: "direct",
+      identity_ids: [identityId],
+      input: { linkedin_people_search_url: searchUrl },
+    }),
+  });
+}
+
+export interface EdgesAsyncRun {
+  run_uid: string;
+  status: string;
+}
+
+// Convite sem nota, em modo async: a edges.run espaça e limita as chamadas por conta
+// própria (ver docs.edges.run/v1/actions/linkedin-connect-profile-async) — em modo
+// live isso seria responsabilidade nossa, e uma função serverless não segura um loop
+// com espera de minutos entre convites. custom_data volta em cada callback, é como
+// identificamos qual perfil foi processado.
+export async function scheduleConnectionInvites(
+  identityId: string,
+  candidates: { linkedin_profile_url: string; full_name?: string; job_title?: string }[],
+  callbackUrl: string,
+) {
+  return edgesFetch<EdgesAsyncRun>("/actions/linkedin-connect-profile/run/async", {
+    method: "POST",
+    body: JSON.stringify({
+      identity_ids: [identityId],
+      inputs: candidates.map((c) => ({
+        linkedin_profile_url: c.linkedin_profile_url,
+        custom_data: { full_name: c.full_name, job_title: c.job_title },
+      })),
+      callback: { url: callbackUrl },
+    }),
+  });
+}
+
 export async function sendMessage(identityId: string, profileUrl: string, message: string) {
   return callAction<EdgesMessageResult>("linkedin-message-profile", {
     identity_ids: [identityId],
