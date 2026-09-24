@@ -43,7 +43,6 @@ const FIELDS: {
     key: "locations",
     label: "Cidade ou região",
     placeholder: "Ex.: Porto Alegre",
-    hint: "Vai como palavra-chave — o LinkedIn só filtra região pela lista própria dele.",
     Icon: IconMapPin,
     suggestions: ["Porto Alegre", "São Paulo", "Curitiba", "Florianópolis", "Belo Horizonte"],
     summary: (v) => `em ${v}`,
@@ -60,7 +59,6 @@ const FIELDS: {
     key: "industries",
     label: "Setor",
     placeholder: "Ex.: Tecnologia",
-    hint: "Também vai como palavra-chave.",
     Icon: IconFactory,
     suggestions: ["Tecnologia", "Saúde", "Advocacia", "Construção", "Logística", "Varejo"],
     summary: (v) => `do setor ${v}`,
@@ -175,6 +173,7 @@ export function PeopleSearchBuilder() {
       <div className="search-summary" aria-live="polite">
         <span className="label">Você vai buscar</span>
         <p>{summary}</p>
+        {ready && <span className="tiny muted">O LinkedIn procura esses termos no perfil inteiro (cargo, empresa, resumo). Confira os resultados antes de copiar os links.</span>}
       </div>
 
       <div className="row" style={{ gap: 8 }}>
