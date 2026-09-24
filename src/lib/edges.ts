@@ -37,6 +37,22 @@ async function callAction<T>(actionSlug: string, payload: Record<string, unknown
   });
 }
 
+export interface EdgesWorkspace {
+  name: string;
+  credits_left: number;
+  credits_max: number;
+  credits_used: number;
+  plan_name: string | null;
+  current_month_end: string | null;
+}
+
+// Saldo de crédito real da conta edges.run. Busca no LinkedIn consome crédito
+// (1 por resultado); convite, mensagem e extração de conversa não consomem —
+// rodam de graça pela Engagement Identity já ativada na conta.
+export async function getWorkspace() {
+  return edgesFetch<EdgesWorkspace>("/workspaces");
+}
+
 export interface EdgesIdentity {
   uid: string;
   name: string;

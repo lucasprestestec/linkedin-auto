@@ -4,7 +4,6 @@ import { useActionState, useState, useTransition } from "react";
 import { search, invite, type InviteState } from "./actions";
 import type { ProspectResult } from "@/lib/prospect";
 import { Avatar } from "@/components/Avatar";
-import { MAX_SEARCH_RESULTS } from "@/lib/prospect-constants";
 
 function ProfilePhoto({ result }: { result: ProspectResult }) {
   if (result.profile_image_url) {
@@ -134,8 +133,9 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
   );
 }
 
-export function ProspectSearch() {
+export function ProspectSearch({ maxPerSearch }: { maxPerSearch: number }) {
   const [state, formAction, searching] = useActionState(search, undefined);
+  const defaultLimit = Math.min(10, maxPerSearch);
 
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -161,10 +161,11 @@ export function ProspectSearch() {
           <input
             name="limit"
             type="number"
-            min={10}
-            max={MAX_SEARCH_RESULTS}
+            min={maxPerSearch > 0 ? 10 : 0}
+            max={maxPerSearch}
             step={10}
-            defaultValue={10}
+            defaultValue={defaultLimit}
+            disabled={maxPerSearch <= 0}
             style={{
               width: 70,
               padding: "6px 8px",
@@ -175,11 +176,11 @@ export function ProspectSearch() {
               fontSize: 13.5,
             }}
           />
-          <span style={{ fontSize: 12, color: "var(--text-faint)" }}>máximo {MAX_SEARCH_RESULTS}</span>
+          <span style={{ fontSize: 12, color: "var(--text-faint)" }}>máximo {maxPerSearch} (crédito disponível)</span>
         </label>
         <button
           type="submit"
-          disabled={searching}
+          disabled={searching || maxPerSearch <= 0}
           style={{
             padding: "10px 16px",
             borderRadius: 8,
@@ -195,6 +196,11 @@ export function ProspectSearch() {
           {searching ? "Buscando..." : "Buscar"}
         </button>
         {state?.error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{state.error}</p>}
+        {maxPerSearch <= 0 && (
+          <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>
+            Sem crédito de busca disponível este mês. Convite e mensagem continuam funcionando normalmente.
+          </p>
+        )}
       </form>
 
       {state && !state.error && <ProspectResults key={state.searchId} results={state.results} />}

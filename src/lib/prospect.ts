@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { searchPeople, scheduleConnectionInvites, type EdgesSearchPerson } from "@/lib/edges";
+import { searchPeople, scheduleConnectionInvites, getWorkspace, type EdgesSearchPerson } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
+import { MAX_SEARCH_RESULTS } from "@/lib/prospect-constants";
 
 // Núcleo compartilhado entre a busca automática (lib/discover.ts, 1x/dia) e a busca
 // manual (app/prospect — o corretor digita o que quer e busca na hora). As duas
@@ -9,9 +10,37 @@ import { getActiveIdentityId } from "@/lib/identity";
 
 export type ProspectResult = EdgesSearchPerson & { alreadyLead: boolean };
 
+export interface SearchQuota {
+  creditsLeft: number;
+  creditsMax: number;
+  maxPerSearch: number;
+  renewsAt: string | null;
+}
+
+// Busca no LinkedIn consome 1 crédito por resultado (convite/mensagem não consomem).
+// O teto por busca é o menor entre MAX_SEARCH_RESULTS e o crédito que sobra na
+// conta — sem isso, uma busca grande podia estourar o crédito do mês inteiro
+// de uma vez.
+export async function getSearchQuota(): Promise<SearchQuota> {
+  const workspace = await getWorkspace();
+  return {
+    creditsLeft: workspace.credits_left,
+    creditsMax: workspace.credits_max,
+    maxPerSearch: Math.max(0, Math.min(MAX_SEARCH_RESULTS, workspace.credits_left)),
+    renewsAt: workspace.current_month_end,
+  };
+}
+
 export async function searchProspects(query: string, maxResults?: number): Promise<ProspectResult[]> {
+  const quota = await getSearchQuota();
+  if (quota.creditsLeft <= 0) {
+    throw new Error("Sem crédito disponível na edges.run pra buscar este mês.");
+  }
+
+  const cappedMax = Math.min(maxResults ?? MAX_SEARCH_RESULTS, quota.maxPerSearch);
+
   const identityId = await getActiveIdentityId();
-  const results = await searchPeople(identityId, query, maxResults);
+  const results = await searchPeople(identityId, query, cappedMax);
 
   const existing = await prisma.lead.findMany({ select: { linkedinProfileUrl: true } });
   const known = new Set(existing.map((l) => l.linkedinProfileUrl));
