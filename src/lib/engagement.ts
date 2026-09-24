@@ -1,9 +1,9 @@
 import type { Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
-  acceptReceivedInvitations,
+  acceptInvitation,
   archiveThread,
-  extractConnections,
+  extractReceivedInvitations,
   extractSentInvitations,
   followProfile,
   visitProfile,
@@ -28,42 +28,46 @@ export interface EngagementResult {
 }
 
 // Convites recebidos viram leads "aguardando resposta": a IA abre a conversa
-// na sequência (mensagem de abertura). No máximo 1x/hora.
-// A ação de aceitar só devolve o ID do convite, não quem convidou — então,
-// depois de aceitar, quem conectou nesta rodada sai da lista de conexões
-// (connected_at a partir do início da rodada).
+// na sequência (mensagem de abertura). No máximo 1x/hora, até 10 por rodada.
+// Dois passos: lista os convites pendentes (quem convidou + urn/secret) e
+// aceita um a um. Quem está na lista de exclusão não é aceito — fica pro
+// corretor decidir no LinkedIn.
 async function acceptInvites(identityId: string, settings: Settings): Promise<number> {
   if (!settings.acceptInvitesEnabled) return 0;
   if (Date.now() - (settings.receivedInvitesCheckedAt?.getTime() ?? 0) < HOUR_MS) return 0;
   await prisma.settings.update({ where: { id: "singleton" }, data: { receivedInvitesCheckedAt: new Date() } });
 
-  // Folga pra diferença de relógio entre a edges.run e o servidor.
-  const since = Date.now() - 5 * 60 * 1000;
-  const accepted = await acceptReceivedInvitations(identityId);
-  if (accepted.length === 0) return 0;
-
   const rules = parseExclusionList(settings.exclusionList);
   let created = 0;
-  for (const person of await extractConnections(identityId)) {
-    const connectedAt = person.connected_at ? new Date(person.connected_at).getTime() : NaN;
-    if (!(connectedAt >= since)) continue;
+  let attempts = 0;
+  for (const inv of await extractReceivedInvitations(identityId)) {
+    if (attempts >= MAX_PER_RUN) break;
+    if (!inv.linkedin_invitation_urn || !inv.linkedin_invitation_secret) continue;
     const url =
-      (person.linkedin_profile_url && normalizeLinkedinUrl(person.linkedin_profile_url)) ||
-      (person.linkedin_profile_handle ? normalizeLinkedinUrl(`https://www.linkedin.com/in/${person.linkedin_profile_handle}`) : null);
-    // Já é lead: é convite nosso que foi aceito (detectAcceptedInvites cuida).
-    if (!url || (await findLeadByProfileUrl(url))) continue;
+      (inv.linkedin_profile_url && normalizeLinkedinUrl(inv.linkedin_profile_url)) ||
+      (inv.linkedin_profile_handle ? normalizeLinkedinUrl(`https://www.linkedin.com/in/${inv.linkedin_profile_handle}`) : null);
     const lead = {
       linkedinProfileUrl: url,
-      firstName: person.first_name ?? null,
-      lastName: person.last_name ?? null,
-      jobTitle: person.job_title ?? null,
+      firstName: inv.first_name ?? null,
+      lastName: inv.last_name ?? null,
+      jobTitle: inv.job_title ?? inv.headline ?? null,
     };
-    // Aceitar a conexão tudo bem; só não entra no funil automático.
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
+
+    attempts++;
+    try {
+      await acceptInvitation(identityId, inv.linkedin_invitation_urn, inv.linkedin_invitation_secret);
+    } catch (err) {
+      console.error("Falha ao aceitar convite", inv.linkedin_invitation_urn, err);
+      continue;
+    }
+    // Aceito; vira lead se tiver perfil e ainda não for lead.
+    if (!url || (await findLeadByProfileUrl(url))) continue;
     await prisma.lead.create({
       data: {
         ...lead,
-        linkedinProfileId: person.linkedin_profile_id != null ? String(person.linkedin_profile_id) : null,
+        linkedinProfileUrl: url,
+        linkedinProfileId: inv.linkedin_profile_id != null ? String(inv.linkedin_profile_id) : null,
         status: "WAITING_REPLY",
         tags: ["convite recebido"],
       },
