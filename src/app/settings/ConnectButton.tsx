@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { getOrCreateIdentityLoginLink } from "./actions";
+import { IconAlert, IconLinkedin } from "@/components/Icons";
 
 export function ConnectButton() {
   const [error, setError] = useState<string | null>(null);
@@ -20,29 +21,25 @@ export function ConnectButton() {
   }
 
   return (
-    <div>
-      <button
-        onClick={handleClick}
-        disabled={pending}
-        style={{
-          padding: "10px 16px",
-          borderRadius: 8,
-          border: "none",
-          background: "var(--primary)",
-          color: "#fff",
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-          opacity: pending ? 0.7 : 1,
-        }}
-      >
-        {pending ? "Gerando link..." : "Conectar minha conta do LinkedIn"}
+    <div className="stack" style={{ gap: 8 }}>
+      <button onClick={handleClick} disabled={pending} className="btn btn-block" style={{ background: "#0a66c2", color: "#fff" }}>
+        {pending ? (
+          <>
+            <span className="spinner" /> Gerando link…
+          </>
+        ) : (
+          <>
+            <IconLinkedin size={18} /> Conectar com LinkedIn
+          </>
+        )}
       </button>
-      <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 8 }}>
-        Abre em uma nova aba. Depois de entrar com o LinkedIn, pode fechar aquela aba e voltar aqui.
+      <p className="hint" style={{ textAlign: "center" }}>
+        Abre em uma nova aba. Depois de entrar, volte aqui.
       </p>
       {error && (
-        <p style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 8 }}>{error}</p>
+        <p className="error-text">
+          <IconAlert size={15} /> {error}
+        </p>
       )}
     </div>
   );

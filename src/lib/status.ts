@@ -8,17 +8,16 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
   LOST: "Sem resposta",
 };
 
-export function statusColor(status: LeadStatus): string {
-  switch (status) {
-    case "NEEDS_HUMAN":
-      return "var(--accent-urgent)";
-    case "CONVERSATION_OPEN":
-    case "QUALIFIED":
-      return "var(--accent-open)";
-    default:
-      return "var(--accent-idle)";
-  }
-}
+// Sufixo das classes .badge-* / .status-* do globals.css.
+export type StatusTone = "urgent" | "open" | "qualified" | "invite" | "lost";
+
+export const STATUS_TONE: Record<LeadStatus, StatusTone> = {
+  NEEDS_HUMAN: "urgent",
+  CONVERSATION_OPEN: "open",
+  QUALIFIED: "qualified",
+  INVITE_SENT: "invite",
+  LOST: "lost",
+};
 
 export interface LeadSection {
   key: string;
@@ -29,6 +28,6 @@ export interface LeadSection {
 export const LEAD_SECTIONS: LeadSection[] = [
   { key: "urgent", label: "Precisa de você", statuses: ["NEEDS_HUMAN"] },
   { key: "open", label: "Conversando", statuses: ["CONVERSATION_OPEN", "QUALIFIED"] },
-  { key: "invited", label: "Convite enviado", statuses: ["INVITE_SENT"] },
+  { key: "invited", label: "Convites", statuses: ["INVITE_SENT"] },
   { key: "lost", label: "Sem resposta", statuses: ["LOST"] },
 ];

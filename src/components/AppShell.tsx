@@ -5,16 +5,13 @@ import { BottomNav } from "./BottomNav";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const hideNav = pathname === "/login";
+  // Login é tela cheia; a conversa tem o próprio compositor fixo no rodapé.
+  const hideNav = pathname === "/login" || pathname.startsWith("/leads/");
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, width: "100%", maxWidth: 640, margin: "0 auto" }}>{children}</div>
-      {!hideNav && (
-        <div style={{ width: "100%", maxWidth: 640, margin: "0 auto" }}>
-          <BottomNav />
-        </div>
-      )}
-    </div>
+    <>
+      <div className="shell">{children}</div>
+      {!hideNav && <BottomNav />}
+    </>
   );
 }

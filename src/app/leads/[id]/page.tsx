@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { relativeTime } from "@/lib/format";
+import { clockTime, dayLabel, relativeTime, sameDay, shortDate } from "@/lib/format";
+import { STATUS_LABEL, STATUS_TONE } from "@/lib/status";
 import { Avatar } from "@/components/Avatar";
+import { IconArrowLeft, IconCheckCheck, IconHand, IconLinkedin, IconSparkles, IconUser } from "@/components/Icons";
 import { ReplyForm } from "./ReplyForm";
 
 export const dynamic = "force-dynamic";
@@ -16,91 +18,106 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   if (!lead) notFound();
 
-  const needsHuman = lead.status === "NEEDS_HUMAN";
+  const tone = STATUS_TONE[lead.status];
+  const fullName = `${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim() || "Lead";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 57px)" }}>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
-          padding: "12px 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          zIndex: 10,
-        }}
-      >
-        <Link href="/" style={{ color: "var(--text-muted)", fontSize: 20, textDecoration: "none", lineHeight: 1 }} aria-label="Voltar">
-          ←
+    <div className="chat-page">
+      <header className="chat-header">
+        <Link href="/" className="icon-btn icon-btn-round" aria-label="Voltar" style={{ border: "none", background: "transparent", boxShadow: "none" }}>
+          <IconArrowLeft size={24} />
         </Link>
-        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={36} />
+        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={40} status={tone} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>
-            {lead.firstName} {lead.lastName}
+          <div className="lead-name" style={{ fontSize: 16 }}>
+            {fullName}
           </div>
-          {lead.jobTitle && (
-            <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {lead.jobTitle}
-            </div>
-          )}
+          <div className="tiny faint" style={{ fontWeight: 600 }}>
+            {STATUS_LABEL[lead.status]}
+          </div>
         </div>
         <a
           href={lead.linkedinProfileUrl}
           target="_blank"
           rel="noreferrer"
           aria-label="Ver perfil no LinkedIn"
-          style={{ color: "var(--text-faint)", fontSize: 18, flexShrink: 0 }}
+          className="icon-btn icon-btn-round"
+          style={{ color: "#0a66c2" }}
         >
-          ↗
+          <IconLinkedin size={18} />
         </a>
       </header>
 
-      {needsHuman && (
-        <div
-          style={{
-            margin: "12px 16px 0",
-            padding: "10px 12px",
-            borderRadius: 8,
-            background: "var(--accent-urgent-bg)",
-            color: "var(--accent-urgent)",
-            fontSize: 13,
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 8,
-          }}
-        >
-          <span>{lead.needsHumanReason ?? "Precisa de resposta"}</span>
-          <span style={{ flexShrink: 0, opacity: 0.8 }}>{relativeTime(lead.updatedAt)}</span>
+      <div className="chat-intro rise">
+        <Avatar firstName={lead.firstName} lastName={lead.lastName} size={76} />
+        <h1 className="title-lg" style={{ marginTop: 8 }}>
+          {fullName}
+        </h1>
+        {lead.jobTitle && (
+          <p className="small muted" style={{ maxWidth: 300 }}>
+            {lead.jobTitle}
+          </p>
+        )}
+        <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
+          <span className={`badge badge-${tone}`}>{STATUS_LABEL[lead.status]}</span>
+          <span className="badge badge-plain">Lead desde {shortDate(lead.createdAt)}</span>
         </div>
-      )}
+      </div>
 
-      <div style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        {lead.messages.map((message) => {
+      <div className="thread">
+        {lead.messages.length === 0 && (
+          <p className="small faint" style={{ textAlign: "center", padding: "24px 0" }}>
+            Nenhuma mensagem ainda. Assim que o convite for aceito, a conversa aparece aqui.
+          </p>
+        )}
+
+        {lead.messages.map((message, i) => {
+          const prev = lead.messages[i - 1];
+          const showDay = !prev || !sameDay(prev.deliveredAt, message.deliveredAt);
           const fromLead = message.sender === "LEAD";
+          const kind = fromLead ? "msg-in" : message.sender === "AGENT" ? "msg-out msg-agent" : "msg-out msg-human";
           return (
-            <div
-              key={message.id}
-              style={{
-                alignSelf: fromLead ? "flex-start" : "flex-end",
-                maxWidth: "80%",
-                padding: "10px 13px",
-                borderRadius: 12,
-                background: fromLead ? "var(--surface)" : "var(--primary)",
-                color: fromLead ? "var(--text)" : "#fff",
-                border: fromLead ? "1px solid var(--border)" : "none",
-                fontSize: 14.5,
-              }}
-            >
-              {message.content}
-              <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 4, textAlign: "right" }}>
-                {relativeTime(message.deliveredAt)}
+            <div key={message.id} style={{ display: "contents" }}>
+              {showDay && <div className="day-sep">{dayLabel(message.deliveredAt)}</div>}
+              <div className={`msg ${kind}`}>
+                <div className="bubble">{message.content}</div>
+                <div className="msg-meta">
+                  {message.sender === "AGENT" && (
+                    <>
+                      <IconSparkles size={12} /> IA ·
+                    </>
+                  )}
+                  {message.sender === "HUMAN" && (
+                    <>
+                      <IconUser size={12} /> Você ·
+                    </>
+                  )}
+                  {clockTime(message.deliveredAt)}
+                  {!fromLead && <IconCheckCheck size={13} style={{ color: "var(--brand)" }} />}
+                </div>
               </div>
             </div>
           );
         })}
+
+        {lead.status === "NEEDS_HUMAN" && (
+          <div className="handoff rise">
+            <span className="alert-icon">
+              <IconHand size={20} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="row" style={{ gap: 8, justifyContent: "space-between" }}>
+                <strong style={{ fontSize: 14 }}>A IA passou a conversa pra você</strong>
+                <span className="tiny faint" style={{ flexShrink: 0 }}>
+                  {relativeTime(lead.updatedAt)}
+                </span>
+              </div>
+              <p className="small" style={{ color: "var(--urgent-ink)", fontWeight: 600, marginTop: 3 }}>
+                {lead.needsHumanReason ?? "Precisa de resposta"}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <ReplyForm leadId={lead.id} />

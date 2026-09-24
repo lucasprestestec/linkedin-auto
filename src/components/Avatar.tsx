@@ -1,24 +1,25 @@
-import { initials, avatarColor } from "@/lib/format";
+import { initials, avatarGradient } from "@/lib/format";
+import type { StatusTone } from "@/lib/status";
 
-export function Avatar({ firstName, lastName, size = 40 }: { firstName?: string | null; lastName?: string | null; size?: number }) {
+export function Avatar({
+  firstName,
+  lastName,
+  size = 44,
+  status,
+}: {
+  firstName?: string | null;
+  lastName?: string | null;
+  size?: number;
+  status?: StatusTone;
+}) {
   const label = `${firstName ?? ""} ${lastName ?? ""}`.trim() || "?";
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: avatarColor(label),
-        color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: size * 0.38,
-        fontWeight: 600,
-        flexShrink: 0,
-      }}
+    <span
+      className="avatar"
+      style={{ width: size, height: size, background: avatarGradient(label), fontSize: Math.round(size * 0.36) }}
     >
       {initials(firstName, lastName)}
-    </div>
+      {status && <span className={`avatar-status status-${status}`} />}
+    </span>
   );
 }

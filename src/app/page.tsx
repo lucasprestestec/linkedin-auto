@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { LEAD_SECTIONS } from "@/lib/status";
-import { relativeTime } from "@/lib/format";
-import { Avatar } from "@/components/Avatar";
-import { toggleAutomation } from "./actions";
-import type { Lead, LeadStatus, Message } from "@prisma/client";
+import { greeting, relativeTime, todayLabel } from "@/lib/format";
+import { IconAlert, IconChevronRight, IconPlus, IconZap } from "@/components/Icons";
+import { AutomationSwitch } from "./AutomationSwitch";
+import { LeadList, type LeadItem } from "./LeadList";
 
 export const dynamic = "force-dynamic";
-
-type LeadWithMessages = Lead & { messages: Message[] };
 
 async function getData() {
   const [settings, leads] = await Promise.all([
@@ -30,158 +27,106 @@ async function getData() {
 export default async function HomePage() {
   const { settings, leads, sentToday } = await getData();
 
-  const byStatus = new Map<LeadStatus, LeadWithMessages[]>();
-  for (const lead of leads) {
-    const list = byStatus.get(lead.status) ?? [];
-    list.push(lead);
-    byStatus.set(lead.status, list);
-  }
-  for (const list of byStatus.values()) {
-    list.sort((a, b) => (b.messages[0]?.deliveredAt.getTime() ?? b.updatedAt.getTime()) - (a.messages[0]?.deliveredAt.getTime() ?? a.updatedAt.getTime()));
-  }
+  const items: LeadItem[] = leads
+    .map((lead) => {
+      const last = lead.messages[0];
+      const when = last?.deliveredAt ?? lead.updatedAt;
+      return {
+        item: {
+          id: lead.id,
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          jobTitle: lead.jobTitle,
+          status: lead.status,
+          needsHumanReason: lead.needsHumanReason,
+          lastMessage: last ? { content: last.content, sender: last.sender } : null,
+          when: relativeTime(when),
+        },
+        sortKey: when.getTime(),
+      };
+    })
+    .sort((a, b) => b.sortKey - a.sortKey)
+    .map((x) => x.item);
+
+  const needYou = leads.filter((l) => l.status === "NEEDS_HUMAN").length;
+  const talking = leads.filter((l) => l.status === "CONVERSATION_OPEN").length;
+  const qualified = leads.filter((l) => l.status === "QUALIFIED").length;
+  const usage = Math.min(100, Math.round((sentToday / Math.max(1, settings.dailyMessageLimit)) * 100));
 
   return (
-    <>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
-          padding: "16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          zIndex: 10,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: -0.2 }}>Leads</h1>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
-            {settings.automationPaused ? "Automação pausada" : "Automação ativa"} · {sentToday}/{settings.dailyMessageLimit} mensagens hoje
-          </div>
+    <main className="page">
+      <header className="topbar">
+        <div className="topbar-titles">
+          <div className="eyebrow">{todayLabel()}</div>
+          <h1 className="title-xl">{greeting()}</h1>
         </div>
-        <form action={toggleAutomation}>
-          <button
-            type="submit"
-            style={{
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid var(--border)",
-              background: settings.automationPaused ? "var(--primary)" : "var(--surface)",
-              color: settings.automationPaused ? "#fff" : "var(--text)",
-              fontSize: 13.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            {settings.automationPaused ? "Retomar" : "Pausar"}
-          </button>
-        </form>
+        <Link href="/prospect" className="icon-btn icon-btn-round" aria-label="Nova prospecção">
+          <IconPlus size={20} />
+        </Link>
       </header>
 
       {settings.linkedinNeedsReconnect && (
-        <Link
-          href="/settings"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            margin: 16,
-            padding: "12px 14px",
-            borderRadius: 8,
-            border: "1px solid var(--accent-urgent)",
-            background: "var(--surface)",
-            textDecoration: "none",
-            color: "var(--text)",
-          }}
-        >
-          <span style={{ fontSize: 13.5 }}>
-            Sua conta do LinkedIn desconectou{settings.linkedinReconnectReason ? ` — ${settings.linkedinReconnectReason}` : ""}. A automação está parada até reconectar.
+        <Link href="/settings" className="alert rise">
+          <span className="alert-icon">
+            <IconAlert size={20} />
           </span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--accent-urgent)", flexShrink: 0 }}>Reconectar</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <strong>LinkedIn desconectado</strong>
+            <p>
+              {settings.linkedinReconnectReason ?? "A sessão expirou"}. A automação está parada até você reconectar.
+            </p>
+          </span>
+          <IconChevronRight size={18} />
         </Link>
       )}
 
-      {leads.length === 0 ? (
-        <p style={{ padding: 24, color: "var(--text-muted)", fontSize: 14 }}>
-          Nenhum lead ainda. Assim que alguém aceitar um convite ou responder, aparece aqui.
-        </p>
-      ) : (
-        <div style={{ padding: "8px 0 24px" }}>
-          {LEAD_SECTIONS.map((section) => {
-            const items = section.statuses.flatMap((s) => byStatus.get(s) ?? []);
-            if (items.length === 0) return null;
-            const urgent = section.key === "urgent";
+      <section className="hero rise" aria-label="Resumo de hoje">
+        <div className="stack" style={{ gap: 16 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div className="stack" style={{ gap: 8 }}>
+              <span className="hero-label">
+                <IconZap size={14} /> Mensagens enviadas hoje
+              </span>
+              <span className="hero-number">
+                {sentToday}
+                <small>/ {settings.dailyMessageLimit}</small>
+              </span>
+            </div>
+            <span
+              className="badge badge-plain"
+              style={{ background: "rgba(255,255,255,0.12)", color: "#fff", marginTop: 2 }}
+            >
+              {usage}% do limite
+            </span>
+          </div>
+          <div className="meter" role="progressbar" aria-valuenow={usage} aria-valuemin={0} aria-valuemax={100}>
+            <span style={{ width: `${usage}%` }} />
+          </div>
 
-            return (
-              <div key={section.key} style={{ marginTop: 24 }}>
-                <div
-                  style={{
-                    padding: "0 16px 8px",
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.6,
-                    color: urgent ? "var(--accent-urgent)" : "var(--text-faint)",
-                  }}
-                >
-                  {section.label} {items.length > 1 && `· ${items.length}`}
-                </div>
-                <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                  {items.map((lead) => {
-                    const lastMessage = lead.messages[0];
-                    const when = lastMessage?.deliveredAt ?? lead.updatedAt;
-                    return (
-                      <li key={lead.id}>
-                        <Link
-                          href={`/leads/${lead.id}`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 12,
-                            padding: urgent ? "12px 16px" : "9px 16px",
-                            textDecoration: "none",
-                            color: "inherit",
-                            borderLeft: urgent ? "3px solid var(--accent-urgent)" : "3px solid transparent",
-                          }}
-                        >
-                          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={urgent ? 40 : 34} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                              <span style={{ fontSize: urgent ? 15.5 : 14.5, fontWeight: urgent ? 700 : 600 }}>
-                                {lead.firstName} {lead.lastName}
-                              </span>
-                              <span style={{ fontSize: 11.5, color: "var(--text-faint)", flexShrink: 0, marginLeft: "auto" }}>
-                                {relativeTime(when)}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 13,
-                                color: urgent ? "var(--text)" : "var(--text-muted)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                marginTop: 1,
-                              }}
-                            >
-                              {urgent && lead.needsHumanReason ? lead.needsHumanReason : lastMessage?.content ?? lead.jobTitle}
-                            </div>
-                          </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <i className="dot" style={{ background: "#ff8a6b" }} />
+              <b>{needYou}</b>
+              <span>Pra você</span>
+            </div>
+            <div className="hero-stat">
+              <i className="dot" style={{ background: "#7fb0ff" }} />
+              <b>{talking}</b>
+              <span>Conversando</span>
+            </div>
+            <div className="hero-stat">
+              <i className="dot" style={{ background: "#4ee0a2" }} />
+              <b>{qualified}</b>
+              <span>Qualificados</span>
+            </div>
+          </div>
+
+          <div className="hero-divider" />
+          <AutomationSwitch paused={settings.automationPaused} />
         </div>
-      )}
-    </>
+      </section>
+
+      <LeadList leads={items} />
+    </main>
   );
 }

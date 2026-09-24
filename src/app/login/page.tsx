@@ -1,70 +1,77 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login } from "./actions";
+import { IconAlert, IconEye, IconEyeOff, IconLock, IconSparkles, LogoMark } from "@/components/Icons";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, undefined);
+  const [visible, setVisible] = useState(false);
+  // Remonta o campo a cada tentativa para a animação de erro tocar de novo.
+  const [attempt, setAttempt] = useState(0);
 
   return (
-    <main
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <form
-        action={formAction}
-        style={{
-          width: "100%",
-          maxWidth: 320,
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          padding: 28,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Entrar</h1>
-        <input
-          type="password"
-          name="password"
-          placeholder="Senha"
-          autoFocus
-          required
-          style={{
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid var(--border)",
-            background: "var(--bg)",
-            color: "var(--text)",
-            fontSize: 15,
-          }}
-        />
+    <main className="login">
+      <div className="login-hero">
+        <span className="logo">
+          <LogoMark size={30} />
+        </span>
+        <h1 className="login-title">
+          Seus leads do LinkedIn, <span>no piloto automático.</span>
+        </h1>
+        <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 15, maxWidth: 340 }}>
+          Convites, conversas e follow-ups com um agente de IA que sabe a hora de te chamar.
+        </p>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          {["Convites automáticos", "Respostas com IA", "Handoff inteligente"].map((t) => (
+            <span key={t} className="badge badge-plain" style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.85)", height: 28, padding: "0 11px" }}>
+              <IconSparkles size={12} /> {t}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <form action={formAction} onSubmit={() => setAttempt((a) => a + 1)} className="login-sheet">
+        <div className="stack" style={{ gap: 4 }}>
+          <h2 className="title-lg">Bem-vindo de volta</h2>
+          <p className="small muted">Entre com sua senha para acessar o painel.</p>
+        </div>
+        <div key={attempt} className={`input-wrap${state?.error ? " shake" : ""}`}>
+          <IconLock size={19} />
+          <input
+            className="input"
+            type={visible ? "text" : "password"}
+            name="password"
+            placeholder="Senha"
+            aria-label="Senha"
+            autoComplete="current-password"
+            autoFocus
+            required
+            style={state?.error ? { borderColor: "var(--urgent)" } : undefined}
+          />
+          <button
+            type="button"
+            className="icon-btn icon-btn-round input-action"
+            style={{ border: "none", background: "transparent", boxShadow: "none", color: "var(--text-3)" }}
+            onClick={() => setVisible((v) => !v)}
+            aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
+          >
+            {visible ? <IconEyeOff size={19} /> : <IconEye size={19} />}
+          </button>
+        </div>
         {state?.error && (
-          <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{state.error}</p>
+          <p className="error-text">
+            <IconAlert size={15} /> {state.error}
+          </p>
         )}
-        <button
-          type="submit"
-          disabled={pending}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "none",
-            background: "var(--primary)",
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: "pointer",
-            opacity: pending ? 0.7 : 1,
-          }}
-        >
-          {pending ? "Entrando..." : "Entrar"}
+        <button type="submit" disabled={pending} className="btn btn-primary btn-lg btn-block">
+          {pending ? (
+            <>
+              <span className="spinner" /> Entrando…
+            </>
+          ) : (
+            "Entrar"
+          )}
         </button>
       </form>
     </main>
