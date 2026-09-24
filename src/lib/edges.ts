@@ -184,3 +184,43 @@ export async function extractConnections(identityId: string): Promise<EdgesConne
   if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-connections.");
   return data;
 }
+
+// Quem visitou o perfil da conta (ação "Extract LinkedIn Profile Viewers",
+// Engagement, sem input). Em conta gratuita o LinkedIn só expõe as últimas
+// poucas visitas, e visitas em modo privado vêm sem URL de perfil.
+export interface EdgesProfileViewer {
+  view_timestamp?: number;
+  view_date?: string;
+  connection_degree?: string;
+  linkedin_profile_handle?: string;
+  headline?: string;
+  linkedin_profile_url?: string;
+  linkedin_profile_id?: number;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+}
+
+export async function extractProfileViewers(identityId: string): Promise<EdgesProfileViewer[]> {
+  const data = await callAction<EdgesProfileViewer[]>("linkedin-extract-profile-viewers", { identity_ids: [identityId] });
+  if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-profile-viewers.");
+  return data;
+}
+
+// Quem segue o perfil da conta (ação "Extract LinkedIn Followers", Engagement,
+// sem input). Inclui as conexões: no LinkedIn, conexão segue automaticamente.
+export interface EdgesFollower {
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  job_title?: string;
+  linkedin_profile_handle?: string;
+  linkedin_profile_url?: string;
+  linkedin_profile_id?: number;
+}
+
+export async function extractFollowers(identityId: string): Promise<EdgesFollower[]> {
+  const data = await callAction<EdgesFollower[]>("linkedin-extract-followers", { identity_ids: [identityId] });
+  if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-followers.");
+  return data;
+}
