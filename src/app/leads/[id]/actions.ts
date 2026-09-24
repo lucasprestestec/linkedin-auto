@@ -38,3 +38,28 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
   revalidatePath("/");
   return { error: undefined };
 }
+
+// ---------------------------------------------------------------------------
+// CRM: anotações e etiquetas do corretor sobre o lead.
+// ---------------------------------------------------------------------------
+
+export async function updateLeadNotes(leadId: string, notes: string) {
+  await prisma.lead.update({ where: { id: leadId }, data: { notes: notes.trim() || null } });
+  revalidatePath(`/leads/${leadId}`);
+  return { saved: true };
+}
+
+// Etiquetas: minúsculas, sem espaço sobrando, sem repetir, até 10 por lead.
+export async function updateLeadTags(leadId: string, tags: string[]) {
+  const clean = [...new Set(tags.map((t) => t.trim().toLowerCase().slice(0, 30)).filter(Boolean))].slice(0, 10);
+  await prisma.lead.update({ where: { id: leadId }, data: { tags: clean } });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { tags: clean };
+}
+
+export async function updateLeadCampaign(leadId: string, campaignId: string | null) {
+  await prisma.lead.update({ where: { id: leadId }, data: { campaignId } });
+  revalidatePath(`/leads/${leadId}`);
+  return { saved: true };
+}

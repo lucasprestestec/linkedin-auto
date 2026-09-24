@@ -24,9 +24,11 @@ export async function parseProfiles(_prevState: ParseState, formData: FormData):
 
 export type InviteState = { scheduled: number; skippedForLimit: number; error?: string } | undefined;
 
-export async function invite(candidates: ProspectResult[]): Promise<InviteState> {
+export async function invite(candidates: ProspectResult[], campaignId?: string): Promise<InviteState> {
   try {
-    return await inviteProspects(candidates.filter((c) => !c.alreadyLead));
+    return await inviteProspects(
+      candidates.filter((c) => !c.alreadyLead && !c.excluded).map((c) => ({ linkedinProfileUrl: c.linkedinProfileUrl, campaignId })),
+    );
   } catch (err) {
     return { scheduled: 0, skippedForLimit: 0, error: err instanceof Error ? err.message : "Falha ao convidar." };
   }
@@ -42,7 +44,7 @@ export async function loadWarmSuggestions(): Promise<WarmState> {
   }
 }
 
-export async function inviteWarm(candidates: WarmSuggestion[]): Promise<InviteState> {
+export async function inviteWarm(candidates: WarmSuggestion[], campaignId?: string): Promise<InviteState> {
   try {
     // A lista vem do navegador: normaliza de novo e descarta quem virou lead
     // entre a busca e o clique.
@@ -51,7 +53,7 @@ export async function inviteWarm(candidates: WarmSuggestion[]): Promise<InviteSt
       const url = normalizeLinkedinUrl(c.linkedinProfileUrl);
       if (!url || (await findLeadByProfileUrl(url))) continue;
       const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ") || undefined;
-      valid.push({ linkedinProfileUrl: url, fullName, jobTitle: c.headline ?? undefined });
+      valid.push({ linkedinProfileUrl: url, fullName, jobTitle: c.headline ?? undefined, icpScore: c.icpScore ?? undefined, campaignId });
     }
     return await inviteProspects(valid);
   } catch (err) {

@@ -16,7 +16,7 @@ export function AgentInstructionsForm({ value }: { value: string }) {
           <IconBot size={20} />
         </span>
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 700 }}>Instruções do agente</span>
+          <span style={{ fontWeight: 700 }}>Instruções gerais do agente</span>
           <span className="tiny faint">Produtos, público, objeções e quando chamar você</span>
         </div>
       </div>

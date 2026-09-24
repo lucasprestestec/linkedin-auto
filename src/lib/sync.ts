@@ -1,5 +1,6 @@
 import type { Lead, MessageSender } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { markNeedsHuman } from "@/lib/handoff";
 import { extractThreadMessages, threadUrl, type EdgesConversation, type EdgesThreadMessage } from "@/lib/edges";
 import { syncLeadFromConversation } from "@/lib/leads";
 
@@ -9,6 +10,8 @@ export interface SyncedMessage {
   content: string;
   deliveredAt: Date;
   fromLead: boolean;
+  // Veio com arquivo (ex.: a apólice atual). A IA não abre anexos.
+  hasAttachment?: boolean;
 }
 
 export interface ConversationSyncResult {
@@ -58,9 +61,10 @@ export function toSyncedMessages(messages: EdgesThreadMessage[], isFromLead: (m:
     .sort((a, b) => new Date(a.delivered_at).getTime() - new Date(b.delivered_at).getTime() || a.position - b.position)
     .map((m) => ({
       messageId: m.message_id,
-      content: m.content ?? "",
+      content: m.content?.trim() || (m.attachments?.length ? "📎 Anexo" : ""),
       deliveredAt: new Date(m.delivered_at),
       fromLead: isFromLead(m),
+      hasAttachment: Boolean(m.attachments?.length),
     }));
 }
 
@@ -159,6 +163,14 @@ export async function syncConversation(conv: EdgesConversation, identityId: stri
     });
   }
   const latest = messages[messages.length - 1];
+  // Anexo do lead: a IA não lê arquivo, e responder sem ver seria chute —
+  // passa pro corretor. Baixar o anexo pela edges.run é ação paga (Standard).
+  if (saved.some((m) => m.fromLead && m.hasAttachment)) {
+    await markNeedsHuman(lead.id, "Enviou um anexo — abra a conversa no LinkedIn pra ver");
+    lead = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+    return { lead, saved, shouldRespond: false, usedFallback };
+  }
+
   const shouldRespond = latest.fromLead && saved.some((m) => m.messageId === latest.messageId);
 
   return { lead, saved, shouldRespond, usedFallback };

@@ -204,3 +204,86 @@ export async function generateFollowUp(
     `${leadDescription(lead)}\n\nHistórico da conversa (mais antiga primeiro):\n${transcript || "(vazio)"}`,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Qualificação por perfil de cliente ideal (ICP): nota 0-100 por pessoa, só com
+// o que já temos (nome, cargo/headline). Uma chamada pra lista toda.
+// ---------------------------------------------------------------------------
+
+export interface ProfileToScore {
+  id: string;
+  name: string;
+  headline: string | null;
+}
+
+export interface ProfileScore {
+  id: string;
+  score: number;
+  reason: string;
+}
+
+const SCORE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "score_profiles",
+    description: "Dá uma nota de 0 a 100 para cada perfil conforme o encaixe com o cliente ideal.",
+    parameters: {
+      type: "object",
+      properties: {
+        scores: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              score: { type: "integer", minimum: 0, maximum: 100 },
+              reason: { type: "string", description: "Motivo curto (até 10 palavras), em português." },
+            },
+            required: ["id", "score", "reason"],
+          },
+        },
+      },
+      required: ["scores"],
+    },
+  },
+};
+
+const SCORE_BATCH = 30;
+
+export async function scoreProfiles(idealCustomer: string, profiles: ProfileToScore[]): Promise<ProfileScore[]> {
+  const client = getClient();
+  const model = process.env.NOUS_MODEL || "deepseek/deepseek-v4-flash";
+  const results: ProfileScore[] = [];
+
+  for (let i = 0; i < profiles.length; i += SCORE_BATCH) {
+    const batch = profiles.slice(i, i + SCORE_BATCH);
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você avalia perfis do LinkedIn para um corretor de seguros. Compare cada perfil com a descrição do cliente ideal e dê uma nota de 0 a 100 " +
+            "(80+ encaixe forte, 50-79 possível, abaixo de 50 fraco). Use só o nome e o cargo/headline informados; se faltar informação, seja conservador (até 40). " +
+            "Não invente fatos. Use a ferramenta score_profiles com todos os ids recebidos.",
+        },
+        {
+          role: "user",
+          content:
+            `Cliente ideal:\n${idealCustomer.trim()}\n\nPerfis:\n` +
+            batch.map((p) => `- id=${p.id} | ${p.name || "(sem nome)"} | ${p.headline || "(sem cargo)"}`).join("\n"),
+        },
+      ],
+      tools: [SCORE_TOOL],
+      tool_choice: { type: "function", function: { name: "score_profiles" } },
+    });
+    const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+    if (!toolCall || toolCall.type !== "function") throw new Error("O agente não retornou as notas.");
+    const { scores } = JSON.parse(toolCall.function.arguments) as { scores?: ProfileScore[] };
+    const ids = new Set(batch.map((p) => p.id));
+    for (const s of scores ?? []) {
+      if (ids.has(s.id)) results.push({ id: s.id, score: Math.max(0, Math.min(100, Math.round(s.score))), reason: s.reason ?? "" });
+    }
+  }
+  return results;
+}
