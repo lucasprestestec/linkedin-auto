@@ -1,6 +1,6 @@
 import type { Lead, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { extractConnectionProfileUrls, sendMessage } from "@/lib/edges";
+import { extractConnections, sendMessage, type EdgesConnection } from "@/lib/edges";
 import { generateFollowUp, generateOpeningMessage } from "@/lib/agent";
 import { messagesSentToday } from "@/lib/limits";
 import { linkedinProfileSlug } from "@/lib/linkedin";
@@ -41,12 +41,35 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
   // a cada rodada do cron.
   await prisma.settings.update({ where: { id: "singleton" }, data: { connectionsCheckedAt: new Date() } });
 
-  const connected = new Set((await extractConnectionProfileUrls(identityId)).map(linkedinProfileSlug).filter(Boolean));
-  const accepted = pending.filter((lead) => connected.has(linkedinProfileSlug(lead.linkedinProfileUrl)));
-  for (const lead of accepted) {
-    await prisma.lead.update({ where: { id: lead.id }, data: { status: "WAITING_REPLY" } });
+  // Indexa pelo slug do perfil: vem da URL ou, na falta dela, do handle.
+  const bySlug = new Map<string, EdgesConnection>();
+  for (const connection of await extractConnections(identityId)) {
+    const slug =
+      (connection.linkedin_profile_url && linkedinProfileSlug(connection.linkedin_profile_url)) ||
+      connection.linkedin_profile_handle?.trim().toLowerCase();
+    if (slug) bySlug.set(slug, connection);
   }
-  return accepted.length;
+
+  let accepted = 0;
+  for (const lead of pending) {
+    const slug = linkedinProfileSlug(lead.linkedinProfileUrl);
+    const connection = slug ? bySlug.get(slug) : undefined;
+    if (!connection) continue;
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: {
+        status: "WAITING_REPLY",
+        // O ID do perfil é o mesmo que vem como remetente no histórico de
+        // mensagens: guardando aqui, a primeira resposta já é reconhecida pelo ID.
+        linkedinProfileId: lead.linkedinProfileId ?? (connection.linkedin_profile_id != null ? String(connection.linkedin_profile_id) : null),
+        firstName: lead.firstName ?? connection.first_name ?? null,
+        lastName: lead.lastName ?? connection.last_name ?? null,
+        jobTitle: lead.jobTitle ?? connection.job_title ?? null,
+      },
+    });
+    accepted++;
+  }
+  return accepted;
 }
 
 async function sendAgentMessage(lead: Lead, identityId: string, content: string) {
