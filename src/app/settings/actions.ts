@@ -60,15 +60,3 @@ export async function updateAgentInstructions(_prevState: unknown, formData: For
   revalidatePath("/settings");
   return { saved: true };
 }
-
-export async function updateTargetAudience(_prevState: unknown, formData: FormData) {
-  const targetAudience = String(formData.get("targetAudience") ?? "").trim();
-
-  await prisma.settings.update({
-    where: { id: "singleton" },
-    data: { targetAudience: targetAudience || null },
-  });
-
-  revalidatePath("/settings");
-  return { saved: true };
-}

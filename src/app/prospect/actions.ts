@@ -1,23 +1,22 @@
 "use server";
 
-import { searchProspects, inviteProspects, type ProspectResult } from "@/lib/prospect";
+import { parsePastedProfiles, inviteProspects, type ProspectResult } from "@/lib/prospect";
 
-export type SearchState = { results: ProspectResult[]; query: string; searchId: number; error?: string } | undefined;
+export type ParseState = { results: ProspectResult[]; parseId: number; error?: string } | undefined;
 
-export async function search(_prevState: SearchState, formData: FormData): Promise<SearchState> {
-  const query = String(formData.get("query") ?? "").trim();
-  const searchId = Date.now();
-  if (!query) return { results: [], query: "", searchId, error: "Escreva o que você está procurando." };
+export async function parseProfiles(_prevState: ParseState, formData: FormData): Promise<ParseState> {
+  const raw = String(formData.get("urls") ?? "");
+  const parseId = Date.now();
 
-  const rawLimit = Number(formData.get("limit"));
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
-
-  try {
-    const results = await searchProspects(query, limit);
-    return { results, query, searchId };
-  } catch (err) {
-    return { results: [], query, searchId, error: err instanceof Error ? err.message : "Falha na busca." };
+  const results = await parsePastedProfiles(raw);
+  if (results.length === 0) {
+    return {
+      results: [],
+      parseId,
+      error: "Nenhum link do LinkedIn válido encontrado. Cole um por linha, ex: https://www.linkedin.com/in/nome-da-pessoa",
+    };
   }
+  return { results, parseId };
 }
 
 export type InviteState = { scheduled: number; skippedForLimit: number; error?: string } | undefined;

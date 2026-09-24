@@ -5,8 +5,6 @@ import { ConnectButton } from "./ConnectButton";
 import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
-import { TargetAudienceForm } from "./TargetAudienceForm";
-import { getSearchQuota } from "@/lib/prospect";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +28,6 @@ const card: React.CSSProperties = {
 export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const status = await getConnectionStatus(settings.linkedinIdentityId);
-  const quota = await getSearchQuota().catch(() => null);
 
   return (
     <>
@@ -77,45 +74,12 @@ export default async function SettingsPage() {
 
         <section style={card}>
           <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            Quem buscar
-          </h2>
-          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 12px" }}>
-            Descreva o tipo de pessoa que você quer alcançar no LinkedIn. O sistema busca e manda convite sozinho, todo dia, dentro do limite abaixo.
-          </p>
-          <TargetAudienceForm value={settings.targetAudience ?? ""} />
-        </section>
-
-        <section style={card}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
             Limite diário
           </h2>
           <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 12px" }}>
             Isso protege a conta do LinkedIn: mandar convite ou mensagem demais por dia é o principal motivo de conta ser restringida. O próprio LinkedIn permite no máximo ~25-30 convites por dia numa conta sem Sales Navigator — não adianta colocar um número maior aqui, ele vai ser recusado de qualquer forma.
           </p>
           <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-        </section>
-
-        <section style={card}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 4px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            Limites da conta
-          </h2>
-          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "0 0 10px" }}>
-            A busca de perfis no LinkedIn gasta crédito da assinatura (1 crédito por perfil encontrado). Convite, mensagem e sincronização de conversa não gastam crédito.
-          </p>
-          {quota ? (
-            <ul style={{ margin: 0, padding: "0 0 0 18px", fontSize: 13, color: "var(--text)", display: "flex", flexDirection: "column", gap: 4 }}>
-              <li>
-                <strong>{quota.creditsLeft}</strong> de <strong>{quota.creditsMax}</strong> créditos de busca restantes este mês
-                {quota.renewsAt && ` (renova em ${new Date(quota.renewsAt).toLocaleDateString("pt-BR")})`}
-              </li>
-              <li>Máximo de {quota.maxPerSearch} perfis por busca, dentro desse crédito</li>
-            </ul>
-          ) : (
-            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>Não foi possível consultar o crédito da conta agora.</p>
-          )}
-          <p style={{ fontSize: 12, color: "var(--text-faint)", margin: "10px 0 0" }}>
-            Além disso, o próprio LinkedIn limita contas sem Sales Navigator a cerca de 300 buscas por mês, separado do crédito acima — evite fazer muitas buscas grandes no mesmo dia.
-          </p>
         </section>
 
         <section style={card}>

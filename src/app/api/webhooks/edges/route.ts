@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 //    para detectar quando a sessão do LinkedIn cai (AUTH_EXPIRED/AUTH_FAILED) e
 //    avisar o corretor em vez de deixar os convites/mensagens falhando em silêncio.
 // 2. Resultado de um convite agendado em modo async (linkedin-connect-profile) —
-//    um callback por perfil, ver lib/discover.ts.
+//    um callback por perfil, ver lib/prospect.ts (inviteProspects).
 //
 // A edges.run permite configurar até 10 headers customizados enviados em toda
 // chamada de webhook; EDGES_WEBHOOK_SECRET precisa estar configurado lá como um
@@ -69,8 +69,8 @@ async function handleConnectCallback(payload: {
 
   if (payload.run.status !== "SUCCEEDED") {
     // Convite não confirmado (limite, já conectado, perfil inacessível, etc.) — não
-    // cria lead. O corretor não vê um lead "morto" na lista; o próximo ciclo de
-    // busca (lib/discover.ts) pode reencontrar o mesmo perfil e tentar de novo.
+    // cria lead. O corretor não vê um lead "morto" na lista; pode colar o mesmo
+    // link de novo na Prospecção depois pra tentar outra vez.
     console.error("Convite não concluído:", profileUrl, payload.error?.error_label);
     return;
   }

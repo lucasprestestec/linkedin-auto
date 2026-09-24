@@ -1,51 +1,31 @@
 import { prisma } from "@/lib/prisma";
-import { searchPeople, scheduleConnectionInvites, getWorkspace, type EdgesSearchPerson } from "@/lib/edges";
+import { scheduleConnectionInvites } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
-import { MAX_SEARCH_RESULTS } from "@/lib/prospect-constants";
+import { normalizeLinkedinUrl } from "@/lib/linkedin";
 
-// Núcleo compartilhado entre a busca automática (lib/discover.ts, 1x/dia) e a busca
-// manual (app/prospect — o corretor digita o que quer e busca na hora). As duas
-// via caem aqui pro limite diário e a checagem de "já é lead" nunca ficarem
-// dessincronizadas entre os dois fluxos.
+// Descoberta fria fica fora da edges.run: buscar perfil novo custa crédito lá
+// (e o piso pago, US$110/mês, não fecha conta pro volume de um corretor só).
+// O corretor busca de graça direto no LinkedIn (URL montada por lib/linkedin.ts)
+// e cola os links de quem escolheu de volta aqui — daqui pra frente é tudo
+// automático de novo: convite (grátis, Engagement Identity) e resposta do
+// agente de IA.
 
-export type ProspectResult = EdgesSearchPerson & { alreadyLead: boolean };
-
-export interface SearchQuota {
-  creditsLeft: number;
-  creditsMax: number;
-  maxPerSearch: number;
-  renewsAt: string | null;
+export interface ProspectResult {
+  linkedinProfileUrl: string;
+  alreadyLead: boolean;
 }
 
-// Busca no LinkedIn consome 1 crédito por resultado (convite/mensagem não consomem).
-// O teto por busca é o menor entre MAX_SEARCH_RESULTS e o crédito que sobra na
-// conta — sem isso, uma busca grande podia estourar o crédito do mês inteiro
-// de uma vez.
-export async function getSearchQuota(): Promise<SearchQuota> {
-  const workspace = await getWorkspace();
-  return {
-    creditsLeft: workspace.credits_left,
-    creditsMax: workspace.credits_max,
-    maxPerSearch: Math.max(0, Math.min(MAX_SEARCH_RESULTS, workspace.credits_left)),
-    renewsAt: workspace.current_month_end,
-  };
-}
-
-export async function searchProspects(query: string, maxResults?: number): Promise<ProspectResult[]> {
-  const quota = await getSearchQuota();
-  if (quota.creditsLeft <= 0) {
-    throw new Error("Sem crédito disponível na edges.run pra buscar este mês.");
+export async function parsePastedProfiles(raw: string): Promise<ProspectResult[]> {
+  const urls = new Set<string>();
+  for (const line of raw.split(/\s+/)) {
+    const normalized = normalizeLinkedinUrl(line);
+    if (normalized) urls.add(normalized);
   }
-
-  const cappedMax = Math.min(maxResults ?? MAX_SEARCH_RESULTS, quota.maxPerSearch);
-
-  const identityId = await getActiveIdentityId();
-  const results = await searchPeople(identityId, query, cappedMax);
 
   const existing = await prisma.lead.findMany({ select: { linkedinProfileUrl: true } });
   const known = new Set(existing.map((l) => l.linkedinProfileUrl));
 
-  return results.map((r) => ({ ...r, alreadyLead: known.has(r.linkedin_profile_url) }));
+  return Array.from(urls).map((url) => ({ linkedinProfileUrl: url, alreadyLead: known.has(url) }));
 }
 
 export async function remainingDailyInviteQuota(): Promise<number> {
@@ -58,11 +38,11 @@ export async function remainingDailyInviteQuota(): Promise<number> {
   return settings.dailyInviteLimit - invitedToday;
 }
 
-// Convite sem nota, em modo async — ver nota em lib/discover.ts sobre o porquê.
-// Corta a lista no limite diário restante; quem sobra fica de fora silenciosamente
-// (o chamador informa ao usuário quantos ficaram de fora, via o retorno).
+// Convite sem nota, em modo async — a edges.run espaça/limita as chamadas por
+// conta própria. Corta a lista no limite diário restante; quem sobra fica de
+// fora silenciosamente (o chamador informa ao usuário quantos ficaram de fora).
 export async function inviteProspects(
-  candidates: { linkedin_profile_url: string; full_name?: string; job_title?: string }[],
+  candidates: { linkedinProfileUrl: string }[],
 ): Promise<{ scheduled: number; skippedForLimit: number }> {
   const remaining = await remainingDailyInviteQuota();
   if (remaining <= 0) {
@@ -79,7 +59,11 @@ export async function inviteProspects(
   if (!appUrl) throw new Error("APP_URL não configurado — necessário para o callback da edges.run.");
 
   const identityId = await getActiveIdentityId();
-  await scheduleConnectionInvites(identityId, toInvite, `${appUrl}/api/webhooks/edges`);
+  await scheduleConnectionInvites(
+    identityId,
+    toInvite.map((c) => ({ linkedin_profile_url: c.linkedinProfileUrl })),
+    `${appUrl}/api/webhooks/edges`,
+  );
 
   return { scheduled: toInvite.length, skippedForLimit };
 }
