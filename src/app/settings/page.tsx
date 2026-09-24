@@ -11,9 +11,9 @@ import { CampaignsForm } from "./CampaignsForm";
 import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
 import { EngagementForm } from "./EngagementForm";
-import { TextSettingForm } from "./TextSettingForm";
-import { updateExclusionList, updateTargetAudience } from "./actions";
-import { IconBan, IconChevronRight, IconDownload, IconLinkedin, IconLogout, IconTarget } from "@/components/Icons";
+import { IdealClientForm } from "./IdealClientForm";
+import { ExclusionListForm } from "./ExclusionListForm";
+import { IconChevronRight, IconDownload, IconLinkedin, IconLogout } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -120,34 +120,12 @@ export default async function SettingsPage() {
 
           <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
             <h2 className="group-title">Cliente ideal</h2>
-            <TextSettingForm
-              action={updateTargetAudience}
-              name="targetAudience"
-              value={settings.targetAudience ?? ""}
-              title="Quem você quer alcançar"
-              subtitle="A IA dá uma nota de encaixe pra cada sugestão da Prospecção"
-              icon={<IconTarget size={19} />}
-              iconStyle={{ background: "var(--success-soft)", color: "var(--success-ink)" }}
-              placeholder="Ex.: Donos, diretores de RH ou financeiro de empresas de 10 a 200 funcionários no RS. Não: estudantes, corretores, recrutadores."
-              rows={4}
-              counter={{ mode: "chars", empty: "Sem descrição — as sugestões vêm sem nota" }}
-            />
+            <IdealClientForm value={settings.targetAudience ?? ""} />
           </section>
 
           <section className="group rise" style={{ "--i": 4 } as React.CSSProperties}>
             <h2 className="group-title">Lista de exclusão</h2>
-            <TextSettingForm
-              action={updateExclusionList}
-              name="exclusionList"
-              value={settings.exclusionList ?? ""}
-              title="Nunca contatar"
-              subtitle="Um por linha: nome completo, empresa ou link do perfil"
-              icon={<IconBan size={19} />}
-              iconStyle={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}
-              placeholder={"Porto Seguro\nMaria Souza\nhttps://www.linkedin.com/in/cliente-atual"}
-              rows={5}
-              counter={{ mode: "lines", empty: "Lista vazia", linesSuffix: " — ficam fora de convites, sugestões e mensagens da IA" }}
-            />
+            <ExclusionListForm value={settings.exclusionList ?? ""} />
           </section>
 
           <section className="group rise" style={{ "--i": 5 } as React.CSSProperties}>

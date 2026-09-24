@@ -1,8 +1,61 @@
-// Monta a URL de busca por pessoas do próprio LinkedIn — de graça, sem depender
-// de nenhum serviço terceiro. Sem dependência de servidor: usado no client
-// component pra montar o link "Abrir busca no LinkedIn".
-export function buildLinkedinSearchUrl(keywords: string): string {
-  return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords.trim())}`;
+// Busca de pessoas no próprio LinkedIn — de graça, sem serviço terceiro. Cada
+// filtro vai pro campo equivalente da busca do LinkedIn (os mesmos do painel
+// "Todos os filtros"). Sem dependência de servidor: roda no navegador.
+
+export interface PeopleSearchFilters {
+  titles: string[];
+  locations: string[];
+  companies: string[];
+  industries: string[];
+  keywords: string[];
+  firstNames: string[];
+  lastNames: string[];
+  schools: string[];
+  // Só 2º e 3º grau: 1º grau já é conexão e não pode receber convite.
+  onlyNotConnected: boolean;
+}
+
+export const EMPTY_SEARCH: PeopleSearchFilters = {
+  titles: [],
+  locations: [],
+  companies: [],
+  industries: [],
+  keywords: [],
+  firstNames: [],
+  lastNames: [],
+  schools: [],
+  onlyNotConnected: true,
+};
+
+// Vários valores no mesmo filtro = qualquer um deles: "Diretor de RH" OR CFO.
+// Frases vão entre aspas pro LinkedIn não misturar as palavras.
+function anyOf(values: string[]): string {
+  return values
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map((v) => (/\s/.test(v) ? `"${v.replace(/"/g, "")}"` : v))
+    .join(" OR ");
+}
+
+export function hasAnyFilter(f: PeopleSearchFilters): boolean {
+  return [f.titles, f.locations, f.companies, f.industries, f.keywords, f.firstNames, f.lastNames, f.schools].some((v) => v.length > 0);
+}
+
+export function buildLinkedinSearchUrl(f: PeopleSearchFilters): string {
+  const params = new URLSearchParams();
+  // Cidade e setor não têm campo de texto livre na URL (o LinkedIn filtra por
+  // lista própria de regiões/setores), então entram como palavras-chave.
+  const keywordGroups = [f.keywords, f.locations, f.industries].filter((g) => g.length > 0).map(anyOf);
+  const keywords = keywordGroups.map((g) => (keywordGroups.length > 1 && g.includes(" OR ") ? `(${g})` : g)).join(" ");
+  if (keywords) params.set("keywords", keywords);
+  if (f.titles.length) params.set("titleFreeText", anyOf(f.titles));
+  if (f.companies.length) params.set("company", anyOf(f.companies));
+  if (f.firstNames.length) params.set("firstName", anyOf(f.firstNames));
+  if (f.lastNames.length) params.set("lastName", anyOf(f.lastNames));
+  if (f.schools.length) params.set("schoolFreeText", anyOf(f.schools));
+  if (f.onlyNotConnected) params.set("network", JSON.stringify(["S", "O"]));
+  params.set("origin", "FACETED_SEARCH");
+  return `https://www.linkedin.com/search/results/people/?${params.toString()}`;
 }
 
 const LINKEDIN_PROFILE_URL = /^https?:\/\/(?:[a-z]{2,3}\.|www\.)?linkedin\.com\/in\/([^\s/?#]+)/i;

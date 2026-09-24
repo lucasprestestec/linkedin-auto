@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { LeadStatus, MessageSender } from "@prisma/client";
 import { Avatar } from "@/components/Avatar";
-import { IconCheck, IconChevronRight, IconHand, IconInbox, IconRadar, IconSearch, IconSparkles, IconX } from "@/components/Icons";
+import { IconCheck, IconChevronRight, IconFilter, IconHand, IconInbox, IconRadar, IconSearch, IconSparkles, IconX } from "@/components/Icons";
 import { LEAD_SECTIONS, STATUS_LABEL, STATUS_TONE, type LeadSection } from "@/lib/status";
 import { useRouter } from "next/navigation";
 
@@ -24,28 +24,86 @@ export interface LeadItem {
   when: string;
 }
 
+const FIT_OPTIONS = [
+  { value: 0, label: "Qualquer" },
+  { value: 40, label: "40%+" },
+  { value: 60, label: "60%+" },
+  { value: 80, label: "80%+" },
+];
+const NO_CAMPAIGN = "__none__";
+
+interface Filters {
+  sections: string[];
+  campaigns: string[];
+  tags: string[];
+  minFit: number;
+}
+const NO_FILTERS: Filters = { sections: [], campaigns: [], tags: [], minFit: 0 };
+
+function toggle(list: string[], value: string) {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <span className="label">{label}</span>
+      <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMax: number }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<string>("all");
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [panelOpen, setPanelOpen] = useState(false);
   const allTags = useMemo(() => [...new Set(leads.flatMap((l) => l.tags))].sort(), [leads]);
+  const allCampaigns = useMemo(() => [...new Set(leads.flatMap((l) => (l.campaignName ? [l.campaignName] : [])))].sort(), [leads]);
+  const hasNoCampaign = leads.some((l) => !l.campaignName);
+  const hasFit = leads.some((l) => l.icpScore != null);
 
   const counts = useMemo(() => {
-    const map: Record<string, number> = { all: leads.length };
+    const map: Record<string, number> = {};
     for (const section of LEAD_SECTIONS) {
       map[section.key] = leads.filter((l) => section.statuses.includes(l.status)).length;
     }
     return map;
   }, [leads]);
 
+  // Filtros combinam com E entre grupos e OU dentro do mesmo grupo.
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads.filter(
       (l) =>
-        (!tagFilter || l.tags.includes(tagFilter)) &&
-        (!q || [l.firstName, l.lastName, l.jobTitle, ...l.tags].filter(Boolean).join(" ").toLowerCase().includes(q)),
+        (filters.tags.length === 0 || filters.tags.some((t) => l.tags.includes(t))) &&
+        (filters.campaigns.length === 0 || filters.campaigns.includes(l.campaignName ?? NO_CAMPAIGN)) &&
+        (filters.minFit === 0 || (l.icpScore ?? -1) >= filters.minFit) &&
+        (!q || [l.firstName, l.lastName, l.jobTitle, l.campaignName, ...l.tags].filter(Boolean).join(" ").toLowerCase().includes(q)),
     );
-  }, [leads, query, tagFilter]);
+  }, [leads, query, filters]);
+
+  const active: { key: string; label: string; clear: () => void }[] = [
+    ...filters.sections.map((k) => ({
+      key: `s-${k}`,
+      label: LEAD_SECTIONS.find((s) => s.key === k)?.label ?? k,
+      clear: () => setFilters((f) => ({ ...f, sections: f.sections.filter((x) => x !== k) })),
+    })),
+    ...filters.campaigns.map((c) => ({
+      key: `c-${c}`,
+      label: c === NO_CAMPAIGN ? "Sem campanha" : `Campanha: ${c}`,
+      clear: () => setFilters((f) => ({ ...f, campaigns: f.campaigns.filter((x) => x !== c) })),
+    })),
+    ...filters.tags.map((t) => ({
+      key: `t-${t}`,
+      label: `# ${t}`,
+      clear: () => setFilters((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) })),
+    })),
+    ...(filters.minFit
+      ? [{ key: "fit", label: `Encaixe ${filters.minFit}%+`, clear: () => setFilters((f) => ({ ...f, minFit: 0 })) }]
+      : []),
+  ];
 
   if (leads.length === 0) {
     return (
@@ -65,7 +123,7 @@ export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMa
     );
   }
 
-  const sections = LEAD_SECTIONS.filter((s) => filter === "all" || s.key === filter)
+  const sections = LEAD_SECTIONS.filter((s) => filters.sections.length === 0 || filters.sections.includes(s.key))
     .map((s) => ({ ...s, items: visible.filter((l) => s.statuses.includes(l.status)) }))
     .filter((s) => s.items.length > 0);
 
@@ -97,33 +155,101 @@ export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMa
           )}
         </div>
 
-        <div className="chips" role="toolbar" aria-label="Filtrar por status">
-          <button type="button" className="chip" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
-            Todos <span className="chip-count">{counts.all}</span>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="chip"
+            aria-expanded={panelOpen}
+            aria-controls="lead-filters"
+            aria-pressed={panelOpen}
+            onClick={() => setPanelOpen((o) => !o)}
+          >
+            <IconFilter size={15} /> Filtros
+            {active.length > 0 && <span className="chip-count">{active.length}</span>}
           </button>
-          {LEAD_SECTIONS.map((s) =>
-            counts[s.key] > 0 ? (
-              <button key={s.key} type="button" className="chip" aria-pressed={filter === s.key} onClick={() => setFilter(s.key)}>
-                {s.label} <span className="chip-count">{counts[s.key]}</span>
+          {active.map((f) => (
+            <span key={f.key} className="tag-pill" style={{ height: 38, borderRadius: 999, paddingLeft: 14 }}>
+              {f.label}
+              <button type="button" onClick={f.clear} aria-label={`Tirar filtro ${f.label}`}>
+                <IconX size={12} strokeWidth={2.6} />
               </button>
-            ) : null,
+            </span>
+          ))}
+          {active.length > 1 && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFilters(NO_FILTERS)}>
+              Limpar tudo
+            </button>
           )}
         </div>
 
-        {allTags.length > 0 && (
-          <div className="chips" role="toolbar" aria-label="Filtrar por etiqueta">
-            {allTags.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="chip"
-                style={{ height: 32, fontSize: 12.5 }}
-                aria-pressed={tagFilter === t}
-                onClick={() => setTagFilter(tagFilter === t ? null : t)}
-              >
-                # {t}
+        {panelOpen && (
+          <div id="lead-filters" className="card card-pad stack filter-panel" style={{ gap: 16 }}>
+            <FilterGroup label="Status">
+              {LEAD_SECTIONS.filter((s) => counts[s.key] > 0).map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  className="chip"
+                  aria-pressed={filters.sections.includes(s.key)}
+                  onClick={() => setFilters((f) => ({ ...f, sections: toggle(f.sections, s.key) }))}
+                >
+                  {s.label} <span className="chip-count">{counts[s.key]}</span>
+                </button>
+              ))}
+            </FilterGroup>
+            {allCampaigns.length > 0 && (
+              <FilterGroup label="Campanha">
+                {[...allCampaigns, ...(hasNoCampaign ? [NO_CAMPAIGN] : [])].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="chip"
+                    aria-pressed={filters.campaigns.includes(c)}
+                    onClick={() => setFilters((f) => ({ ...f, campaigns: toggle(f.campaigns, c) }))}
+                  >
+                    {c === NO_CAMPAIGN ? "Sem campanha" : c}
+                  </button>
+                ))}
+              </FilterGroup>
+            )}
+            {allTags.length > 0 && (
+              <FilterGroup label="Etiquetas">
+                {allTags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="chip"
+                    aria-pressed={filters.tags.includes(t)}
+                    onClick={() => setFilters((f) => ({ ...f, tags: toggle(f.tags, t) }))}
+                  >
+                    # {t}
+                  </button>
+                ))}
+              </FilterGroup>
+            )}
+            {hasFit && (
+              <FilterGroup label="Encaixe mínimo com o cliente ideal">
+                {FIT_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    className="chip"
+                    aria-pressed={filters.minFit === o.value}
+                    onClick={() => setFilters((f) => ({ ...f, minFit: o.value }))}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </FilterGroup>
+            )}
+            <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+              <span className="tiny faint">
+                {visible.length} de {leads.length} leads
+              </span>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPanelOpen(false)}>
+                Pronto
               </button>
-            ))}
+            </div>
           </div>
         )}
       </div>

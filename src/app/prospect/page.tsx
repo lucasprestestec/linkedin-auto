@@ -1,6 +1,7 @@
 import { ProspectSearch } from "./ProspectSearch";
 import { WarmSuggestions } from "./WarmSuggestions";
 import { AccountTypeNotice } from "./AccountTypeNotice";
+import { ProspectTabs } from "./ProspectTabs";
 import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { prisma } from "@/lib/prisma";
 import { ProgressRing } from "@/components/ProgressRing";
@@ -41,18 +42,15 @@ export default async function ProspectPage() {
         </div>
       </section>
 
-      <div className="two-col">
-        <div className="col">
-          <WarmSuggestions campaigns={campaigns} />
-          <AccountTypeNotice />
-        </div>
-        <div className="col">
-          <h2 className="group-title only-mobile" style={{ marginTop: 4 }}>
-            Ou busque manualmente
-          </h2>
-          <ProspectSearch campaigns={campaigns} />
-        </div>
-      </div>
+      <ProspectTabs
+        warm={
+          <>
+            <WarmSuggestions campaigns={campaigns} />
+            <AccountTypeNotice />
+          </>
+        }
+        search={<ProspectSearch campaigns={campaigns} />}
+      />
     </main>
   );
 }

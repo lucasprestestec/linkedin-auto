@@ -1,14 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 
+import { parseExclusionLines } from "@/lib/audience";
+
 // Lista de exclusão: gente que nunca deve receber convite nem mensagem
 // automática (clientes atuais, concorrentes, colegas). Um item por linha:
 // - link de perfil do LinkedIn → casa exatamente com aquele perfil;
-// - qualquer outro texto → casa com o nome completo (igual) ou aparece no
-//   cargo/headline (serve pra empresa: "Porto Seguro" bloqueia quem trabalha lá).
+// - "Empresa: X" → X aparece no cargo/headline ("Porto Seguro" bloqueia quem trabalha lá);
+// - "Pessoa: X" → X é igual ao nome completo;
+// - texto sem tipo (listas antigas) → vale como nome e como empresa.
 
 export interface ExclusionRules {
   slugs: Set<string>;
+  companies: string[];
+  people: string[];
   terms: string[];
 }
 
@@ -24,17 +29,19 @@ function normalize(text: string): string {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+// Termos muito curtos casariam com meio mundo ("ana", "rh").
+function usable(items: string[]): string[] {
+  return items.map(normalize).filter((t) => t.length >= 3);
+}
+
 export function parseExclusionList(raw: string | null | undefined): ExclusionRules {
-  const rules: ExclusionRules = { slugs: new Set(), terms: [] };
-  for (const line of (raw ?? "").split("\n")) {
-    const item = line.trim();
-    if (!item) continue;
-    const slug = linkedinProfileSlug(item);
-    if (slug) rules.slugs.add(slug);
-    // Termos muito curtos casariam com meio mundo ("ana", "rh").
-    else if (normalize(item).length >= 3) rules.terms.push(normalize(item));
+  const lists = parseExclusionLines(raw);
+  const slugs = new Set<string>();
+  for (const url of lists.profiles) {
+    const slug = linkedinProfileSlug(url);
+    if (slug) slugs.add(slug);
   }
-  return rules;
+  return { slugs, companies: usable(lists.companies), people: usable(lists.people), terms: usable(lists.other) };
 }
 
 export function isExcluded(target: ExclusionTarget, rules: ExclusionRules): boolean {
@@ -42,10 +49,13 @@ export function isExcluded(target: ExclusionTarget, rules: ExclusionRules): bool
     const slug = linkedinProfileSlug(target.linkedinProfileUrl);
     if (slug && rules.slugs.has(slug)) return true;
   }
-  if (rules.terms.length === 0) return false;
   const fullName = normalize([target.firstName, target.lastName].filter(Boolean).join(" "));
   const headline = normalize(target.headline ?? "");
-  return rules.terms.some((term) => term === fullName || (headline && headline.includes(term)));
+  const isName = (t: string) => t === fullName;
+  const inHeadline = (t: string) => Boolean(headline) && headline.includes(t);
+  return (
+    rules.people.some(isName) || rules.companies.some(inHeadline) || rules.terms.some((t) => isName(t) || inHeadline(t))
+  );
 }
 
 export async function loadExclusionRules(): Promise<ExclusionRules> {
