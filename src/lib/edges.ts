@@ -233,7 +233,11 @@ export async function extractFollowers(identityId: string): Promise<EdgesFollowe
 // ---------------------------------------------------------------------------
 
 export const ENGAGEMENT_ACTIONS = {
-  acceptInvitations: "linkedin-accept-invitations",
+  // Confirmados na documentação: accept-invitation, withdraw-invitation,
+  // visit-profile, follow-profile, archive-message, extract-sent-invitations.
+  // extract-received-invitations segue o mesmo padrão da de enviados.
+  acceptInvitation: "linkedin-accept-invitation",
+  extractReceivedInvitations: "linkedin-extract-received-invitations",
   withdrawInvitation: "linkedin-withdraw-invitation",
   visitProfile: "linkedin-visit-profile",
   followProfile: "linkedin-follow-profile",
@@ -247,12 +251,31 @@ export interface EdgesInvitationRef {
   linkedin_invitation_urn?: string;
 }
 
-// Aceita os convites recebidos. Input "invitations" é opcional — sem ele,
-// aceita os pendentes. A saída só traz o ID do convite (não quem convidou):
-// quem entrou é descoberto depois, pela lista de conexões.
-export async function acceptReceivedInvitations(identityId: string): Promise<EdgesInvitationRef[]> {
-  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.acceptInvitations, { identity_ids: [identityId] });
-  return Array.isArray(data) ? (data as EdgesInvitationRef[]) : [];
+// Convite recebido pendente: quem convidou + o que a ação de aceitar exige
+// (urn e secret). Formato espelhado do de convites enviados.
+export interface EdgesReceivedInvitation extends EdgesInvitationRef {
+  linkedin_invitation_secret?: string;
+  linkedin_profile_url?: string;
+  linkedin_profile_handle?: string;
+  linkedin_profile_id?: number;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  job_title?: string;
+  headline?: string;
+}
+
+export async function extractReceivedInvitations(identityId: string): Promise<EdgesReceivedInvitation[]> {
+  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.extractReceivedInvitations, { identity_ids: [identityId], parameters: {} });
+  return Array.isArray(data) ? (data as EdgesReceivedInvitation[]) : [];
+}
+
+// Aceita UM convite recebido (a ação exige urn + secret do convite).
+export async function acceptInvitation(identityId: string, urn: string, secret: string) {
+  return callAction<unknown>(ENGAGEMENT_ACTIONS.acceptInvitation, {
+    identity_ids: [identityId],
+    input: { linkedin_invitation_urn: urn, linkedin_invitation_secret: secret },
+  });
 }
 
 // Convites que a conta enviou e ainda estão pendentes — é daqui que sai o URN
@@ -260,18 +283,19 @@ export async function acceptReceivedInvitations(identityId: string): Promise<Edg
 export interface EdgesSentInvitation extends EdgesInvitationRef {
   linkedin_profile_url?: string;
   linkedin_profile_handle?: string;
-  sent_at?: string;
+  sent_date?: string;
 }
 
 export async function extractSentInvitations(identityId: string): Promise<EdgesSentInvitation[]> {
-  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.extractSentInvitations, { identity_ids: [identityId] });
+  // Paginada (100 por página); a primeira página basta pro volume de um corretor.
+  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.extractSentInvitations, { identity_ids: [identityId], parameters: {} });
   return Array.isArray(data) ? (data as EdgesSentInvitation[]) : [];
 }
 
 export async function withdrawInvitation(identityId: string, invitationUrn: string) {
   return callAction<unknown>(ENGAGEMENT_ACTIONS.withdrawInvitation, {
     identity_ids: [identityId],
-    input: { linkedin_invitation_urn: invitationUrn },
+    input: { linkedin_invitation_urn: invitationUrn, linkedin_invitation_type: "CONNECTION" },
   });
 }
 
