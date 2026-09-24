@@ -95,7 +95,7 @@ export function CampaignsForm({ campaigns }: { campaigns: CampaignItem[] }) {
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="card" style={{ overflow: "hidden" }}>
+    <div id="campanhas" className="card" style={{ overflow: "hidden", scrollMarginTop: 90 }}>
       <div className="setting-row">
         <span className="setting-icon" style={{ background: "var(--brand-soft)", color: "var(--brand-ink)" }}>
           <IconLayers size={19} />

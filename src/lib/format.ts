@@ -94,3 +94,34 @@ export function nameFromProfileUrl(url: string): { firstName: string; lastName: 
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   return { firstName: words[0] ?? slug, lastName: words.slice(1).join(" "), slug };
 }
+
+// "Gerente de Pessoas na Nubank" / "CFO · Caju" / "CTO at Stone" → cargo e empresa.
+// A headline do LinkedIn é texto livre; sem separador conhecido, tudo é cargo.
+const HEADLINE_SEPARATORS = [/\s+[·|•]\s+/, /\s+@\s*/, /\s+-\s+/, /\s+(?:na|no|em|at)\s+/i];
+
+export function splitHeadline(headline: string | null | undefined): { role: string | null; company: string | null } {
+  const text = headline?.trim();
+  if (!text) return { role: null, company: null };
+  // O separador que aparece primeiro divide cargo e empresa.
+  const match = HEADLINE_SEPARATORS.map((sep) => sep.exec(text))
+    .filter((m): m is RegExpExecArray => m !== null && m.index > 0)
+    .sort((a, b) => a.index - b.index)[0];
+  if (match) {
+    const role = text.slice(0, match.index).trim();
+    const company = text
+      .slice(match.index + match[0].length)
+      .split(/\s+[·|•]\s+|\s+-\s+|,\s*/)[0]
+      .trim();
+    if (role && company) return { role, company };
+  }
+  return { role: text, company: null };
+}
+
+// Chave do dia (AAAA-MM-DD) no fuso do corretor — pra agrupar por dia.
+export function dayKeyOf(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: TIME_ZONE });
+}
+
+export function weekdayShort(date: Date): string {
+  return date.toLocaleDateString("pt-BR", { weekday: "short", timeZone: TIME_ZONE }).replace(".", "");
+}

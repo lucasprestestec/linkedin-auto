@@ -3,13 +3,12 @@
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { parseProfiles, invite, type InviteState } from "./actions";
 import type { ProspectResult } from "@/lib/prospect";
-import { buildLinkedinSearchUrl, normalizeLinkedinUrl } from "@/lib/linkedin";
+import { normalizeLinkedinUrl } from "@/lib/linkedin";
 import { nameFromProfileUrl } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { CampaignPicker } from "./CampaignPicker";
-import { IconAlert, IconCheck, IconClipboard, IconExternal, IconLinkedin, IconSearch, IconUserPlus } from "@/components/Icons";
-
-const SUGGESTIONS = ["Diretor de RH", "Sócio fundador", "CFO", "Gerente administrativo", "Advogado sócio"];
+import { PeopleSearchBuilder } from "./PeopleSearchBuilder";
+import { IconAlert, IconCheck, IconClipboard, IconExternal, IconUserPlus } from "@/components/Icons";
 
 function StepHeader({ n, title, subtitle, done }: { n: number; title: string; subtitle: string; done?: boolean }) {
   return (
@@ -23,43 +22,11 @@ function StepHeader({ n, title, subtitle, done }: { n: number; title: string; su
   );
 }
 
-function LinkedinSearchLink() {
-  const [query, setQuery] = useState("");
-  const url = buildLinkedinSearchUrl(query);
-  const canOpen = query.trim() !== "";
-
+function LinkedinSearchStep() {
   return (
-    <section className="card card-pad step rise" style={{ "--i": 1 } as React.CSSProperties}>
-      <StepHeader n={1} title="Encontre pessoas" subtitle="Busca gratuita, direto no LinkedIn." />
-      <div className="input-wrap">
-        <IconSearch size={19} />
-        <input
-          className="input"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cargo, setor ou cidade"
-          aria-label="Quem você quer alcançar?"
-          enterKeyHint="search"
-        />
-      </div>
-      <div className="chips" aria-label="Sugestões">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} type="button" className="chip" aria-pressed={query === s} onClick={() => setQuery(s)}>
-            {s}
-          </button>
-        ))}
-      </div>
-      <a
-        href={canOpen ? url : undefined}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-disabled={!canOpen}
-        className="btn btn-dark btn-block"
-      >
-        <IconLinkedin size={18} />
-        Abrir busca no LinkedIn
-        <IconExternal size={16} style={{ opacity: 0.6 }} />
-      </a>
+    <section id="search-step" className="card card-pad step rise" style={{ "--i": 1, scrollMarginTop: 16 } as React.CSSProperties}>
+      <StepHeader n={1} title="Encontre pessoas" subtitle="Monte a busca com os filtros que quiser — é grátis, direto no LinkedIn." />
+      <PeopleSearchBuilder />
       <p className="hint">Abre numa aba nova. Escolha quem quiser e copie o link do perfil de cada pessoa.</p>
     </section>
   );
@@ -240,51 +207,54 @@ export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: s
   const hasResults = Boolean(state && !state.error);
 
   return (
-    <>
-      <LinkedinSearchLink />
-
-      <section className="card card-pad step rise" style={{ "--i": 2 } as React.CSSProperties}>
-        <StepHeader n={2} title="Cole os perfis escolhidos" subtitle="Um link por linha — pode colar vários de uma vez." done={hasResults} />
-        <form action={formAction} className="stack" style={{ gap: 12 }}>
-          <div className="stack" style={{ gap: 10 }}>
-            <textarea
-              name="urls"
-              rows={4}
-              className="textarea"
-              value={raw}
-              onChange={(e) => setRaw(e.target.value)}
-              placeholder={"https://www.linkedin.com/in/fulano\nhttps://www.linkedin.com/in/ciclana"}
-              aria-label="Links dos perfis"
-              style={{ fontSize: 14.5 }}
-            />
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span className={`badge ${detected > 0 ? "badge-open" : "badge-plain"}`}>
-                {detected} perfi{detected !== 1 ? "s" : "l"} detectado{detected !== 1 ? "s" : ""}
-              </span>
-              <button type="button" className="btn btn-soft btn-sm" onClick={pasteFromClipboard}>
-                <IconClipboard size={15} /> Colar
-              </button>
+    <div className="search-flow">
+      <div className="col">
+        <LinkedinSearchStep />
+      </div>
+      <div className="col">
+        <section id="paste-step" className="card card-pad step rise" style={{ "--i": 2, scrollMarginTop: 16 } as React.CSSProperties}>
+          <StepHeader n={2} title="Cole os perfis escolhidos" subtitle="Um link por linha — pode colar vários de uma vez." done={hasResults} />
+          <form action={formAction} className="stack" style={{ gap: 12 }}>
+            <div className="stack" style={{ gap: 10 }}>
+              <textarea
+                name="urls"
+                rows={4}
+                className="textarea"
+                value={raw}
+                onChange={(e) => setRaw(e.target.value)}
+                placeholder={"https://www.linkedin.com/in/fulano\nhttps://www.linkedin.com/in/ciclana"}
+                aria-label="Links dos perfis"
+                style={{ fontSize: 14.5 }}
+              />
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className={`badge ${detected > 0 ? "badge-open" : "badge-plain"}`}>
+                  {detected} perfi{detected !== 1 ? "s" : "l"} detectado{detected !== 1 ? "s" : ""}
+                </span>
+                <button type="button" className="btn btn-soft btn-sm" onClick={pasteFromClipboard}>
+                  <IconClipboard size={15} /> Colar
+                </button>
+              </div>
             </div>
-          </div>
-          {clipboardError && <p className="hint">Não foi possível ler a área de transferência — cole manualmente no campo.</p>}
-          <button type="submit" className="btn btn-primary btn-block" disabled={parsing || raw.trim() === ""}>
-            {parsing ? (
-              <>
-                <span className="spinner" /> Verificando…
-              </>
-            ) : (
-              "Verificar perfis"
+            {clipboardError && <p className="hint">Não foi possível ler a área de transferência — cole manualmente no campo.</p>}
+            <button type="submit" className="btn btn-primary btn-block" disabled={parsing || raw.trim() === ""}>
+              {parsing ? (
+                <>
+                  <span className="spinner" /> Verificando…
+                </>
+              ) : (
+                "Verificar perfis"
+              )}
+            </button>
+            {state?.error && (
+              <p className="error-text">
+                <IconAlert size={15} /> {state.error}
+              </p>
             )}
-          </button>
-          {state?.error && (
-            <p className="error-text">
-              <IconAlert size={15} /> {state.error}
-            </p>
-          )}
-        </form>
-      </section>
+          </form>
+        </section>
 
-      {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaigns={campaigns} />}
-    </>
+        {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaigns={campaigns} />}
+      </div>
+    </div>
   );
 }

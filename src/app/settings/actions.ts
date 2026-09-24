@@ -176,3 +176,10 @@ export async function sendTestPush() {
   const delivered = await sendPush({ title: "Notificações ativadas", body: "É assim que você vai saber quando um lead precisar de você.", url: "/" });
   return { delivered };
 }
+
+export async function updateOwnerName(_prevState: unknown, formData: FormData) {
+  const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 60);
+  await prisma.settings.update({ where: { id: "singleton" }, data: { ownerName: ownerName || null } });
+  revalidatePath("/", "layout");
+  return { saved: true };
+}

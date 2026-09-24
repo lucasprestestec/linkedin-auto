@@ -287,3 +287,39 @@ export async function scoreProfiles(idealCustomer: string, profiles: ProfileToSc
   }
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Ajudas sob demanda na tela da conversa (só quando o corretor clica): resumo
+// da conversa e sugestão de resposta. Nada é enviado ao lead por aqui.
+// ---------------------------------------------------------------------------
+
+function transcriptOf(history: Pick<DbMessage, "sender" | "content">[]): string {
+  return history
+    .map((m) => `${m.sender === "LEAD" ? "Lead" : m.sender === "AGENT" ? "Nós (agente)" : "Nós (corretor)"}: ${m.content}`)
+    .join("\n");
+}
+
+export async function summarizeConversation(lead: LeadContext, history: Pick<DbMessage, "sender" | "content">[]): Promise<string> {
+  return writeMessage(
+    `Você ajuda um corretor de seguros a retomar conversas do LinkedIn. Resuma a conversa abaixo em português do Brasil,
+em até 5 tópicos curtos começando com "• ": quem é o lead, o que ele quer ou perguntou, objeções ou dúvidas,
+em que pé a conversa está e o próximo passo sugerido. Não invente nada que não esteja no histórico.
+Use a ferramenta write_message (o campo message recebe o resumo).`,
+    `${leadDescription(lead)}\n\nHistórico (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
+  );
+}
+
+export async function suggestReply(
+  instructions: string | null,
+  lead: LeadContext,
+  history: Pick<DbMessage, "sender" | "content">[],
+): Promise<string> {
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      "Escreva a PRÓXIMA mensagem do corretor nesta conversa, respondendo ao que o lead disse por último. " +
+        "O corretor vai revisar antes de enviar. Não repita frases do histórico.",
+    ),
+    `${leadDescription(lead)}\n\nHistórico (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
+  );
+}

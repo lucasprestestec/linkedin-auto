@@ -1,93 +1,152 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { greeting, relativeTime, todayLabel } from "@/lib/format";
-import { IconAlert, IconChevronRight, IconPlus, IconZap } from "@/components/Icons";
-import { AutomationSwitch } from "./AutomationSwitch";
+import { dayKeyOf, greeting, relativeTime, splitHeadline, weekdayShort } from "@/lib/format";
+import { firstNameOf } from "@/lib/shell";
+import { IconAlert, IconArrowRight, IconArrowUpRight, IconChat, IconChevronRight, IconClock, IconUser } from "@/components/Icons";
+import { MobileHeader } from "@/components/MobileHeader";
 import { LeadList, type LeadItem } from "./LeadList";
-import { FunnelCard, type FunnelStep } from "./FunnelCard";
+import { RhythmCard, type DayBar } from "./RhythmCard";
 
 export const dynamic = "force-dynamic";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 async function getData() {
-  const [settings, leads] = await Promise.all([
+  const weekAgo = new Date(Date.now() - 7 * DAY_MS);
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] } } };
+  const inbound = { some: { sender: "LEAD" as const } };
+
+  const [settings, leads, sentToday, sentWeek, contacted, repliedAfterContact] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.lead.findMany({
       include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 }, campaign: { select: { name: true } } },
     }),
-  ]);
-
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const sentToday = await prisma.message.count({
-    where: { sender: { not: "LEAD" }, createdAt: { gte: startOfDay } },
-  });
-
-  // Funil: contatado = recebeu alguma mensagem nossa; respondeu = mandou
-  // alguma mensagem. Taxa de resposta = responderam / contatados.
-  const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] } } };
-  const inbound = { some: { sender: "LEAD" as const } };
-  const [contacted, repliedAfterContact, replied] = await Promise.all([
+    prisma.message.count({ where: { sender: { not: "LEAD" }, createdAt: { gte: startOfDay } } }),
+    prisma.message.findMany({ where: { sender: { not: "LEAD" }, createdAt: { gte: weekAgo } }, select: { createdAt: true } }),
     prisma.lead.count({ where: { messages: outbound } }),
     prisma.lead.count({ where: { AND: [{ messages: outbound }, { messages: inbound }] } }),
-    prisma.lead.count({ where: { messages: inbound } }),
   ]);
 
-  return { settings, leads, sentToday, funnel: { contacted, repliedAfterContact, replied } };
+  // Barras: mensagens enviadas por dia, do mais antigo (6 dias atrás) até hoje.
+  const perDay = new Map<string, number>();
+  for (const m of sentWeek) perDay.set(dayKeyOf(m.createdAt), (perDay.get(dayKeyOf(m.createdAt)) ?? 0) + 1);
+  const days: DayBar[] = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(Date.now() - (6 - i) * DAY_MS);
+    return { label: i === 6 ? "hoje" : weekdayShort(d), value: perDay.get(dayKeyOf(d)) ?? 0 };
+  });
+
+  return {
+    settings,
+    leads,
+    sentToday,
+    days,
+    replyRate: contacted > 0 ? Math.round((repliedAfterContact / contacted) * 100) : null,
+    newThisWeek: leads.filter((l) => l.createdAt >= weekAgo).length,
+  };
 }
 
-export default async function HomePage() {
-  const { settings, leads, sentToday, funnel } = await getData();
+const TILES = [
+  { key: "urgent", label: "Precisa de você", tone: "peach", Icon: IconUser },
+  { key: "open", label: "Conversando", tone: "lav", Icon: IconChat },
+  { key: "waiting", label: "Aguardando resposta", tone: "cream", Icon: IconClock },
+] as const;
+
+export default async function HomePage({ searchParams }: PageProps<"/">) {
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q : "";
+  const status = typeof params.status === "string" ? params.status : "";
+  const { settings, leads, sentToday, days, replyRate, newThisWeek } = await getData();
 
   const items: LeadItem[] = leads
     .map((lead) => {
       const last = lead.messages[0];
       const when = last?.deliveredAt ?? lead.updatedAt;
+      const { role, company } = splitHeadline(lead.jobTitle);
       return {
-        item: {
-          id: lead.id,
-          firstName: lead.firstName,
-          lastName: lead.lastName,
-          jobTitle: lead.jobTitle,
-          status: lead.status,
-          needsHumanReason: lead.needsHumanReason,
-          followUpsSent: lead.followUpsSent,
-          tags: lead.tags,
-          campaignName: lead.campaign?.name ?? null,
-          icpScore: lead.icpScore,
-          lastMessage: last ? { content: last.content, sender: last.sender } : null,
-          when: relativeTime(when),
-        },
-        sortKey: when.getTime(),
+        id: lead.id,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        jobTitle: lead.jobTitle,
+        role,
+        company,
+        linkedinProfileUrl: lead.linkedinProfileUrl,
+        status: lead.status,
+        needsHumanReason: lead.needsHumanReason,
+        followUpsSent: lead.followUpsSent,
+        tags: lead.tags,
+        campaignName: lead.campaign?.name ?? null,
+        icpScore: lead.icpScore,
+        lastMessage: last ? { content: last.content, sender: last.sender } : null,
+        when: relativeTime(when),
+        whenTs: when.getTime(),
       };
     })
-    .sort((a, b) => b.sortKey - a.sortKey)
-    .map((x) => x.item);
+    .sort((a, b) => b.whenTs - a.whenTs);
 
-  const needYou = leads.filter((l) => l.status === "NEEDS_HUMAN").length;
-  const talking = leads.filter((l) => l.status === "CONVERSATION_OPEN").length;
-  const waiting = leads.filter((l) => l.status === "WAITING_REPLY").length;
-  const qualified = leads.filter((l) => l.status === "QUALIFIED").length;
-  const connected = leads.filter((l) => l.status !== "INVITE_SENT").length;
-  const funnelSteps: FunnelStep[] = [
-    { label: "Leads", value: leads.length },
-    { label: "Conectados", value: connected },
-    { label: "Contatados", value: funnel.contacted },
-    { label: "Responderam", value: funnel.replied },
-    { label: "Qualificados", value: qualified },
-  ];
-  const usage = Math.min(100, Math.round((sentToday / Math.max(1, settings.dailyMessageLimit)) * 100));
+  const counts = {
+    urgent: leads.filter((l) => l.status === "NEEDS_HUMAN").length,
+    open: leads.filter((l) => l.status === "CONVERSATION_OPEN" || l.status === "QUALIFIED").length,
+    waiting: leads.filter((l) => l.status === "WAITING_REPLY").length,
+  };
+  const name = firstNameOf(settings.ownerName);
 
   return (
-    <main className="page">
-      <header className="topbar">
-        <div className="topbar-titles">
-          <div className="eyebrow">{todayLabel()}</div>
-          <h1 className="title-xl">{greeting()}</h1>
+    <main className="page home">
+      <MobileHeader />
+
+      <div className="home-grid">
+        <section className="home-hero rise" aria-label="Resumo">
+          <h1 className="display hero-title">
+            {greeting()}
+            {name ? (
+              <>
+                , <span className="name-grad">{name}.</span>
+              </>
+            ) : (
+              <span className="name-grad">.</span>
+            )}
+          </h1>
+          <p className="hero-sub">
+            <b>{counts.open}</b> conversa{counts.open !== 1 ? "s" : ""} em andamento.{" "}
+            {newThisWeek > 0 ? "Novos leads chegando esta semana. ✨" : "Que tal convidar gente nova hoje?"}
+          </p>
+          {newThisWeek > 0 && (
+            <Link href="/?status=all#leads" className="hero-bubble" aria-label={`${newThisWeek} novos leads esta semana`}>
+              <span className="hero-bubble-arrow">
+                <IconArrowUpRight size={16} />
+              </span>
+              <b className="display">+{newThisWeek}</b>
+              <span>
+                novo{newThisWeek > 1 ? "s" : ""} lead{newThisWeek > 1 ? "s" : ""}
+                <br />
+                esta semana
+              </span>
+            </Link>
+          )}
+        </section>
+
+        <div className="stat-tiles rise" style={{ "--i": 1 } as React.CSSProperties}>
+          {TILES.map(({ key, label, tone, Icon }) => (
+            <Link key={key} href={`/?status=${key}#leads`} className={`stat-tile tile-${tone}`} aria-current={status === key ? "true" : undefined}>
+              <span className="stat-tile-icon">
+                <Icon size={20} />
+              </span>
+              <b className="stat-tile-num">{counts[key]}</b>
+              <span className="stat-tile-label">{label}</span>
+              <span className="stat-tile-go" aria-hidden="true">
+                <IconArrowRight size={16} />
+              </span>
+            </Link>
+          ))}
         </div>
-        <Link href="/prospect" className="icon-btn icon-btn-round" aria-label="Nova prospecção">
-          <IconPlus size={20} />
-        </Link>
-      </header>
+
+        <div className="home-rhythm rise" style={{ "--i": 2 } as React.CSSProperties}>
+          <RhythmCard days={days} replyRate={replyRate} sentToday={sentToday} dailyLimit={settings.dailyMessageLimit} paused={settings.automationPaused} />
+        </div>
+      </div>
 
       {settings.linkedinNeedsReconnect && (
         <Link href="/settings" className="alert rise">
@@ -102,54 +161,7 @@ export default async function HomePage() {
         </Link>
       )}
 
-      <div className="home-top">
-        <section className="hero rise" aria-label="Resumo de hoje">
-          <div className="stack" style={{ gap: 16 }}>
-            <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div className="stack" style={{ gap: 8 }}>
-                <span className="hero-label">
-                  <IconZap size={14} /> Mensagens enviadas hoje
-                </span>
-                <span className="hero-number">
-                  {sentToday}
-                  <small>/ {settings.dailyMessageLimit}</small>
-                </span>
-              </div>
-              <span className="badge badge-plain" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", marginTop: 2 }}>
-                {usage}% do limite
-              </span>
-            </div>
-            <div className="meter" role="progressbar" aria-valuenow={usage} aria-valuemin={0} aria-valuemax={100}>
-              <span style={{ width: `${usage}%` }} />
-            </div>
-
-            <div className="hero-stats">
-              <div className="hero-stat">
-                <i className="dot" style={{ background: "#ff8a6b" }} />
-                <b>{needYou}</b>
-                <span>Pra você</span>
-              </div>
-              <div className="hero-stat">
-                <i className="dot" style={{ background: "#7fb0ff" }} />
-                <b>{talking}</b>
-                <span>Conversando</span>
-              </div>
-              <div className="hero-stat">
-                <i className="dot" style={{ background: "#b7adff" }} />
-                <b>{waiting}</b>
-                <span>Aguardando</span>
-              </div>
-            </div>
-
-            <div className="hero-divider" />
-            <AutomationSwitch paused={settings.automationPaused} />
-          </div>
-        </section>
-
-        {leads.length > 0 && <FunnelCard steps={funnelSteps} contacted={funnel.contacted} replied={funnel.repliedAfterContact} />}
-      </div>
-
-      <LeadList leads={items} followUpMax={settings.followUpMaxCount} />
+      <LeadList key={`${q}|${status}`} leads={items} followUpMax={settings.followUpMaxCount} initialQuery={q} initialSection={status} />
     </main>
   );
 }
