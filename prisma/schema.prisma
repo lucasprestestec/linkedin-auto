@@ -36,9 +36,37 @@ model Lead {
   invitedAt         DateTime?
   // Follow-ups enviados desde a última resposta do lead (zera quando ele responde).
   followUpsSent     Int       @default(0)
+  // CRM: anotações livres do corretor e etiquetas.
+  notes             String?   @db.Text
+  tags              String[]  @default([])
+  // Nota 0-100 da IA: quanto o perfil combina com o cliente ideal (Settings.targetAudience).
+  icpScore          Int?
+  campaign          Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId        String?
+  // Conversa arquivada no LinkedIn (lead perdido) — evita arquivar de novo.
+  archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
+}
+
+// Campanha = um público com instruções próprias pro agente (ex.: "Saúde
+// empresarial" x "RC profissional"). Sem campanha, vale Settings.agentInstructions.
+model Campaign {
+  id           String   @id @default(cuid())
+  name         String
+  instructions String?  @db.Text
+  createdAt    DateTime @default(now())
+  leads        Lead[]
+}
+
+// Inscrição de Web Push (um por navegador/aparelho do corretor).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }
 
 model Message {
@@ -66,6 +94,20 @@ model Settings {
   followUpDelayHours  Int     @default(48)
   // Última checagem de convites aceitos (lista de conexões) — no máximo 1x/hora.
   connectionsCheckedAt DateTime?
+  // Janela de envio automático (fuso de São Paulo): fora dela a IA não manda nada.
+  workStartHour       Int     @default(8)
+  workEndHour         Int     @default(19)
+  workWeekdaysOnly    Boolean @default(true)
+  // Um item por linha: nome, empresa ou link de perfil que nunca deve ser contatado.
+  exclusionList       String? @db.Text
+  // Ações Engagement opcionais — desligadas até o corretor ativar.
+  acceptInvitesEnabled   Boolean @default(false)
+  withdrawInvitesEnabled Boolean @default(false)
+  withdrawAfterDays      Int     @default(21)
+  warmupEnabled          Boolean @default(false)
+  archiveLostEnabled     Boolean @default(false)
+  receivedInvitesCheckedAt DateTime?
+  withdrawCheckedAt        DateTime?
   linkedinNeedsReconnect Boolean @default(false)
   linkedinReconnectReason String?
 }

@@ -9,9 +9,10 @@ import { IconShield } from "@/components/Icons";
 export const dynamic = "force-dynamic";
 
 export default async function ProspectPage() {
-  const [remaining, settings] = await Promise.all([
+  const [remaining, settings, campaigns] = await Promise.all([
     remainingDailyInviteQuota(),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
+    prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   const usedToday = Math.max(0, settings.dailyInviteLimit - remaining);
   const left = Math.max(0, remaining);
@@ -40,13 +41,18 @@ export default async function ProspectPage() {
         </div>
       </section>
 
-      <WarmSuggestions />
-      <AccountTypeNotice />
-
-      <h2 className="group-title" style={{ marginTop: 4 }}>
-        Ou busque manualmente
-      </h2>
-      <ProspectSearch />
+      <div className="two-col">
+        <div className="col">
+          <WarmSuggestions campaigns={campaigns} />
+          <AccountTypeNotice />
+        </div>
+        <div className="col">
+          <h2 className="group-title only-mobile" style={{ marginTop: 4 }}>
+            Ou busque manualmente
+          </h2>
+          <ProspectSearch campaigns={campaigns} />
+        </div>
+      </div>
     </main>
   );
 }

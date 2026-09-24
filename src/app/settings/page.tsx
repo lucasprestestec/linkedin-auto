@@ -6,7 +6,14 @@ import { RefreshStatusButton } from "./RefreshStatusButton";
 import { LimitsForm } from "./LimitsForm";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { FollowUpForm } from "./FollowUpForm";
-import { IconChevronRight, IconLinkedin, IconLogout } from "@/components/Icons";
+import { WorkHoursForm } from "./WorkHoursForm";
+import { CampaignsForm } from "./CampaignsForm";
+import { NotificationsCard } from "./NotificationsCard";
+import { pushPublicKey } from "@/lib/push";
+import { EngagementForm } from "./EngagementForm";
+import { TextSettingForm } from "./TextSettingForm";
+import { updateExclusionList, updateTargetAudience } from "./actions";
+import { IconBan, IconChevronRight, IconDownload, IconLinkedin, IconLogout, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +28,10 @@ async function getConnectionStatus(identityId: string | null) {
 }
 
 export default async function SettingsPage() {
-  const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const [settings, campaigns] = await Promise.all([
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
+    prisma.campaign.findMany({ orderBy: { createdAt: "asc" }, include: { _count: { select: { leads: true } } } }),
+  ]);
   const status = await getConnectionStatus(settings.linkedinIdentityId);
   const connected = status.connected && !settings.linkedinNeedsReconnect;
 
@@ -68,36 +78,116 @@ export default async function SettingsPage() {
         )}
       </section>
 
-      <section className="group rise" style={{ "--i": 1 } as React.CSSProperties}>
-        <h2 className="group-title">Limites diários</h2>
-        <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-      </section>
+      <div className="settings-grid">
+        <div className="settings-col">
+          <section className="group rise" style={{ "--i": 1 } as React.CSSProperties}>
+            <h2 className="group-title">Horário de trabalho</h2>
+            <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} />
+          </section>
 
-      <section className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
-        <h2 className="group-title">Follow-up automático</h2>
-        <FollowUpForm followUpMaxCount={settings.followUpMaxCount} followUpDelayHours={settings.followUpDelayHours} />
-      </section>
+          <section className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
+            <h2 className="group-title">Limites diários</h2>
+            <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
+          </section>
 
-      <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
-        <h2 className="group-title">Agente de IA</h2>
-        <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
-      </section>
+          <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
+            <h2 className="group-title">Follow-up automático</h2>
+            <FollowUpForm followUpMaxCount={settings.followUpMaxCount} followUpDelayHours={settings.followUpDelayHours} />
+          </section>
 
-      <section className="group rise" style={{ "--i": 4 } as React.CSSProperties}>
-        <h2 className="group-title">Sessão</h2>
-        <form action={logout} className="card" style={{ overflow: "hidden" }}>
-          <button type="submit" className="setting-row" style={{ width: "100%", border: "none", background: "none", textAlign: "left" }}>
-            <span className="setting-icon" style={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}>
-              <IconLogout size={19} />
-            </span>
-            <span style={{ flex: 1, fontWeight: 700, color: "var(--urgent-ink)" }}>Sair da conta</span>
-            <IconChevronRight size={18} className="chev" />
-          </button>
-        </form>
-      </section>
+          <section className="group rise" style={{ "--i": 4 } as React.CSSProperties}>
+            <h2 className="group-title">Ações extras do LinkedIn</h2>
+            <EngagementForm
+              values={{
+                acceptInvitesEnabled: settings.acceptInvitesEnabled,
+                withdrawInvitesEnabled: settings.withdrawInvitesEnabled,
+                warmupEnabled: settings.warmupEnabled,
+                archiveLostEnabled: settings.archiveLostEnabled,
+              }}
+              withdrawAfterDays={settings.withdrawAfterDays}
+            />
+          </section>
+        </div>
+
+        <div className="settings-col">
+          <section className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
+            <h2 className="group-title">Agente de IA</h2>
+            <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
+            <CampaignsForm
+              campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, instructions: c.instructions ?? "", leads: c._count.leads }))}
+            />
+          </section>
+
+          <section className="group rise" style={{ "--i": 3 } as React.CSSProperties}>
+            <h2 className="group-title">Cliente ideal</h2>
+            <TextSettingForm
+              action={updateTargetAudience}
+              name="targetAudience"
+              value={settings.targetAudience ?? ""}
+              title="Quem você quer alcançar"
+              subtitle="A IA dá uma nota de encaixe pra cada sugestão da Prospecção"
+              icon={<IconTarget size={19} />}
+              iconStyle={{ background: "var(--success-soft)", color: "var(--success-ink)" }}
+              placeholder="Ex.: Donos, diretores de RH ou financeiro de empresas de 10 a 200 funcionários no RS. Não: estudantes, corretores, recrutadores."
+              rows={4}
+              counter={{ mode: "chars", empty: "Sem descrição — as sugestões vêm sem nota" }}
+            />
+          </section>
+
+          <section className="group rise" style={{ "--i": 4 } as React.CSSProperties}>
+            <h2 className="group-title">Lista de exclusão</h2>
+            <TextSettingForm
+              action={updateExclusionList}
+              name="exclusionList"
+              value={settings.exclusionList ?? ""}
+              title="Nunca contatar"
+              subtitle="Um por linha: nome completo, empresa ou link do perfil"
+              icon={<IconBan size={19} />}
+              iconStyle={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}
+              placeholder={"Porto Seguro\nMaria Souza\nhttps://www.linkedin.com/in/cliente-atual"}
+              rows={5}
+              counter={{ mode: "lines", empty: "Lista vazia", linesSuffix: " — ficam fora de convites, sugestões e mensagens da IA" }}
+            />
+          </section>
+
+          <section className="group rise" style={{ "--i": 5 } as React.CSSProperties}>
+            <h2 className="group-title">Notificações</h2>
+            <NotificationsCard publicKey={pushPublicKey()} />
+          </section>
+
+          <section className="group rise" style={{ "--i": 5 } as React.CSSProperties}>
+            <h2 className="group-title">Dados</h2>
+            <div className="card" style={{ overflow: "hidden" }}>
+              <a href="/api/export/leads" className="setting-row" download>
+                <span className="setting-icon" style={{ background: "var(--brand-soft)", color: "var(--brand-ink)" }}>
+                  <IconDownload size={19} />
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontWeight: 700 }}>Exportar leads (CSV)</span>
+                  <span className="tiny faint">Abre no Excel ou Google Planilhas, com etiquetas e anotações</span>
+                </span>
+                <IconChevronRight size={18} className="chev" />
+              </a>
+            </div>
+          </section>
+
+          <section className="group rise" style={{ "--i": 6 } as React.CSSProperties}>
+            <h2 className="group-title">Sessão</h2>
+            <form action={logout} className="card" style={{ overflow: "hidden" }}>
+              <button type="submit" className="setting-row" style={{ width: "100%", border: "none", background: "none", textAlign: "left" }}>
+                <span className="setting-icon" style={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}>
+                  <IconLogout size={19} />
+                </span>
+                <span style={{ flex: 1, fontWeight: 700, color: "var(--urgent-ink)" }}>Sair da conta</span>
+                <IconChevronRight size={18} className="chev" />
+              </button>
+            </form>
+          </section>
+        </div>
+      </div>
 
       <p className="tiny faint" style={{ textAlign: "center" }}>
-        LinkedIn Leads · v0.1
+        LinkedIn Leads · v0.2
       </p>
     </main>
   );

@@ -4,27 +4,70 @@ import { prisma } from "@/lib/prisma";
 import { clockTime, dayLabel, relativeTime, sameDay, shortDate } from "@/lib/format";
 import { STATUS_LABEL, STATUS_TONE } from "@/lib/status";
 import { Avatar } from "@/components/Avatar";
-import { IconArrowLeft, IconCheckCheck, IconHand, IconLinkedin, IconSparkles, IconUser } from "@/components/Icons";
+import { IconArrowLeft, IconCheckCheck, IconChevronRight, IconHand, IconLinkedin, IconSparkles, IconUser } from "@/components/Icons";
 import { ReplyForm } from "./ReplyForm";
+import { LeadCrm } from "./LeadCrm";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [lead, settings] = await Promise.all([
+  const [lead, settings, campaigns, tagRows] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
-      include: { messages: { orderBy: { deliveredAt: "asc" } } },
+      include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true } } },
     }),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
+    prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.lead.findMany({ where: { tags: { isEmpty: false } }, select: { tags: true } }),
   ]);
 
   if (!lead) notFound();
 
   const tone = STATUS_TONE[lead.status];
   const fullName = `${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim() || "Lead";
+  const knownTags = [...new Set(tagRows.flatMap((r) => r.tags))].sort();
+  const crm = (
+    <LeadCrm
+      leadId={lead.id}
+      notes={lead.notes ?? ""}
+      tags={lead.tags}
+      knownTags={knownTags}
+      campaignId={lead.campaignId}
+      campaigns={campaigns}
+    />
+  );
+  const facts = (
+    <dl className="facts">
+      <div>
+        <dt>Status</dt>
+        <dd>
+          <span className={`badge badge-${tone}`}>{STATUS_LABEL[lead.status]}</span>
+        </dd>
+      </div>
+      {lead.icpScore != null && (
+        <div>
+          <dt>Encaixe com o cliente ideal</dt>
+          <dd>{lead.icpScore}%</dd>
+        </div>
+      )}
+      <div>
+        <dt>Campanha</dt>
+        <dd>{lead.campaign?.name ?? "Instruções gerais"}</dd>
+      </div>
+      <div>
+        <dt>Lead desde</dt>
+        <dd>{shortDate(lead.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>Mensagens</dt>
+        <dd>{lead.messages.length}</dd>
+      </div>
+    </dl>
+  );
 
   return (
+    <div className="chat-layout">
     <div className="chat-page">
       <header className="chat-header">
         <Link href="/" className="icon-btn icon-btn-round" aria-label="Voltar" style={{ border: "none", background: "transparent", boxShadow: "none" }}>
@@ -51,7 +94,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         </a>
       </header>
 
-      <div className="chat-intro rise">
+      <div className="chat-intro only-mobile rise">
         <Avatar firstName={lead.firstName} lastName={lead.lastName} size={76} />
         <h1 className="title-lg" style={{ marginTop: 8 }}>
           {fullName}
@@ -69,8 +112,23 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
           <span className="badge badge-plain">Lead desde {shortDate(lead.createdAt)}</span>
+          {lead.tags.map((t) => (
+            <span key={t} className="badge badge-waiting badge-plain">
+              {t}
+            </span>
+          ))}
         </div>
       </div>
+
+      {/* No celular o CRM fica aqui, recolhido; no computador, no painel lateral. */}
+      <details className="card notice only-mobile" style={{ marginBottom: 8 }}>
+        <summary className="notice-summary">
+          <span style={{ flex: 1, fontWeight: 700 }}>Anotações, etiquetas e campanha</span>
+          {lead.notes && <span className="badge badge-plain">com anotação</span>}
+          <IconChevronRight size={18} className="chev notice-chev" />
+        </summary>
+        <div style={{ padding: "4px 18px 18px" }}>{crm}</div>
+      </details>
 
       <div className="thread">
         {lead.messages.length === 0 && (
@@ -131,6 +189,22 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <ReplyForm leadId={lead.id} />
+    </div>
+
+      <aside className="lead-aside" aria-label="Detalhes do lead">
+        <div className="card card-pad stack" style={{ alignItems: "center", textAlign: "center", gap: 6 }}>
+          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={64} />
+          <h2 className="title-md" style={{ marginTop: 6 }}>
+            {fullName}
+          </h2>
+          {lead.jobTitle && <p className="small muted">{lead.jobTitle}</p>}
+          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }}>
+            <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Ver no LinkedIn
+          </a>
+        </div>
+        <div className="card card-pad">{facts}</div>
+        <div className="card card-pad">{crm}</div>
+      </aside>
     </div>
   );
 }

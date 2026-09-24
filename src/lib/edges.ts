@@ -114,7 +114,7 @@ export interface EdgesAsyncRun {
 // identificamos qual perfil foi processado.
 export async function scheduleConnectionInvites(
   identityId: string,
-  candidates: { linkedin_profile_url: string; full_name?: string; job_title?: string }[],
+  candidates: { linkedin_profile_url: string; full_name?: string; job_title?: string; icp_score?: number; campaign_id?: string }[],
   callbackUrl: string,
 ) {
   return edgesFetch<EdgesAsyncRun>("/actions/linkedin-connect-profile/run/async", {
@@ -123,7 +123,7 @@ export async function scheduleConnectionInvites(
       identity_ids: [identityId],
       inputs: candidates.map((c) => ({
         linkedin_profile_url: c.linkedin_profile_url,
-        custom_data: { full_name: c.full_name, job_title: c.job_title },
+        custom_data: { full_name: c.full_name, job_title: c.job_title, icp_score: c.icp_score, campaign_id: c.campaign_id },
       })),
       callback: { url: callbackUrl },
     }),
@@ -223,4 +223,75 @@ export async function extractFollowers(identityId: string): Promise<EdgesFollowe
   const data = await callAction<EdgesFollower[]>("linkedin-extract-followers", { identity_ids: [identityId] });
   if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-followers.");
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Ações Engagement opcionais (ligadas em Ajustes). Os slugs abaixo seguem o
+// padrão das ações já confirmadas (linkedin-connect-profile,
+// linkedin-message-profile...); se algum não bater com o Actions Library, é
+// só corrigir aqui. Todas são tolerantes: falha vira log, não derruba o cron.
+// ---------------------------------------------------------------------------
+
+export const ENGAGEMENT_ACTIONS = {
+  acceptInvitations: "linkedin-accept-invitations",
+  withdrawInvitation: "linkedin-withdraw-invitation",
+  visitProfile: "linkedin-visit-profile",
+  followProfile: "linkedin-follow-profile",
+  archiveMessage: "linkedin-archive-message",
+  extractSentInvitations: "linkedin-extract-sent-invitations",
+} as const;
+
+// Convite (recebido ou enviado) como a edges.run devolve.
+export interface EdgesInvitationRef {
+  linkedin_invitation_id?: string;
+  linkedin_invitation_urn?: string;
+}
+
+// Aceita os convites recebidos. Input "invitations" é opcional — sem ele,
+// aceita os pendentes. A saída só traz o ID do convite (não quem convidou):
+// quem entrou é descoberto depois, pela lista de conexões.
+export async function acceptReceivedInvitations(identityId: string): Promise<EdgesInvitationRef[]> {
+  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.acceptInvitations, { identity_ids: [identityId] });
+  return Array.isArray(data) ? (data as EdgesInvitationRef[]) : [];
+}
+
+// Convites que a conta enviou e ainda estão pendentes — é daqui que sai o URN
+// que a ação de retirar exige. Formato do item a confirmar no Actions Library.
+export interface EdgesSentInvitation extends EdgesInvitationRef {
+  linkedin_profile_url?: string;
+  linkedin_profile_handle?: string;
+  sent_at?: string;
+}
+
+export async function extractSentInvitations(identityId: string): Promise<EdgesSentInvitation[]> {
+  const data = await callAction<unknown>(ENGAGEMENT_ACTIONS.extractSentInvitations, { identity_ids: [identityId] });
+  return Array.isArray(data) ? (data as EdgesSentInvitation[]) : [];
+}
+
+export async function withdrawInvitation(identityId: string, invitationUrn: string) {
+  return callAction<unknown>(ENGAGEMENT_ACTIONS.withdrawInvitation, {
+    identity_ids: [identityId],
+    input: { linkedin_invitation_urn: invitationUrn },
+  });
+}
+
+export async function visitProfile(identityId: string, profileUrl: string) {
+  return callAction<unknown>(ENGAGEMENT_ACTIONS.visitProfile, {
+    identity_ids: [identityId],
+    input: { linkedin_profile_url: profileUrl },
+  });
+}
+
+export async function followProfile(identityId: string, profileUrl: string) {
+  return callAction<unknown>(ENGAGEMENT_ACTIONS.followProfile, {
+    identity_ids: [identityId],
+    input: { linkedin_profile_url: profileUrl },
+  });
+}
+
+export async function archiveThread(identityId: string, linkedinThreadId: string) {
+  return callAction<unknown>(ENGAGEMENT_ACTIONS.archiveMessage, {
+    identity_ids: [identityId],
+    input: { linkedin_thread_id: linkedinThreadId },
+  });
 }

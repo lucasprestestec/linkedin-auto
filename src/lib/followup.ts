@@ -1,8 +1,14 @@
 import type { Lead, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { markNeedsHuman } from "@/lib/handoff";
 import { extractConnections, sendMessage, type EdgesConnection } from "@/lib/edges";
 import { generateFollowUp, generateOpeningMessage } from "@/lib/agent";
 import { messagesSentToday } from "@/lib/limits";
+import { isWithinWorkHours } from "@/lib/schedule";
+import { isExcluded, parseExclusionList } from "@/lib/exclusion";
+import { handleIncomingMessage } from "@/lib/respond";
+import { runEngagement, type EngagementResult } from "@/lib/engagement";
+import { instructionsFor } from "@/lib/campaigns";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { PROACTIVE_STATUSES } from "@/lib/status";
 
@@ -16,7 +22,9 @@ const MAX_PROACTIVE_PER_RUN = 5;
 const CONNECTIONS_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface ProactiveResult {
+  engagement?: EngagementResult;
   acceptedInvites: number;
+  repliesSent: number;
   openingsSent: number;
   followUpsSent: number;
   markedLost: number;
@@ -85,9 +93,6 @@ async function sendAgentMessage(lead: Lead, identityId: string, content: string)
   });
 }
 
-async function markNeedsHuman(leadId: string, reason: string) {
-  await prisma.lead.update({ where: { id: leadId }, data: { status: "NEEDS_HUMAN", needsHumanReason: reason } });
-}
 
 function errorMessage(err: unknown) {
   return err instanceof Error ? err.message : "erro desconhecido";
@@ -102,13 +107,14 @@ async function sendOpenings(identityId: string, settings: Settings, budget: numb
     // mas cuja sincronização falhou.
     where: { status: { in: PROACTIVE_STATUSES }, linkedinThreadId: null, messages: { none: {} } },
     orderBy: { updatedAt: "asc" },
-    take: budget,
   });
+  const rules = parseExclusionList(settings.exclusionList);
+  const eligible = leads.filter((l) => !isExcluded({ ...l, headline: l.jobTitle }, rules)).slice(0, budget);
 
   let sent = 0;
-  for (const lead of leads) {
+  for (const lead of eligible) {
     try {
-      const content = await generateOpeningMessage(settings.agentInstructions, lead);
+      const content = await generateOpeningMessage(await instructionsFor(lead, settings), lead);
       await sendAgentMessage(lead, identityId, content);
       await prisma.lead.update({ where: { id: lead.id }, data: { status: "WAITING_REPLY", followUpsSent: 0 } });
       sent++;
@@ -132,8 +138,11 @@ async function sendFollowUps(
     where: { status: { in: PROACTIVE_STATUSES } },
     include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
   });
+  const rules = parseExclusionList(settings.exclusionList);
   const due = leads
     .filter((l) => l.messages[0] && l.messages[0].sender !== "LEAD" && l.messages[0].deliveredAt < cutoff)
+    // Lista de exclusão: nem follow-up nem "perdido" — o corretor conduz.
+    .filter((l) => !isExcluded({ ...l, headline: l.jobTitle }, rules))
     .sort((a, b) => a.messages[0].deliveredAt.getTime() - b.messages[0].deliveredAt.getTime());
 
   let sent = 0;
@@ -155,10 +164,11 @@ async function sendFollowUps(
       const attempt = lead.followUpsSent + 1;
       const previous = new Set(history.filter((m) => m.sender !== "LEAD").map((m) => normalizeText(m.content)));
 
-      let content = await generateFollowUp(settings.agentInstructions, lead, history, attempt, settings.followUpMaxCount);
+      const instructions = await instructionsFor(lead, settings);
+      let content = await generateFollowUp(instructions, lead, history, attempt, settings.followUpMaxCount);
       if (previous.has(normalizeText(content))) {
         // Repetiu uma mensagem anterior: uma segunda tentativa; se repetir de novo, não envia.
-        content = await generateFollowUp(settings.agentInstructions, lead, history, attempt, settings.followUpMaxCount);
+        content = await generateFollowUp(instructions, lead, history, attempt, settings.followUpMaxCount);
         if (previous.has(normalizeText(content))) throw new Error("o agente repetiu uma mensagem anterior");
       }
 
@@ -172,18 +182,41 @@ async function sendFollowUps(
   return { sent, lost };
 }
 
+// Lead escreveu fora do horário: a resposta não saiu na hora (ver cron). Aqui,
+// já dentro da janela, a IA responde quem está esperando — a última mensagem
+// da conversa é do lead e ninguém respondeu ainda.
+async function answerPendingReplies(identityId: string): Promise<number> {
+  const leads = await prisma.lead.findMany({
+    where: { status: { in: ["CONVERSATION_OPEN", "QUALIFIED"] } },
+    include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
+  });
+  const pending = leads.filter((l) => l.messages[0]?.sender === "LEAD").slice(0, MAX_PROACTIVE_PER_RUN);
+  for (const lead of pending) {
+    await handleIncomingMessage(lead, identityId);
+  }
+  return pending.length;
+}
+
 export async function runProactive(identityId: string): Promise<ProactiveResult> {
-  const result: ProactiveResult = { acceptedInvites: 0, openingsSent: 0, followUpsSent: 0, markedLost: 0 };
+  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, followUpsSent: 0, markedLost: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // Mesmas travas do handleIncomingMessage: pausado, nada acontece sozinho.
   if (settings.automationPaused) return { ...result, skipped: "automação pausada" };
+  // Fora do horário de trabalho nada sai; o que ficou devido sai na próxima janela.
+  if (!isWithinWorkHours(settings)) return { ...result, skipped: "fora do horário de trabalho" };
+
+  result.engagement = await runEngagement(identityId, settings);
 
   try {
     result.acceptedInvites = await detectAcceptedInvites(identityId, settings);
   } catch (err) {
     console.error("Falha ao checar convites aceitos", err);
   }
+
+  // Respostas que ficaram pra depois (lead escreveu fora do horário) vêm antes
+  // de qualquer iniciativa nossa.
+  result.repliesSent = await answerPendingReplies(identityId);
 
   const remainingToday = settings.dailyMessageLimit - (await messagesSentToday());
   let budget = Math.max(0, Math.min(MAX_PROACTIVE_PER_RUN, remainingToday));

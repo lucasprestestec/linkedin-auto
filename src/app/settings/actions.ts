@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
 import { FOLLOW_UP_DELAY_HOURS_RANGE, FOLLOW_UP_MAX_COUNT_RANGE } from "@/lib/settings-ranges";
+import { sendPush } from "@/lib/push";
 
 export async function getOrCreateIdentityLoginLink(): Promise<string> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
@@ -86,4 +87,92 @@ export async function updateAgentInstructions(_prevState: unknown, formData: For
 
   revalidatePath("/settings");
   return { saved: true };
+}
+
+export async function updateWorkHours(_prevState: unknown, formData: FormData) {
+  const workStartHour = Number(formData.get("workStartHour"));
+  const workEndHour = Number(formData.get("workEndHour"));
+  const workWeekdaysOnly = formData.get("workWeekdaysOnly") === "on";
+  if (!Number.isInteger(workStartHour) || !Number.isInteger(workEndHour) || workStartHour < 0 || workEndHour > 24 || workStartHour >= workEndHour) {
+    return { error: "O início precisa ser antes do fim." };
+  }
+  await prisma.settings.update({ where: { id: "singleton" }, data: { workStartHour, workEndHour, workWeekdaysOnly } });
+  revalidatePath("/settings");
+  return { error: undefined, saved: true };
+}
+
+export async function updateTargetAudience(_prevState: unknown, formData: FormData) {
+  const targetAudience = String(formData.get("targetAudience") ?? "").trim();
+  await prisma.settings.update({ where: { id: "singleton" }, data: { targetAudience: targetAudience || null } });
+  revalidatePath("/settings");
+  return { saved: true };
+}
+
+export async function updateExclusionList(_prevState: unknown, formData: FormData) {
+  const exclusionList = String(formData.get("exclusionList") ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join("\n");
+  await prisma.settings.update({ where: { id: "singleton" }, data: { exclusionList: exclusionList || null } });
+  revalidatePath("/settings");
+  return { saved: true };
+}
+
+const ENGAGEMENT_FLAGS = ["acceptInvitesEnabled", "withdrawInvitesEnabled", "warmupEnabled", "archiveLostEnabled"] as const;
+export type EngagementFlag = (typeof ENGAGEMENT_FLAGS)[number];
+
+export async function setEngagementFlag(flag: EngagementFlag, enabled: boolean) {
+  if (!ENGAGEMENT_FLAGS.includes(flag)) throw new Error("Opção inválida.");
+  await prisma.settings.update({ where: { id: "singleton" }, data: { [flag]: enabled } });
+  revalidatePath("/settings");
+}
+
+export async function setWithdrawAfterDays(days: number) {
+  if (!Number.isInteger(days) || days < 7 || days > 90) throw new Error("Entre 7 e 90 dias.");
+  await prisma.settings.update({ where: { id: "singleton" }, data: { withdrawAfterDays: days } });
+  revalidatePath("/settings");
+}
+
+// ---------------------------------------------------------------------------
+// Campanhas
+// ---------------------------------------------------------------------------
+
+export async function saveCampaign(id: string | null, name: string, instructions: string) {
+  const cleanName = name.trim().slice(0, 60);
+  if (!cleanName) return { error: "Dê um nome à campanha." };
+  const data = { name: cleanName, instructions: instructions.trim() || null };
+  const campaign = id ? await prisma.campaign.update({ where: { id }, data }) : await prisma.campaign.create({ data });
+  revalidatePath("/settings");
+  revalidatePath("/prospect");
+  return { error: undefined, id: campaign.id };
+}
+
+// Os leads da campanha continuam; passam a usar as instruções gerais.
+export async function deleteCampaign(id: string) {
+  await prisma.campaign.delete({ where: { id } });
+  revalidatePath("/settings");
+  revalidatePath("/prospect");
+}
+
+// ---------------------------------------------------------------------------
+// Notificações (Web Push)
+// ---------------------------------------------------------------------------
+
+export async function savePushSubscription(sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+  if (!sub?.endpoint?.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) throw new Error("Inscrição inválida.");
+  await prisma.pushSubscription.upsert({
+    where: { endpoint: sub.endpoint },
+    update: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+    create: { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+  });
+}
+
+export async function removePushSubscription(endpoint: string) {
+  await prisma.pushSubscription.deleteMany({ where: { endpoint } });
+}
+
+export async function sendTestPush() {
+  const delivered = await sendPush({ title: "Notificações ativadas", body: "É assim que você vai saber quando um lead precisar de você.", url: "/" });
+  return { delivered };
 }

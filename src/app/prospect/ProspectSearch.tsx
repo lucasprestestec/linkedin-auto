@@ -6,6 +6,7 @@ import type { ProspectResult } from "@/lib/prospect";
 import { buildLinkedinSearchUrl, normalizeLinkedinUrl } from "@/lib/linkedin";
 import { nameFromProfileUrl } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
+import { CampaignPicker } from "./CampaignPicker";
 import { IconAlert, IconCheck, IconClipboard, IconExternal, IconLinkedin, IconSearch, IconUserPlus } from "@/components/Icons";
 
 const SUGGESTIONS = ["Diretor de RH", "Sócio fundador", "CFO", "Gerente administrativo", "Advogado sócio"];
@@ -64,11 +65,12 @@ function LinkedinSearchLink() {
   );
 }
 
-function ProspectResults({ results }: { results: ProspectResult[] }) {
-  const newResults = results.filter((r) => !r.alreadyLead);
+function ProspectResults({ results, campaigns }: { results: ProspectResult[]; campaigns: { id: string; name: string }[] }) {
+  const newResults = results.filter((r) => !r.alreadyLead && !r.excluded);
   const [selected, setSelected] = useState<Set<string>>(new Set(newResults.map((r) => r.linkedinProfileUrl)));
   const [inviteState, setInviteState] = useState<InviteState>(undefined);
   const [inviting, startInvite] = useTransition();
+  const [campaignId, setCampaignId] = useState("");
 
   const selectedResults = newResults.filter((r) => selected.has(r.linkedinProfileUrl));
   const allSelected = newResults.length > 0 && selectedResults.length === newResults.length;
@@ -88,7 +90,7 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
 
   function handleInvite() {
     startInvite(async () => {
-      setInviteState(await invite(selectedResults));
+      setInviteState(await invite(selectedResults, campaignId || undefined));
     });
   }
 
@@ -120,7 +122,7 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
           n={3}
           title="Revise e convide"
           subtitle={`${results.length} perfi${results.length !== 1 ? "s" : "l"} reconhecido${results.length !== 1 ? "s" : ""}${
-            results.length > newResults.length ? ` · ${results.length - newResults.length} já são leads` : ""
+            results.length > newResults.length ? ` · ${results.length - newResults.length} não podem ser convidados` : ""
           }`}
         />
       </div>
@@ -141,8 +143,8 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
           const { firstName, lastName, slug } = nameFromProfileUrl(r.linkedinProfileUrl);
           return (
             <li key={r.linkedinProfileUrl}>
-              <label className="check-row" style={r.alreadyLead ? { opacity: 0.5, cursor: "default" } : undefined}>
-                {!r.alreadyLead && (
+              <label className="check-row" style={r.alreadyLead || r.excluded ? { opacity: 0.5, cursor: "default" } : undefined}>
+                {!r.alreadyLead && !r.excluded && (
                   <>
                     <input type="checkbox" checked={selected.has(r.linkedinProfileUrl)} onChange={() => toggle(r.linkedinProfileUrl)} />
                     <span className="checkbox">
@@ -157,8 +159,8 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
                   </span>
                   <span className="lead-sub tiny">linkedin.com/in/{slug}</span>
                 </span>
-                {r.alreadyLead ? (
-                  <span className="badge badge-plain">Já é lead</span>
+                {r.alreadyLead || r.excluded ? (
+                  <span className="badge badge-plain">{r.alreadyLead ? "Já é lead" : "Na lista de exclusão"}</span>
                 ) : (
                   <a
                     href={r.linkedinProfileUrl}
@@ -180,6 +182,7 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
 
       {newResults.length > 0 && (
         <div className="sticky-cta stack" style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}>
+          <CampaignPicker campaigns={campaigns} value={campaignId} onChange={setCampaignId} />
           {inviteState?.error && (
             <p className="error-text">
               <IconAlert size={15} /> {inviteState.error}
@@ -210,7 +213,7 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
   );
 }
 
-export function ProspectSearch() {
+export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: string }[] }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
   const [clipboardError, setClipboardError] = useState(false);
@@ -281,7 +284,7 @@ export function ProspectSearch() {
         </form>
       </section>
 
-      {state && !state.error && <ProspectResults key={state.parseId} results={state.results} />}
+      {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaigns={campaigns} />}
     </>
   );
 }

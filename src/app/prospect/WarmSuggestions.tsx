@@ -5,6 +5,7 @@ import { inviteWarm, loadWarmSuggestions, type InviteState, type WarmState } fro
 import type { WarmSuggestion } from "@/lib/warm";
 import { relativeTime } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
+import { CampaignPicker } from "./CampaignPicker";
 import { IconAlert, IconCheck, IconEye, IconFlame, IconRefresh, IconUserPlus } from "@/components/Icons";
 
 function SourceBadges({ s }: { s: WarmSuggestion }) {
@@ -24,22 +25,39 @@ function SourceBadges({ s }: { s: WarmSuggestion }) {
   );
 }
 
-function excludedSummary(ex: { anonymous: number; connections: number; leads: number }): string {
+const GOOD_FIT = 60;
+
+function FitBadge({ s }: { s: WarmSuggestion }) {
+  if (s.icpScore == null) return null;
+  const tone = s.icpScore >= 80 ? "badge-qualified" : s.icpScore >= GOOD_FIT ? "badge-open" : s.icpScore >= 40 ? "badge-invite" : "";
+  return (
+    <span className={`badge badge-plain ${tone}`} style={{ height: 22, flexShrink: 0 }} title={s.icpReason ?? undefined}>
+      {s.icpScore}% encaixe
+    </span>
+  );
+}
+
+function excludedSummary(ex: { anonymous: number; connections: number; leads: number; blocked: number }): string {
   const parts = [];
+  if (ex.blocked) parts.push(`${ex.blocked} na lista de exclusão`);
   if (ex.connections) parts.push(`${ex.connections} já ${ex.connections > 1 ? "são conexões" : "é conexão"}`);
   if (ex.leads) parts.push(`${ex.leads} já ${ex.leads > 1 ? "são leads" : "é lead"}`);
   if (ex.anonymous) parts.push(`${ex.anonymous} visita${ex.anonymous > 1 ? "s" : ""} anônima${ex.anonymous > 1 ? "s" : ""}`);
   return parts.length ? `Fora da lista: ${parts.join(" · ")}.` : "";
 }
 
-export function WarmSuggestions() {
+export function WarmSuggestions({ campaigns }: { campaigns: { id: string; name: string }[] }) {
   const [state, setState] = useState<WarmState | undefined>(undefined);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inviteState, setInviteState] = useState<InviteState>(undefined);
   const [loading, startLoad] = useTransition();
   const [inviting, startInvite] = useTransition();
+  const [onlyGoodFit, setOnlyGoodFit] = useState(false);
+  const [campaignId, setCampaignId] = useState("");
 
-  const suggestions = state?.ok ? state.suggestions : [];
+  const all = state?.ok ? state.suggestions : [];
+  const scored = state?.ok && state.scoring === "ok";
+  const suggestions = scored && onlyGoodFit ? all.filter((s) => (s.icpScore ?? 0) >= GOOD_FIT) : all;
   const chosen = suggestions.filter((s) => selected.has(s.linkedinProfileUrl));
 
   function load() {
@@ -47,7 +65,11 @@ export function WarmSuggestions() {
     startLoad(async () => {
       const result = await loadWarmSuggestions();
       setState(result);
-      setSelected(new Set(result.ok ? result.suggestions.map((s) => s.linkedinProfileUrl) : []));
+      // Com nota, já vem marcado só quem tem bom encaixe; sem nota, todo mundo.
+      const preselected = result.ok
+        ? result.suggestions.filter((s) => result.scoring !== "ok" || (s.icpScore ?? 0) >= GOOD_FIT)
+        : [];
+      setSelected(new Set(preselected.map((s) => s.linkedinProfileUrl)));
     });
   }
 
@@ -61,7 +83,7 @@ export function WarmSuggestions() {
   }
 
   function handleInvite() {
-    startInvite(async () => setInviteState(await inviteWarm(chosen)));
+    startInvite(async () => setInviteState(await inviteWarm(chosen, campaignId || undefined)));
   }
 
   const header = (
@@ -149,6 +171,22 @@ export function WarmSuggestions() {
               </button>
             </div>
             {excludedSummary(state.excluded) && <p className="hint">{excludedSummary(state.excluded)}</p>}
+            {state.scoring === "off" && (
+              <p className="hint">
+                Dica: descreva seu cliente ideal em <a href="/settings" style={{ color: "var(--brand-ink)", fontWeight: 700 }}>Ajustes</a> e a IA dá uma nota de encaixe pra cada pessoa.
+              </p>
+            )}
+            {state.scoring === "error" && <p className="hint" style={{ color: "var(--warning-ink)" }}>Não deu pra calcular o encaixe agora; a lista segue sem nota.</p>}
+            {scored && all.length > 0 && (
+              <div className="chips" style={{ margin: "4px -18px 0" }}>
+                <button type="button" className="chip" aria-pressed={!onlyGoodFit} onClick={() => setOnlyGoodFit(false)}>
+                  Todos <span className="chip-count">{all.length}</span>
+                </button>
+                <button type="button" className="chip" aria-pressed={onlyGoodFit} onClick={() => setOnlyGoodFit(true)}>
+                  Bom encaixe <span className="chip-count">{all.filter((s) => (s.icpScore ?? 0) >= GOOD_FIT).length}</span>
+                </button>
+              </div>
+            )}
             {state.failed.length > 0 && (
               <p className="hint" style={{ color: "var(--warning-ink)" }}>
                 Não deu pra carregar {state.failed.map((f) => (f === "viewer" ? "as visitas ao perfil" : "os seguidores")).join(" nem ")} agora.
@@ -170,10 +208,16 @@ export function WarmSuggestions() {
                   </span>
                   <Avatar firstName={s.firstName} lastName={s.lastName} size={40} />
                   <span className="lead-main">
-                    <span className="lead-name" style={{ fontSize: 14.5 }}>
-                      {[s.firstName, s.lastName].filter(Boolean).join(" ") || "Perfil do LinkedIn"}
+                    <span className="lead-top">
+                      <span className="lead-name" style={{ fontSize: 14.5 }}>
+                        {[s.firstName, s.lastName].filter(Boolean).join(" ") || "Perfil do LinkedIn"}
+                      </span>
+                      <span style={{ marginLeft: "auto" }}>
+                        <FitBadge s={s} />
+                      </span>
                     </span>
                     {s.headline && <span className="lead-sub tiny">{s.headline}</span>}
+                    {s.icpReason && <span className="tiny faint">{s.icpReason}</span>}
                     <SourceBadges s={s} />
                   </span>
                 </label>
@@ -185,6 +229,7 @@ export function WarmSuggestions() {
             className={`${suggestions.length > 5 ? "sticky-cta " : ""}stack`}
             style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}
           >
+            <CampaignPicker campaigns={campaigns} value={campaignId} onChange={setCampaignId} />
             {inviteState?.error && (
               <p className="error-text">
                 <IconAlert size={15} /> {inviteState.error}

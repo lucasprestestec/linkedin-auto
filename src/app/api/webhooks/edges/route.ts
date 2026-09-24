@@ -66,7 +66,7 @@ async function handleIntegrationEvent(payload: {
 async function handleConnectCallback(payload: {
   run: { status: string };
   input?: { linkedin_profile_url?: string } | null;
-  custom_data?: { full_name?: string; job_title?: string } | null;
+  custom_data?: { full_name?: string; job_title?: string; icp_score?: number; campaign_id?: string } | null;
   error?: { error_label?: string } | null;
 }) {
   const profileUrl = payload.input?.linkedin_profile_url;
@@ -94,6 +94,11 @@ async function handleConnectCallback(payload: {
         jobTitle: payload.custom_data?.job_title ?? null,
         status: "INVITE_SENT",
         invitedAt: new Date(),
+        icpScore: typeof payload.custom_data?.icp_score === "number" ? payload.custom_data.icp_score : null,
+        // A campanha pode ter sido apagada entre o convite e o callback.
+        campaignId: payload.custom_data?.campaign_id
+          ? ((await prisma.campaign.findUnique({ where: { id: payload.custom_data.campaign_id }, select: { id: true } }))?.id ?? null)
+          : null,
       },
     });
   } catch (err) {

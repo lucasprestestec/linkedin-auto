@@ -12,7 +12,7 @@ async function getData() {
   const [settings, leads] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.lead.findMany({
-      include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
+      include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 }, campaign: { select: { name: true } } },
     }),
   ]);
 
@@ -51,6 +51,9 @@ export default async function HomePage() {
           status: lead.status,
           needsHumanReason: lead.needsHumanReason,
           followUpsSent: lead.followUpsSent,
+          tags: lead.tags,
+          campaignName: lead.campaign?.name ?? null,
+          icpScore: lead.icpScore,
           lastMessage: last ? { content: last.content, sender: last.sender } : null,
           when: relativeTime(when),
         },
@@ -93,63 +96,58 @@ export default async function HomePage() {
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <strong>LinkedIn desconectado</strong>
-            <p>
-              {settings.linkedinReconnectReason ?? "A sessão expirou"}. A automação está parada até você reconectar.
-            </p>
+            <p>{settings.linkedinReconnectReason ?? "A sessão expirou"}. A automação está parada até você reconectar.</p>
           </span>
           <IconChevronRight size={18} />
         </Link>
       )}
 
-      <section className="hero rise" aria-label="Resumo de hoje">
-        <div className="stack" style={{ gap: 16 }}>
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div className="stack" style={{ gap: 8 }}>
-              <span className="hero-label">
-                <IconZap size={14} /> Mensagens enviadas hoje
+      <div className="home-top">
+        <section className="hero rise" aria-label="Resumo de hoje">
+          <div className="stack" style={{ gap: 16 }}>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div className="stack" style={{ gap: 8 }}>
+                <span className="hero-label">
+                  <IconZap size={14} /> Mensagens enviadas hoje
+                </span>
+                <span className="hero-number">
+                  {sentToday}
+                  <small>/ {settings.dailyMessageLimit}</small>
+                </span>
+              </div>
+              <span className="badge badge-plain" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", marginTop: 2 }}>
+                {usage}% do limite
               </span>
-              <span className="hero-number">
-                {sentToday}
-                <small>/ {settings.dailyMessageLimit}</small>
-              </span>
             </div>
-            <span
-              className="badge badge-plain"
-              style={{ background: "rgba(255,255,255,0.12)", color: "#fff", marginTop: 2 }}
-            >
-              {usage}% do limite
-            </span>
-          </div>
-          <div className="meter" role="progressbar" aria-valuenow={usage} aria-valuemin={0} aria-valuemax={100}>
-            <span style={{ width: `${usage}%` }} />
-          </div>
+            <div className="meter" role="progressbar" aria-valuenow={usage} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ width: `${usage}%` }} />
+            </div>
 
-          <div className="hero-stats">
-            <div className="hero-stat">
-              <i className="dot" style={{ background: "#ff8a6b" }} />
-              <b>{needYou}</b>
-              <span>Pra você</span>
+            <div className="hero-stats">
+              <div className="hero-stat">
+                <i className="dot" style={{ background: "#ff8a6b" }} />
+                <b>{needYou}</b>
+                <span>Pra você</span>
+              </div>
+              <div className="hero-stat">
+                <i className="dot" style={{ background: "#7fb0ff" }} />
+                <b>{talking}</b>
+                <span>Conversando</span>
+              </div>
+              <div className="hero-stat">
+                <i className="dot" style={{ background: "#b7adff" }} />
+                <b>{waiting}</b>
+                <span>Aguardando</span>
+              </div>
             </div>
-            <div className="hero-stat">
-              <i className="dot" style={{ background: "#7fb0ff" }} />
-              <b>{talking}</b>
-              <span>Conversando</span>
-            </div>
-            <div className="hero-stat">
-              <i className="dot" style={{ background: "#b7adff" }} />
-              <b>{waiting}</b>
-              <span>Aguardando</span>
-            </div>
+
+            <div className="hero-divider" />
+            <AutomationSwitch paused={settings.automationPaused} />
           </div>
+        </section>
 
-          <div className="hero-divider" />
-          <AutomationSwitch paused={settings.automationPaused} />
-        </div>
-      </section>
-
-      {leads.length > 0 && (
-        <FunnelCard steps={funnelSteps} contacted={funnel.contacted} replied={funnel.repliedAfterContact} />
-      )}
+        {leads.length > 0 && <FunnelCard steps={funnelSteps} contacted={funnel.contacted} replied={funnel.repliedAfterContact} />}
+      </div>
 
       <LeadList leads={items} followUpMax={settings.followUpMaxCount} />
     </main>

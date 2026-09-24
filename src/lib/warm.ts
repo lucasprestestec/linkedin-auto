@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { extractConnections, extractFollowers, extractProfileViewers } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
+import { scoreProfiles } from "@/lib/agent";
 import { linkedinProfileSlug, normalizeLinkedinUrl } from "@/lib/linkedin";
+import { isExcluded, loadExclusionRules } from "@/lib/exclusion";
 
 // Prospecção quente: gente que já demonstrou interesse no corretor (visitou o
 // perfil ou segue a conta). Só ações Engagement da edges.run, e só quando o
@@ -15,6 +17,9 @@ export interface WarmSuggestion {
   lastName: string | null;
   headline: string | null;
   sources: WarmSource[];
+  // Encaixe com o cliente ideal (0-100), quando ele está descrito em Ajustes.
+  icpScore: number | null;
+  icpReason: string | null;
   // ISO; só para quem visitou o perfil.
   viewedAt: string | null;
 }
@@ -22,9 +27,11 @@ export interface WarmSuggestion {
 export interface WarmResult {
   suggestions: WarmSuggestion[];
   // Quantos foram descartados e por quê — a tela explica pro corretor.
-  excluded: { anonymous: number; connections: number; leads: number };
+  excluded: { anonymous: number; connections: number; leads: number; blocked: number };
   // Fonte que falhou (a outra ainda aparece).
   failed: WarmSource[];
+  // "off": cliente ideal não descrito; "error": a IA falhou (lista segue sem nota).
+  scoring: "ok" | "off" | "error";
 }
 
 function slugFrom(url?: string, handle?: string): string | null {
@@ -64,7 +71,8 @@ export async function findWarmSuggestions(): Promise<WarmResult> {
       : [],
   );
 
-  const excluded = { anonymous: 0, connections: 0, leads: 0 };
+  const excluded = { anonymous: 0, connections: 0, leads: 0, blocked: 0 };
+  const rules = await loadExclusionRules();
   const bySlug = new Map<string, WarmSuggestion>();
 
   // Retorna o slug se a pessoa pode receber convite; senão conta o motivo.
@@ -101,6 +109,8 @@ export async function findWarmSuggestions(): Promise<WarmResult> {
       headline: v.headline ?? null,
       sources: ["viewer"],
       viewedAt,
+      icpScore: null,
+      icpReason: null,
     });
   }
 
@@ -120,14 +130,45 @@ export async function findWarmSuggestions(): Promise<WarmResult> {
       headline: f.job_title ?? null,
       sources: ["follower"],
       viewedAt: null,
+      icpScore: null,
+      icpReason: null,
     });
   }
 
   // Mais quente primeiro: visitou E segue > visitou (mais recente antes) > segue.
   const score = (s: WarmSuggestion) => (s.sources.includes("viewer") ? 2 : 0) + (s.sources.includes("follower") ? 1 : 0);
-  const suggestions = [...bySlug.values()].sort(
+  const allowed = [...bySlug.values()].filter((sug) => {
+    const blocked = isExcluded(sug, rules);
+    if (blocked) excluded.blocked++;
+    return !blocked;
+  });
+  const suggestions = allowed.sort(
     (a, b) => score(b) - score(a) || (b.viewedAt ?? "").localeCompare(a.viewedAt ?? ""),
   );
 
-  return { suggestions, excluded, failed };
+  // Nota de encaixe com o cliente ideal; com nota, os melhores sobem.
+  let scoring: WarmResult["scoring"] = "off";
+  const settings = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { targetAudience: true } });
+  if (settings?.targetAudience?.trim() && suggestions.length > 0) {
+    try {
+      const scores = await scoreProfiles(
+        settings.targetAudience,
+        suggestions.map((s, i) => ({ id: String(i), name: [s.firstName, s.lastName].filter(Boolean).join(" "), headline: s.headline })),
+      );
+      for (const sc of scores) {
+        const sug = suggestions[Number(sc.id)];
+        if (sug) {
+          sug.icpScore = sc.score;
+          sug.icpReason = sc.reason;
+        }
+      }
+      suggestions.sort((a, b) => (b.icpScore ?? -1) - (a.icpScore ?? -1) || score(b) - score(a));
+      scoring = "ok";
+    } catch (err) {
+      console.error("Falha ao qualificar sugestões", err);
+      scoring = "error";
+    }
+  }
+
+  return { suggestions, excluded, failed, scoring };
 }
