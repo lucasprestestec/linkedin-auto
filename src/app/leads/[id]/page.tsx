@@ -11,10 +11,13 @@ export const dynamic = "force-dynamic";
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const lead = await prisma.lead.findUnique({
-    where: { id },
-    include: { messages: { orderBy: { deliveredAt: "asc" } } },
-  });
+  const [lead, settings] = await Promise.all([
+    prisma.lead.findUnique({
+      where: { id },
+      include: { messages: { orderBy: { deliveredAt: "asc" } } },
+    }),
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
+  ]);
 
   if (!lead) notFound();
 
@@ -60,6 +63,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         )}
         <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
           <span className={`badge badge-${tone}`}>{STATUS_LABEL[lead.status]}</span>
+          {lead.followUpsSent > 0 && (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN") && (
+            <span className="badge badge-waiting badge-plain">
+              Follow-up {lead.followUpsSent}/{settings.followUpMaxCount}
+            </span>
+          )}
           <span className="badge badge-plain">Lead desde {shortDate(lead.createdAt)}</span>
         </div>
       </div>
@@ -67,7 +75,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       <div className="thread">
         {lead.messages.length === 0 && (
           <p className="small faint" style={{ textAlign: "center", padding: "24px 0" }}>
-            Nenhuma mensagem ainda. Assim que o convite for aceito, a conversa aparece aqui.
+            {lead.status === "INVITE_SENT"
+              ? "Nenhuma mensagem ainda. Assim que o convite for aceito, a IA abre a conversa."
+              : "Conexão aceita. A IA vai mandar a mensagem de abertura na próxima rodada."}
           </p>
         )}
 

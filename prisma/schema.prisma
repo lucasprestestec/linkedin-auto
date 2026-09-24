@@ -8,7 +8,8 @@ datasource db {
 
 enum LeadStatus {
   INVITE_SENT      // convite mandado, aguardando aceite
-  CONVERSATION_OPEN // aceitou, agente conversando
+  WAITING_REPLY    // conectado; mandamos mensagem (abertura/follow-up) e o lead ainda não respondeu
+  CONVERSATION_OPEN // o lead já respondeu pelo menos uma vez — conversa de verdade
   NEEDS_HUMAN      // agente pediu handoff
   QUALIFIED        // pronto para fechar
   LOST             // sem resposta / recusou
@@ -30,6 +31,11 @@ model Lead {
   status            LeadStatus @default(INVITE_SENT)
   linkedinThreadId  String?   @unique
   needsHumanReason  String?
+  // Quando o convite foi enviado (callback da edges.run). É o que conta pro limite
+  // diário de convites — o status muda assim que o convite é aceito.
+  invitedAt         DateTime?
+  // Follow-ups enviados desde a última resposta do lead (zera quando ele responde).
+  followUpsSent     Int       @default(0)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -54,6 +60,12 @@ model Settings {
   linkedinIdentityId  String?
   agentInstructions   String? @db.Text
   targetAudience      String? @db.Text
+  // Follow-up automático: até followUpMaxCount mensagens, uma a cada
+  // followUpDelayHours sem resposta. Depois disso o lead vira LOST.
+  followUpMaxCount    Int     @default(2)
+  followUpDelayHours  Int     @default(48)
+  // Última checagem de convites aceitos (lista de conexões) — no máximo 1x/hora.
+  connectionsCheckedAt DateTime?
   linkedinNeedsReconnect Boolean @default(false)
   linkedinReconnectReason String?
 }

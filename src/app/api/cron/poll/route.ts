@@ -4,11 +4,17 @@ import { getActiveIdentityId } from "@/lib/identity";
 import { handleIncomingMessage } from "@/lib/respond";
 import { isValidBearer } from "@/lib/auth";
 import { syncConversation } from "@/lib/sync";
+import { runProactive } from "@/lib/followup";
+
+// Geração de texto + envio por lead somam alguns segundos; a parte proativa é
+// limitada por rodada (ver lib/followup.ts), mas o padrão da função é curto.
+export const maxDuration = 120;
 
 // Agendador externo (cron-job.org) chama este endpoint periodicamente, a cada poucos minutos.
-// Sincroniza as conversas (com o histórico completo das que tiveram novidade) e,
-// quando a última mensagem é do lead, aciona o agente de IA (que decide
-// responder ou pedir handoff humano).
+// 1. Reativo: sincroniza as conversas (com o histórico completo das que tiveram
+//    novidade) e, quando a última mensagem é do lead, aciona o agente de IA.
+// 2. Proativo: detecta convites aceitos, manda a mensagem de abertura e os
+//    follow-ups de quem parou de responder.
 export async function GET(request: Request) {
   if (!isValidBearer(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -40,5 +46,14 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ updatedLeads, newIncomingMessages, fallbacks, failed });
+  // Depois do reativo: responder quem escreveu tem prioridade no limite diário.
+  let proactive;
+  try {
+    proactive = await runProactive(identityId);
+  } catch (err) {
+    console.error("Falha na etapa proativa", err);
+    proactive = { error: err instanceof Error ? err.message : "erro desconhecido" };
+  }
+
+  return NextResponse.json({ updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
 }

@@ -23,9 +23,12 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
         deliveredAt: new Date(result.delivered_at),
       },
     });
+    // "Conversando" só se o lead já respondeu alguma vez; senão, seguimos
+    // aguardando a primeira resposta dele.
+    const leadHasReplied = await prisma.message.count({ where: { leadId: lead.id, sender: "LEAD" } });
     await prisma.lead.update({
       where: { id: lead.id },
-      data: { status: "CONVERSATION_OPEN", needsHumanReason: null },
+      data: { status: leadHasReplied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null },
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Falha ao enviar mensagem." };

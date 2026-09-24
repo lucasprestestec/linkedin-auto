@@ -14,12 +14,13 @@ export interface LeadItem {
   jobTitle: string | null;
   status: LeadStatus;
   needsHumanReason: string | null;
+  followUpsSent: number;
   lastMessage: { content: string; sender: MessageSender } | null;
   // Pré-formatado no servidor: evita divergência de hidratação por relógio.
   when: string;
 }
 
-export function LeadList({ leads }: { leads: LeadItem[] }) {
+export function LeadList({ leads, followUpMax }: { leads: LeadItem[]; followUpMax: number }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>("all");
 
@@ -160,6 +161,11 @@ export function LeadList({ leads }: { leads: LeadItem[] }) {
                         )}
                         <span className="lead-time">{lead.when}</span>
                       </div>
+                      {lead.followUpsSent > 0 && (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN") && (
+                        <span className="badge badge-waiting" style={{ alignSelf: "flex-start", height: 22, marginBottom: 1 }}>
+                          Follow-up {lead.followUpsSent}/{followUpMax}
+                        </span>
+                      )}
                       <div className="lead-sub">
                         {lead.lastMessage ? (
                           <>
@@ -167,7 +173,9 @@ export function LeadList({ leads }: { leads: LeadItem[] }) {
                             {lead.lastMessage.content}
                           </>
                         ) : (
-                          lead.jobTitle ?? "Aguardando aceite do convite"
+                          (lead.status === "WAITING_REPLY" || lead.status === "CONVERSATION_OPEN"
+                            ? "Conexão aceita · a IA vai abrir a conversa"
+                            : lead.jobTitle ?? (lead.status === "INVITE_SENT" ? "Aguardando aceite do convite" : ""))
                         )}
                       </div>
                     </div>

@@ -95,3 +95,112 @@ export async function decideResponse(
   }
   return { action: "handoff", reason: input.handoff_reason ?? "O agente não soube responder." };
 }
+
+// ---------------------------------------------------------------------------
+// Mensagens proativas: o agente fala primeiro (abertura) ou retoma uma conversa
+// parada (follow-up). Não há mensagem do lead pra reagir — é iniciativa nossa,
+// então o formato é outro: uma única mensagem, sem opção de handoff.
+// ---------------------------------------------------------------------------
+
+export interface LeadContext {
+  firstName: string | null;
+  lastName: string | null;
+  jobTitle: string | null;
+}
+
+const WRITE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "write_message",
+    description: "Escreve a mensagem que será enviada ao lead no LinkedIn.",
+    parameters: {
+      type: "object",
+      properties: {
+        message: { type: "string", description: "Texto final da mensagem, pronto para enviar." },
+      },
+      required: ["message"],
+    },
+  },
+};
+
+function proactiveSystemPrompt(instructions: string | null, task: string): string {
+  return `${instructions?.trim() || DEFAULT_INSTRUCTIONS}
+
+Regras fixas, sempre válidas, independente do material acima:
+- Português do Brasil, tom natural de mensagem de LinkedIn: curta (2 a 4 frases), direta, humana — nada de script de vendas, emojis em excesso ou elogios genéricos ("vi seu perfil e fiquei impressionado").
+- NUNCA invente preço, condição, cobertura ou fato sobre produto que não esteja no material acima. Na dúvida, não cite produto específico: fale do problema/interesse, não da oferta.
+- Não inclua links, não peça dados pessoais e não prometa nada em nome do corretor.
+- Termine com uma pergunta aberta e fácil de responder.
+- Use a ferramenta write_message. Nunca responda em texto livre fora da ferramenta.
+
+Tarefa: ${task}`;
+}
+
+function leadDescription(lead: LeadContext): string {
+  const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "(nome não disponível)";
+  return `Lead: ${name}${lead.jobTitle ? ` — ${lead.jobTitle}` : ""}`;
+}
+
+async function writeMessage(system: string, user: string): Promise<string> {
+  const client = getClient();
+  const model = process.env.NOUS_MODEL || "deepseek/deepseek-v4-flash";
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    tools: [WRITE_TOOL],
+    tool_choice: { type: "function", function: { name: "write_message" } },
+  });
+
+  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== "function") throw new Error("O agente não retornou uma mensagem.");
+  const { message } = JSON.parse(toolCall.function.arguments) as { message?: string };
+  if (!message?.trim()) throw new Error("O agente retornou uma mensagem vazia.");
+  return message.trim();
+}
+
+// Primeira mensagem depois que o convite é aceito. Sem histórico: o único
+// contexto é quem é o lead (nome e cargo).
+export async function generateOpeningMessage(instructions: string | null, lead: LeadContext): Promise<string> {
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      "O lead acabou de aceitar o convite de conexão. Escreva a PRIMEIRA mensagem da conversa: agradeça a conexão de forma breve, " +
+        "faça uma ponte com o cargo/área dele quando houver, e abra espaço pra conversa. Use só o primeiro nome.",
+    ),
+    leadDescription(lead),
+  );
+}
+
+// Follow-up número `attempt` (1..maxCount) numa conversa sem resposta. Cada
+// tentativa tem um ângulo diferente, e as anteriores vão no histórico pra ele
+// não repetir frase.
+export async function generateFollowUp(
+  instructions: string | null,
+  lead: LeadContext,
+  history: Pick<DbMessage, "sender" | "content">[],
+  attempt: number,
+  maxCount: number,
+): Promise<string> {
+  const isLast = attempt >= maxCount;
+  const angle = isLast
+    ? "É a ÚLTIMA tentativa: seja leve, diga que não vai mais insistir e deixe a porta aberta pra quando fizer sentido."
+    : attempt === 1
+      ? "Retome a conversa com leveza, sem cobrar resposta; traga um motivo concreto (e verdadeiro) pra conversarem."
+      : "Traga um ângulo NOVO em relação às mensagens anteriores (outra dor, outro benefício, outra pergunta).";
+
+  const transcript = history
+    .map((m) => `${m.sender === "LEAD" ? "Lead" : m.sender === "AGENT" ? "Nós (agente)" : "Nós (corretor)"}: ${m.content}`)
+    .join("\n");
+
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      `O lead não respondeu à última mensagem. Escreva o follow-up ${attempt} de ${maxCount}. ${angle} ` +
+        "NÃO repita frases, aberturas ou perguntas que já aparecem no histórico. Não mencione que é um follow-up nem conte tentativas.",
+    ),
+    `${leadDescription(lead)}\n\nHistórico da conversa (mais antiga primeiro):\n${transcript || "(vazio)"}`,
+  );
+}

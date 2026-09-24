@@ -148,6 +148,16 @@ export async function syncConversation(conv: EdgesConversation, identityId: stri
   }
 
   const saved = await saveNewMessages(lead, messages);
+
+  // O lead escreveu: a conversa é de verdade (inclusive se estava dado como
+  // perdido e voltou) e a sequência de follow-up recomeça do zero.
+  if (saved.some((m) => m.fromLead)) {
+    const revived = lead.status === "INVITE_SENT" || lead.status === "WAITING_REPLY" || lead.status === "LOST";
+    lead = await prisma.lead.update({
+      where: { id: lead.id },
+      data: { followUpsSent: 0, ...(revived ? { status: "CONVERSATION_OPEN" as const } : {}) },
+    });
+  }
   const latest = messages[messages.length - 1];
   const shouldRespond = latest.fromLead && saved.some((m) => m.messageId === latest.messageId);
 

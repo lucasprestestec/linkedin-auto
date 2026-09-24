@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
 import { decideResponse } from "@/lib/agent";
+import { messagesSentToday } from "@/lib/limits";
 import type { Lead } from "@prisma/client";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
@@ -13,12 +14,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string) {
     return;
   }
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const sentToday = await prisma.message.count({
-    where: { sender: { not: "LEAD" }, createdAt: { gte: startOfDay } },
-  });
-  if (sentToday >= settings.dailyMessageLimit) {
+  if ((await messagesSentToday()) >= settings.dailyMessageLimit) {
     await markNeedsHuman(lead.id, "Limite diário de mensagens atingido");
     return;
   }

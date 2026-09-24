@@ -93,6 +93,7 @@ async function handleConnectCallback(payload: {
         lastName: rest.join(" ") || null,
         jobTitle: payload.custom_data?.job_title ?? null,
         status: "INVITE_SENT",
+        invitedAt: new Date(),
       },
     });
   } catch (err) {

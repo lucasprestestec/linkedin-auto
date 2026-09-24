@@ -162,3 +162,23 @@ export async function extractThreadMessages(identityId: string, linkedinThreadUr
   if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-messages.");
   return data;
 }
+
+// Conexões mais recentes da conta (ação "Extract LinkedIn Connections", tipo
+// Engagement). É como detectamos que um convite foi aceito: aceitar convite sem
+// nota não cria conversa no LinkedIn, então extract-conversations não enxerga.
+// Devolve só as URLs de perfil; o formato de cada item é tratado de forma
+// tolerante porque o nome do campo não foi confirmado na documentação.
+export async function extractConnectionProfileUrls(identityId: string): Promise<string[]> {
+  const data = await callAction<unknown>("linkedin-extract-connections", {
+    identity_ids: [identityId],
+  });
+  if (!Array.isArray(data)) throw new Error("Resposta inesperada de linkedin-extract-connections.");
+  const urls: string[] = [];
+  for (const item of data) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const url = record.linkedin_profile_url ?? record.profile_url ?? record.linkedin_url;
+    if (typeof url === "string") urls.push(url);
+  }
+  return urls;
+}

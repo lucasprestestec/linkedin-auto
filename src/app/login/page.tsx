@@ -20,10 +20,10 @@ export default function LoginPage() {
           Seus leads do LinkedIn, <span>no piloto automático.</span>
         </h1>
         <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 15, maxWidth: 340 }}>
-          Convites, conversas e follow-ups com um agente de IA que sabe a hora de te chamar.
+          Um agente de IA que abre a conversa, responde, faz follow-up e sabe a hora de te chamar.
         </p>
         <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-          {["Convites automáticos", "Respostas com IA", "Handoff inteligente"].map((t) => (
+          {["Abertura automática", "Follow-up com IA", "Handoff inteligente"].map((t) => (
             <span key={t} className="badge badge-plain" style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.85)", height: 28, padding: "0 11px" }}>
               <IconSparkles size={12} /> {t}
             </span>

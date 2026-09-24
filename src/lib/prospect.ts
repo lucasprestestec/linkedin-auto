@@ -34,8 +34,10 @@ export async function remainingDailyInviteQuota(): Promise<number> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
+  // Conta pelo momento do convite, não pelo status: com a detecção de aceite,
+  // um convite de hoje pode já ter virado WAITING_REPLY e não pode liberar vaga.
   const invitedToday = await prisma.lead.count({
-    where: { status: "INVITE_SENT", createdAt: { gte: startOfDay } },
+    where: { invitedAt: { gte: startOfDay } },
   });
   return settings.dailyInviteLimit - invitedToday;
 }
