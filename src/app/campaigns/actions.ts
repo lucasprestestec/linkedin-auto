@@ -75,9 +75,18 @@ export async function inviteWarm(candidates: WarmSuggestion[], campaignId?: stri
 export type CampaignFormState = { error?: string } | undefined;
 
 function readCampaign(formData: FormData) {
+  let audience: string[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("audience") ?? "[]"));
+    if (Array.isArray(parsed)) audience = parsed.map((v) => String(v).trim().slice(0, 60)).filter(Boolean).slice(0, 20);
+  } catch {}
+  const max = Number(formData.get("maxLeads"));
   return {
     name: String(formData.get("name") ?? "").trim().slice(0, 60),
+    description: String(formData.get("description") ?? "").trim().slice(0, 200) || null,
+    audience,
     instructions: String(formData.get("instructions") ?? "").trim().slice(0, 4000) || null,
+    maxLeads: Number.isInteger(max) && max > 0 ? Math.min(max, 5000) : null,
   };
 }
 
@@ -85,7 +94,7 @@ export async function createCampaign(_prev: CampaignFormState, formData: FormDat
   const data = readCampaign(formData);
   if (!data.name) return { error: "Dê um nome à campanha." };
   const campaign = await prisma.campaign.create({ data });
-  revalidatePath("/campaigns");
+  revalidatePath("/", "layout");
   redirect(`/campaigns/${campaign.id}?novo=1`);
 }
 
@@ -93,13 +102,19 @@ export async function updateCampaign(id: string, _prev: CampaignFormState, formD
   const data = readCampaign(formData);
   if (!data.name) return { error: "Dê um nome à campanha." };
   await prisma.campaign.update({ where: { id }, data });
-  revalidatePath("/campaigns", "layout");
-  return {};
+  revalidatePath("/", "layout");
+  redirect(`/campaigns/${id}`);
 }
 
-// Os leads da campanha continuam (em "Conversas"), só ficam sem campanha.
+export async function setCampaignStatus(id: string, status: "ACTIVE" | "PAUSED" | "FINISHED") {
+  if (!["ACTIVE", "PAUSED", "FINISHED"].includes(status)) throw new Error("Status inválido.");
+  await prisma.campaign.update({ where: { id }, data: { status } });
+  revalidatePath("/", "layout");
+}
+
+// As pessoas da campanha continuam em Conversas, só ficam sem campanha.
 export async function deleteCampaign(id: string) {
   await prisma.campaign.delete({ where: { id } });
-  revalidatePath("/campaigns", "layout");
+  revalidatePath("/", "layout");
   redirect("/campaigns");
 }

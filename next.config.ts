@@ -4,7 +4,6 @@ const nextConfig: NextConfig = {
   // Endereços antigos (antes da simplificação) continuam funcionando.
   async redirects() {
     return [
-      { source: "/prospect", destination: "/campaigns", permanent: false },
       { source: "/messages", destination: "/conversations", permanent: false },
       { source: "/stats", destination: "/", permanent: false },
     ];

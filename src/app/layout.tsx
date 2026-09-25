@@ -3,6 +3,7 @@ import { Archivo, Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import "./theme.css";
+import "./ui.css";
 import { AppShell } from "@/components/AppShell";
 import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
 import { getShellData } from "@/lib/shell";

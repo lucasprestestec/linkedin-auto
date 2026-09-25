@@ -21,17 +21,17 @@ function StepHeader({ n, title, subtitle, done }: { n: number; title: string; su
   );
 }
 
-function LinkedinSearchStep() {
+function LinkedinSearchStep({ initialKeywords }: { initialKeywords: string[] }) {
   return (
     <section id="search-step" className="card card-pad step rise" style={{ "--i": 1, scrollMarginTop: 16 } as React.CSSProperties}>
       <StepHeader n={1} title="Encontre pessoas" subtitle="Monte a busca com os filtros que quiser — é grátis, direto no LinkedIn." />
-      <PeopleSearchBuilder />
+      <PeopleSearchBuilder initialKeywords={initialKeywords} />
       <p className="hint">Abre numa aba nova. Escolha quem quiser e copie o link do perfil de cada pessoa.</p>
     </section>
   );
 }
 
-function ProspectResults({ results, campaignId }: { results: ProspectResult[]; campaignId: string }) {
+function ProspectResults({ results, campaignId }: { results: ProspectResult[]; campaignId?: string }) {
   const newResults = results.filter((r) => !r.alreadyLead && !r.excluded);
   const [selected, setSelected] = useState<Set<string>>(new Set(newResults.map((r) => r.linkedinProfileUrl)));
   const [inviteState, setInviteState] = useState<InviteState>(undefined);
@@ -177,7 +177,7 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
   );
 }
 
-export function ProspectSearch({ campaignId }: { campaignId: string }) {
+export function ProspectSearch({ campaignId, initialKeywords = [] }: { campaignId?: string; initialKeywords?: string[] }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
   const [clipboardError, setClipboardError] = useState(false);
@@ -206,7 +206,7 @@ export function ProspectSearch({ campaignId }: { campaignId: string }) {
   return (
     <div className="search-flow">
       <div className="col">
-        <LinkedinSearchStep />
+        <LinkedinSearchStep initialKeywords={initialKeywords} />
       </div>
       <div className="col">
         <section id="paste-step" className="card card-pad step rise" style={{ "--i": 2, scrollMarginTop: 16 } as React.CSSProperties}>

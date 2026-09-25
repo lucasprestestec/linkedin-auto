@@ -8,10 +8,8 @@ import { EMPTY_SEARCH, buildLinkedinSearchUrl } from "@/lib/linkedin";
 import { Avatar } from "@/components/Avatar";
 import {
   IconArrowLeft,
-  IconArrowUpRight,
   IconBuilding,
   IconCheckCheck,
-  IconDots,
   IconFlame,
   IconLinkedin,
   IconSearch,
@@ -25,6 +23,9 @@ import { LeadCampaign } from "./LeadCampaign";
 import { LeadNotes } from "./LeadNotes";
 import { LeadActions } from "./LeadActions";
 import { HandoffCard } from "./HandoffCard";
+import { DetailsToggle, LeadWorkspace } from "./LeadWorkspace";
+import { ConversationList } from "@/components/ConversationList";
+import { getConversationItems } from "@/lib/conversations";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ function StatusStepper({ status }: { status: LeadStatus }) {
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [lead, settings, campaigns, tagRows] = await Promise.all([
+  const [lead, settings, campaigns, tagRows, conversations] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
       include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true } } },
@@ -67,6 +68,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
     prisma.lead.findMany({ where: { tags: { isEmpty: false } }, select: { tags: true } }),
+    getConversationItems(),
   ]);
 
   if (!lead) notFound();
@@ -215,7 +217,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       )}
       <div>
         <dt>Campanha</dt>
-        <dd>{lead.campaign?.name ?? "Instruções gerais"}</dd>
+        <dd>{lead.campaign?.name ?? "Sem campanha"}</dd>
       </div>
       {lead.followUpsSent > 0 && (
         <div>
@@ -291,54 +293,46 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   );
 
   return (
-    <div className="lead-layout">
-      <div className="chat-card">
-        <header className="chat-head">
-          <Link href="/conversations" className="chat-back" aria-label="Voltar para Conversas">
-            <IconArrowLeft size={22} />
-          </Link>
-          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={64} status={tone} />
-          <div className="chat-head-main">
-            <h1 className="chat-name">
-              <span className="display-desktop">{fullName}</span>
-              <IconLinkedin size={20} className="only-desktop li-badge" />
-            </h1>
-            {lead.jobTitle && <p className="chat-role">{company ? `${role} na ${company}` : lead.jobTitle}</p>}
-          </div>
-          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm only-desktop li-link">
-            Ver no LinkedIn <IconArrowUpRight size={16} />
-          </a>
-          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn">
-            <IconDots size={22} />
-          </a>
-        </header>
-
-        <LeadTabs
-          chat={conversation}
-          about={aboutTab}
-          composer={<ReplyForm key="composer" leadId={lead.id} firstName={firstName} profileUrl={lead.linkedinProfileUrl} />}
-        />
-      </div>
-
-      <aside className="lead-side only-desktop" aria-label="Detalhes do lead">
-        <section className="side-card">
-          <div className="row" style={{ gap: 16, alignItems: "flex-start" }}>
-            <Avatar firstName={lead.firstName} lastName={lead.lastName} size={76} />
-            <div className="stack" style={{ minWidth: 0, flex: 1, gap: 4 }}>
-              <h2 className="display side-name">
-                {fullName} <IconLinkedin size={20} className="li-badge" />
-              </h2>
-              {lead.jobTitle && <p className="small muted">{lead.jobTitle}</p>}
-            </div>
-          </div>
-          {profileBadges}
-          {companyRow}
-          <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
-        </section>
-        {sideCards}
-        <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
-        {moreInfo}
+    <div className="conv-layout lead-view">
+      <aside className="conv-col only-desktop" aria-label="Lista de conversas">
+        <ConversationList items={conversations} activeId={lead.id} pane />
       </aside>
+
+      <LeadWorkspace>
+        <div className="chat-card">
+          <header className="chat-head">
+            <Link href="/conversations" className="chat-back only-mobile" aria-label="Voltar para Conversas">
+              <IconArrowLeft size={22} />
+            </Link>
+            <Avatar firstName={lead.firstName} lastName={lead.lastName} size={44} status={tone} />
+            <div className="chat-head-main">
+              <h1 className="chat-name">{fullName}</h1>
+              {lead.jobTitle && <p className="chat-role">{company ? `${role} · ${company}` : lead.jobTitle}</p>}
+            </div>
+            <DetailsToggle />
+            <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn" title="Ver no LinkedIn">
+              <IconLinkedin size={19} />
+            </a>
+          </header>
+
+          <LeadTabs
+            chat={conversation}
+            about={aboutTab}
+            composer={<ReplyForm key="composer" leadId={lead.id} firstName={firstName} profileUrl={lead.linkedinProfileUrl} />}
+          />
+        </div>
+
+        <aside className="lead-side" aria-label="Detalhes do lead">
+          <section className="side-card">
+            {profileBadges}
+            {companyRow}
+            <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
+          </section>
+          {sideCards}
+          <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
+          {moreInfo}
+        </aside>
+      </LeadWorkspace>
     </div>
   );
 }

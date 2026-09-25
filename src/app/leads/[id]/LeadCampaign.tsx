@@ -30,8 +30,8 @@ export function LeadCampaign({
           <IconRocket size={20} />
         </span>
         <span className="stack" style={{ flex: 1, minWidth: 0 }}>
-          <b className="truncate">{current?.name ?? "Instruções gerais"}</b>
-          <span className="tiny faint">{current ? `Criada em ${current.since}` : "Sem campanha específica"}</span>
+          <b className="truncate">{current?.name ?? "Sem campanha"}</b>
+          <span className="tiny faint">{current ? `Criada em ${current.since}` : "Opcional — agrupa por oferta"}</span>
         </span>
         {campaigns.length > 0 && (
           <select
@@ -45,7 +45,7 @@ export function LeadCampaign({
               });
             }}
           >
-            <option value="">Sem campanha (instruções gerais)</option>
+            <option value="">Sem campanha</option>
             {campaigns.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

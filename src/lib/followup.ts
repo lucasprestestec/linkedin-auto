@@ -98,6 +98,10 @@ function errorMessage(err: unknown) {
   return err instanceof Error ? err.message : "erro desconhecido";
 }
 
+// Leads sem campanha ou numa campanha ativa. Campanha pausada/finalizada não
+// recebe abertura nem follow-up (respostas a quem escrever continuam normais).
+const IN_ACTIVE_CAMPAIGN = { OR: [{ campaignId: null }, { campaign: { status: "ACTIVE" as const } }] };
+
 // Conectado e sem nenhuma mensagem: o agente abre a conversa.
 async function sendOpenings(identityId: string, settings: Settings, budget: number): Promise<number> {
   if (budget <= 0) return 0;
@@ -105,7 +109,7 @@ async function sendOpenings(identityId: string, settings: Settings, budget: numb
     // Sem conversa no LinkedIn (thread) e sem mensagem no banco. Checar a thread
     // evita mandar "obrigado por conectar" no meio de uma conversa que existe
     // mas cuja sincronização falhou.
-    where: { status: { in: PROACTIVE_STATUSES }, linkedinThreadId: null, messages: { none: {} } },
+    where: { status: { in: PROACTIVE_STATUSES }, linkedinThreadId: null, messages: { none: {} }, ...IN_ACTIVE_CAMPAIGN },
     orderBy: { updatedAt: "asc" },
   });
   const rules = parseExclusionList(settings.exclusionList);
@@ -135,7 +139,7 @@ async function sendFollowUps(
 ): Promise<{ sent: number; lost: number }> {
   const cutoff = new Date(Date.now() - settings.followUpDelayHours * 60 * 60 * 1000);
   const leads = await prisma.lead.findMany({
-    where: { status: { in: PROACTIVE_STATUSES } },
+    where: { status: { in: PROACTIVE_STATUSES }, ...IN_ACTIVE_CAMPAIGN },
     include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
   });
   const rules = parseExclusionList(settings.exclusionList);

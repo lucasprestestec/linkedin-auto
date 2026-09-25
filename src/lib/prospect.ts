@@ -64,6 +64,19 @@ export async function inviteProspects(
     return !isExcluded({ linkedinProfileUrl: c.linkedinProfileUrl, firstName, lastName: rest.join(" "), headline: c.jobTitle }, rules);
   });
 
+  // Campanha pausada/finalizada não recebe gente nova; limite de pessoas da
+  // campanha (se houver) corta o excedente.
+  const campaignIds = [...new Set(candidates.map((c) => c.campaignId).filter((id): id is string => Boolean(id)))];
+  for (const id of campaignIds) {
+    const campaign = await prisma.campaign.findUnique({ where: { id }, select: { status: true, maxLeads: true, _count: { select: { leads: true } } } });
+    if (!campaign || campaign.status !== "ACTIVE") throw new Error("Essa campanha está pausada ou finalizada. Reative-a para convidar pessoas.");
+    if (campaign.maxLeads != null) {
+      let room = Math.max(0, campaign.maxLeads - campaign._count.leads);
+      if (room === 0) throw new Error(`A campanha já chegou ao limite de ${campaign.maxLeads} pessoas.`);
+      candidates = candidates.filter((c) => c.campaignId !== id || room-- > 0);
+    }
+  }
+
   const remaining = await remainingDailyInviteQuota();
   if (remaining <= 0) {
     return { scheduled: 0, skippedForLimit: candidates.length };

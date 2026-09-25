@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { IconPlus, IconSearch } from "./Icons";
+import { IconSearch } from "./Icons";
+import { UserAvatar } from "./UserAvatar";
 import { NotificationBell } from "./NotificationBell";
 
 // Barra de cima do computador: busca global (⌘K), sino e atalho pra prospectar.
@@ -42,16 +42,14 @@ export function DesktopTopbar() {
           type="search"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Buscar pessoa, cargo ou empresa nas conversas..."
+          placeholder="Buscar pessoa, cargo ou empresa..."
           aria-label="Buscar leads"
         />
         <kbd>⌘ K</kbd>
       </form>
       <div className="row" style={{ gap: 12 }}>
         <NotificationBell />
-        <Link href="/campaigns/new" className="btn btn-primary btn-pill">
-          <IconPlus size={18} strokeWidth={2.4} /> Nova campanha
-        </Link>
+        <UserAvatar size={44} />
       </div>
     </header>
   );

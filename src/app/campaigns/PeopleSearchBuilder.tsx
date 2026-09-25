@@ -88,9 +88,10 @@ function joinOr(values: string[]) {
   return quoted.length <= 1 ? quoted.join("") : `${quoted.slice(0, -1).join(", ")} ou ${quoted[quoted.length - 1]}`;
 }
 
-export function PeopleSearchBuilder() {
-  const [filters, setFilters] = useState<PeopleSearchFilters>(EMPTY_SEARCH);
-  const [visible, setVisible] = useState<ListKey[]>(["titles", "locations"]);
+// initialKeywords: público da campanha (cargos/setores/empresas) já entra como palavra-chave.
+export function PeopleSearchBuilder({ initialKeywords = [] }: { initialKeywords?: string[] }) {
+  const [filters, setFilters] = useState<PeopleSearchFilters>({ ...EMPTY_SEARCH, keywords: initialKeywords });
+  const [visible, setVisible] = useState<ListKey[]>(initialKeywords.length ? ["titles", "locations", "keywords"] : ["titles", "locations"]);
 
 
   const hidden = FIELDS.filter((f) => !visible.includes(f.key));

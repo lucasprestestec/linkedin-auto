@@ -45,7 +45,7 @@ function excludedSummary(ex: { anonymous: number; connections: number; leads: nu
   return parts.length ? `Fora da lista: ${parts.join(" · ")}.` : "";
 }
 
-export function WarmSuggestions({ campaignId }: { campaignId: string }) {
+export function WarmSuggestions({ campaignId }: { campaignId?: string }) {
   const [state, setState] = useState<WarmState | undefined>(undefined);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inviteState, setInviteState] = useState<InviteState>(undefined);
