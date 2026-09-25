@@ -115,7 +115,7 @@ export default async function SettingsPage() {
         </div>
 
         <div className="settings-col">
-          <section className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
+          <section id="campanhas" className="group rise" style={{ "--i": 2 } as React.CSSProperties}>
             <h2 className="group-title">Agente de IA</h2>
             <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
             <CampaignsForm
