@@ -6,7 +6,6 @@ import { IconLogout } from "@/components/Icons";
 import { AdminLogin } from "./AdminLogin";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { LimitsForm } from "./LimitsForm";
-import { FollowUpForm } from "./FollowUpForm";
 import { WorkHoursForm } from "./WorkHoursForm";
 import { EngagementForm } from "./EngagementForm";
 import { AccountTypeNotice } from "./AccountTypeNotice";
@@ -61,10 +60,6 @@ export default async function AdminPage() {
           <section className="group">
             <h2 className="group-title">Limites diários</h2>
             <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Follow-up automático</h2>
-            <FollowUpForm followUpMaxCount={settings.followUpMaxCount} followUpDelayHours={settings.followUpDelayHours} />
           </section>
         </div>
         <div className="settings-col">

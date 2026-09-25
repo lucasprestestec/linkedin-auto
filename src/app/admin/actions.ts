@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { FOLLOW_UP_DELAY_HOURS_RANGE, FOLLOW_UP_MAX_COUNT_RANGE } from "@/lib/settings-ranges";
 import { ADMIN_COOKIE, adminEnabled, checkAdminPassword, createAdminToken, requireAdmin } from "@/lib/admin";
 
 export async function adminLogin(_prev: { error?: string } | undefined, formData: FormData) {
@@ -37,33 +36,6 @@ export async function updateLimits(_prevState: unknown, formData: FormData) {
   await prisma.settings.update({
     where: { id: "singleton" },
     data: { dailyInviteLimit, dailyMessageLimit },
-  });
-
-  revalidatePath("/admin");
-  return { error: undefined, saved: true };
-}
-
-export async function updateFollowUp(_prevState: unknown, formData: FormData) {
-  await requireAdmin();
-  const followUpMaxCount = Number(formData.get("followUpMaxCount"));
-  const followUpDelayHours = Number(formData.get("followUpDelayHours"));
-  const [minCount, maxCount] = FOLLOW_UP_MAX_COUNT_RANGE;
-  const [minHours, maxHours] = FOLLOW_UP_DELAY_HOURS_RANGE;
-
-  if (
-    !Number.isInteger(followUpMaxCount) ||
-    !Number.isInteger(followUpDelayHours) ||
-    followUpMaxCount < minCount ||
-    followUpMaxCount > maxCount ||
-    followUpDelayHours < minHours ||
-    followUpDelayHours > maxHours
-  ) {
-    return { error: "Valores inválidos." };
-  }
-
-  await prisma.settings.update({
-    where: { id: "singleton" },
-    data: { followUpMaxCount, followUpDelayHours },
   });
 
   revalidatePath("/admin");

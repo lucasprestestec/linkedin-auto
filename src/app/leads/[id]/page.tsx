@@ -23,6 +23,8 @@ import { LeadCampaign } from "./LeadCampaign";
 import { LeadNotes } from "./LeadNotes";
 import { LeadActions } from "./LeadActions";
 import { HandoffCard } from "./HandoffCard";
+import { LeadFollowUp } from "./LeadFollowUp";
+import { describeRule, followUpRuleFor } from "@/lib/followupPolicy";
 import { DetailsToggle, LeadWorkspace } from "./LeadWorkspace";
 import { ConversationList } from "@/components/ConversationList";
 import { getConversationItems } from "@/lib/conversations";
@@ -63,7 +65,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const [lead, settings, campaigns, tagRows, conversations] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
-      include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true } } },
+      include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
     }),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
@@ -125,6 +127,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     </div>
   );
 
+  // Regra que vale agora pra esta conversa, e a que valeria sem personalizar.
+  const rule = followUpRuleFor(lead, lead.campaign, settings);
+  const inherited = followUpRuleFor({ followUpMaxCount: null, followUpDelayHours: null }, lead.campaign, settings);
+  const inheritedLabel = `${describeRule(inherited.maxCount, inherited.delayHours)} (${inherited.source === "campaign" ? "da campanha" : "da conta"})`;
+
   const sideCards = (
     <>
       <StatusStepper status={lead.status} />
@@ -133,6 +140,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         leadId={lead.id}
         campaignId={lead.campaignId}
         campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, since: shortDate(c.createdAt) }))}
+      />
+      <LeadFollowUp
+        leadId={lead.id}
+        sent={lead.followUpsSent}
+        inheritedLabel={inheritedLabel}
+        custom={
+          rule.source === "lead" ? { count: rule.maxCount, days: Math.max(1, Math.round(rule.delayHours / 24)) } : null
+        }
       />
     </>
   );
@@ -223,7 +238,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <div>
           <dt>Follow-ups</dt>
           <dd>
-            {lead.followUpsSent}/{settings.followUpMaxCount}
+            {lead.followUpsSent}/{rule.maxCount}
           </dd>
         </div>
       )}

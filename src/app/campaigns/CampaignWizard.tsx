@@ -5,6 +5,10 @@ import { useActionState, useState } from "react";
 import { TagInput } from "@/components/TagInput";
 import { IconAlert, IconArrowLeft, IconArrowRight, IconCheck, IconHash, IconMessages, IconUser } from "@/components/Icons";
 import type { CampaignFormState } from "./actions";
+import { FollowUpOverride, type FollowUpValue } from "@/components/FollowUpFields";
+
+const followUpShort = (v: FollowUpValue) =>
+  v.count === 0 ? "Sem follow-up" : `${v.count} follow-up${v.count > 1 ? "s" : ""} a cada ${v.days} dia${v.days > 1 ? "s" : ""}`;
 
 const STEPS = ["Detalhes", "Público", "Mensagem", "Revisão"];
 
@@ -14,9 +18,11 @@ export interface CampaignDraft {
   audience: string[];
   instructions: string;
   maxLeads: string;
+  // null = usa o padrão da conta
+  followUp: FollowUpValue | null;
 }
 
-const EMPTY: CampaignDraft = { name: "", description: "", audience: [], instructions: "", maxLeads: "" };
+const EMPTY: CampaignDraft = { name: "", description: "", audience: [], instructions: "", maxLeads: "", followUp: null };
 
 // Criar/editar campanha em 4 passos curtos. Tudo é enviado junto no final.
 export function CampaignWizard({
@@ -24,11 +30,13 @@ export function CampaignWizard({
   initial,
   cancelHref,
   submitLabel,
+  accountFollowUp,
 }: {
   action: (prev: CampaignFormState, formData: FormData) => Promise<CampaignFormState>;
   initial?: CampaignDraft;
   cancelHref: string;
   submitLabel: string;
+  accountFollowUp: string;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [step, setStep] = useState(0);
@@ -43,6 +51,9 @@ export function CampaignWizard({
       <input type="hidden" name="audience" value={JSON.stringify(d.audience)} />
       <input type="hidden" name="instructions" value={d.instructions} />
       <input type="hidden" name="maxLeads" value={d.maxLeads} />
+      <input type="hidden" name="followUpCustom" value={d.followUp ? "1" : ""} />
+      <input type="hidden" name="followUpCount" value={d.followUp?.count ?? ""} />
+      <input type="hidden" name="followUpDays" value={d.followUp?.days ?? ""} />
 
       <ol className="wizard-steps" aria-label="Etapas">
         {STEPS.map((label, i) => (
@@ -116,6 +127,13 @@ export function CampaignWizard({
           </label>
         )}
 
+        {step === 2 && (
+          <div className="wfield">
+            <span>Follow-up</span>
+            <FollowUpOverride custom={d.followUp} onChange={(v) => set("followUp", v)} inheritedLabel={accountFollowUp} idPrefix="fu-camp" />
+          </div>
+        )}
+
         {step === 3 && (
           <dl className="wreview">
             <div>
@@ -133,6 +151,10 @@ export function CampaignWizard({
             <div>
               <dt>Limite de leads</dt>
               <dd>{d.maxLeads || "Sem limite"}</dd>
+            </div>
+            <div>
+              <dt>Follow-up</dt>
+              <dd>{d.followUp ? followUpShort(d.followUp) : `Padrão da conta (${accountFollowUp})`}</dd>
             </div>
             <div>
               <dt>Oferta</dt>

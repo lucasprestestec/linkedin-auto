@@ -6,7 +6,8 @@ import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
 import { CampaignStatus } from "@/components/CampaignStatus";
 import { ConversationRow } from "@/components/ConversationRow";
-import { IconArrowLeft, IconCheck, IconPlus } from "@/components/Icons";
+import { IconArrowLeft, IconCheck, IconPlus, IconRefresh } from "@/components/Icons";
+import { describeRule } from "@/lib/followupPolicy";
 import { CampaignMenu } from "../CampaignMenu";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +15,13 @@ export const dynamic = "force-dynamic";
 export default async function CampaignPage({ params, searchParams }: PageProps<"/campaigns/[id]">) {
   const { id } = await params;
   const isNew = (await searchParams).novo === "1";
-  const [campaign, conversations] = await Promise.all([
+  const [campaign, conversations, settings] = await Promise.all([
     prisma.campaign.findUnique({
       where: { id },
       include: { leads: { select: { status: true, messages: { select: { sender: true } } } } },
     }),
     getConversationItems(),
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true } }),
   ]);
   if (!campaign) notFound();
 
@@ -80,6 +82,16 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
           <dt>Oportunidades</dt>
         </div>
       </dl>
+
+      <p className="small muted row" style={{ gap: 6 }}>
+        <IconRefresh size={15} /> Follow-up:{" "}
+        {campaign.followUpMaxCount != null && campaign.followUpDelayHours != null
+          ? describeRule(campaign.followUpMaxCount, campaign.followUpDelayHours)
+          : `padrão da conta (${describeRule(settings.followUpMaxCount, settings.followUpDelayHours)})`}
+        <Link href={`/campaigns/${campaign.id}/edit`} className="sec-link" style={{ color: "var(--brand)" }}>
+          Alterar
+        </Link>
+      </p>
 
       {campaign.instructions && (
         <section className="offer-box">
