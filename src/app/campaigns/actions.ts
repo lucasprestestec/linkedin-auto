@@ -1,5 +1,8 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { parsePastedProfiles, inviteProspects, type ProspectResult } from "@/lib/prospect";
 import { findWarmSuggestions, type WarmResult, type WarmSuggestion } from "@/lib/warm";
 import { findLeadByProfileUrl } from "@/lib/leads";
@@ -26,9 +29,11 @@ export type InviteState = { scheduled: number; skippedForLimit: number; error?: 
 
 export async function invite(candidates: ProspectResult[], campaignId?: string): Promise<InviteState> {
   try {
-    return await inviteProspects(
+    const result = await inviteProspects(
       candidates.filter((c) => !c.alreadyLead && !c.excluded).map((c) => ({ linkedinProfileUrl: c.linkedinProfileUrl, campaignId })),
     );
+    revalidatePath("/campaigns", "layout");
+    return result;
   } catch (err) {
     return { scheduled: 0, skippedForLimit: 0, error: err instanceof Error ? err.message : "Falha ao convidar." };
   }
@@ -55,8 +60,46 @@ export async function inviteWarm(candidates: WarmSuggestion[], campaignId?: stri
       const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ") || undefined;
       valid.push({ linkedinProfileUrl: url, fullName, jobTitle: c.headline ?? undefined, icpScore: c.icpScore ?? undefined, campaignId });
     }
-    return await inviteProspects(valid);
+    const result = await inviteProspects(valid);
+    revalidatePath("/campaigns", "layout");
+    return result;
   } catch (err) {
     return { scheduled: 0, skippedForLimit: 0, error: err instanceof Error ? err.message : "Falha ao convidar." };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Campanhas: nome + o que oferecer (texto que a IA soma às instruções gerais).
+// ---------------------------------------------------------------------------
+
+export type CampaignFormState = { error?: string } | undefined;
+
+function readCampaign(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? "").trim().slice(0, 60),
+    instructions: String(formData.get("instructions") ?? "").trim().slice(0, 4000) || null,
+  };
+}
+
+export async function createCampaign(_prev: CampaignFormState, formData: FormData): Promise<CampaignFormState> {
+  const data = readCampaign(formData);
+  if (!data.name) return { error: "Dê um nome à campanha." };
+  const campaign = await prisma.campaign.create({ data });
+  revalidatePath("/campaigns");
+  redirect(`/campaigns/${campaign.id}?novo=1`);
+}
+
+export async function updateCampaign(id: string, _prev: CampaignFormState, formData: FormData): Promise<CampaignFormState> {
+  const data = readCampaign(formData);
+  if (!data.name) return { error: "Dê um nome à campanha." };
+  await prisma.campaign.update({ where: { id }, data });
+  revalidatePath("/campaigns", "layout");
+  return {};
+}
+
+// Os leads da campanha continuam (em "Conversas"), só ficam sem campanha.
+export async function deleteCampaign(id: string) {
+  await prisma.campaign.delete({ where: { id } });
+  revalidatePath("/campaigns", "layout");
+  redirect("/campaigns");
 }

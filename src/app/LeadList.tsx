@@ -46,7 +46,6 @@ export interface LeadItem {
 }
 
 const PAGE_SIZE = 8;
-const MOBILE_PREVIEW = 5;
 
 const FIT_OPTIONS = [
   { value: 0, label: "Qualquer" },
@@ -96,8 +95,7 @@ function FitCell({ score }: { score: number | null }) {
   const up = score >= 50;
   return (
     <span className="fit-cell">
-      {score}%
-      {up ? <IconArrowUpRight size={16} className="fit-up" /> : <IconArrowDownRight size={16} className="fit-down" />}
+      {score}%{up ? <IconArrowUpRight size={16} className="fit-up" /> : <IconArrowDownRight size={16} className="fit-down" />}
     </span>
   );
 }
@@ -132,7 +130,13 @@ function RowMenu({ lead }: { lead: LeadItem }) {
 
   return (
     <div className="popover-anchor" ref={ref} onClick={(e) => e.stopPropagation()}>
-      <button type="button" className="kebab" aria-label={`Ações de ${fullName(lead)}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className="kebab"
+        aria-label={`Ações de ${fullName(lead)}`}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
         <IconDotsVertical size={18} />
       </button>
       {open && (
@@ -180,8 +184,6 @@ export function LeadList({
   const [sort, setSort] = useState<SortKey>("recent");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Celular: começa mostrando só os mais recentes; "Ver todos" abre busca e filtros.
-  const [expanded, setExpanded] = useState(Boolean(initialQuery || validSection || initialSection === "all"));
 
   const allTags = useMemo(() => [...new Set(leads.flatMap((l) => l.tags))].sort(), [leads]);
   const allCampaigns = useMemo(() => [...new Set(leads.flatMap((l) => (l.campaignName ? [l.campaignName] : [])))].sort(), [leads]);
@@ -219,14 +221,10 @@ export function LeadList({
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const current = Math.min(page, pages);
   const pageItems = visible.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-  const mobileItems = expanded ? pageItems : visible.slice(0, MOBILE_PREVIEW);
+  const mobileItems = pageItems;
+  const hasExtraFilters = allCampaigns.length > 0 || allTags.length > 0 || hasFit;
 
   const active: { key: string; label: string; clear: () => void }[] = [
-    ...filters.sections.map((k) => ({
-      key: `s-${k}`,
-      label: LEAD_SECTIONS.find((s) => s.key === k)?.label ?? k,
-      clear: () => setFilters((f) => ({ ...f, sections: f.sections.filter((x) => x !== k) })),
-    })),
     ...filters.campaigns.map((c) => ({
       key: `c-${c}`,
       label: c === NO_CAMPAIGN ? "Sem campanha" : `Campanha: ${c}`,
@@ -237,7 +235,9 @@ export function LeadList({
       label: `# ${t}`,
       clear: () => setFilters((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) })),
     })),
-    ...(filters.minFit ? [{ key: "fit", label: `Encaixe ${filters.minFit}%+`, clear: () => setFilters((f) => ({ ...f, minFit: 0 })) }] : []),
+    ...(filters.minFit
+      ? [{ key: "fit", label: `Encaixe ${filters.minFit}%+`, clear: () => setFilters((f) => ({ ...f, minFit: 0 })) }]
+      : []),
   ];
 
   function changeFilters(next: (f: Filters) => Filters) {
@@ -266,25 +266,39 @@ export function LeadList({
         <p className="small muted" style={{ maxWidth: 280 }}>
           Assim que alguém aceitar um convite ou responder, a conversa aparece aqui.
         </p>
-        <Link href="/prospect" className="btn btn-primary" style={{ marginTop: 10 }}>
+        <Link href="/campaigns" className="btn btn-primary" style={{ marginTop: 10 }}>
           <IconRadar size={18} />
-          Começar prospecção
+          Criar uma campanha
         </Link>
       </section>
     );
   }
 
   return (
-    <section id="leads" className={`leads-card${expanded ? " expanded" : ""}`} aria-labelledby="leads-title">
-      <div className="leads-head">
-        <h2 id="leads-title" className="leads-title">
-          <span className="only-mobile">Leads recentes</span>
-          <span className="only-desktop display">Seus leads recentes</span>
-        </h2>
-        <button type="button" className="link-btn only-mobile" onClick={() => setExpanded((e) => !e)}>
-          {expanded ? "Mostrar menos" : "Ver todos"}
+    <section id="leads" className="leads-card expanded" aria-label="Conversas">
+      {/* Um toque pra ver só um grupo: o filtro mais usado fica sempre à vista. */}
+      <div className="status-chips" role="toolbar" aria-label="Mostrar">
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={filters.sections.length === 0}
+          onClick={() => changeFilters((f) => ({ ...f, sections: [] }))}
+        >
+          Todas <span className="chip-count">{leads.length}</span>
         </button>
-
+        {LEAD_SECTIONS.filter((s) => counts[s.key] > 0).map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            className={`chip${s.key === "urgent" ? " chip-urgent" : ""}`}
+            aria-pressed={filters.sections.length === 1 && filters.sections[0] === s.key}
+            onClick={() => changeFilters((f) => ({ ...f, sections: [s.key] }))}
+          >
+            {s.label} <span className="chip-count">{counts[s.key]}</span>
+          </button>
+        ))}
+      </div>
+      <div className="leads-head">
         <div className="leads-controls">
           <label className="pill-input">
             <IconSearch size={18} />
@@ -314,18 +328,20 @@ export function LeadList({
             </select>
             <IconChevronDown size={16} />
           </label>
-          <button
-            type="button"
-            className="square-btn"
-            aria-label="Filtros"
-            aria-expanded={panelOpen}
-            aria-controls="lead-filters"
-            aria-pressed={panelOpen || active.length > 0}
-            onClick={() => setPanelOpen((o) => !o)}
-          >
-            <IconFilter size={18} />
-            {active.length > 0 && <span className="square-btn-count">{active.length}</span>}
-          </button>
+          {hasExtraFilters && (
+            <button
+              type="button"
+              className="square-btn"
+              aria-label="Mais filtros"
+              aria-expanded={panelOpen}
+              aria-controls="lead-filters"
+              aria-pressed={panelOpen || active.length > 0}
+              onClick={() => setPanelOpen((o) => !o)}
+            >
+              <IconFilter size={18} />
+              {active.length > 0 && <span className="square-btn-count">{active.length}</span>}
+            </button>
+          )}
         </div>
       </div>
 
@@ -333,7 +349,9 @@ export function LeadList({
         <div className="row leads-chips" style={{ gap: 8, flexWrap: "wrap" }}>
           {selected.size > 0 && (
             <span className="bulk-bar">
-              <b>{selected.size} selecionado{selected.size > 1 ? "s" : ""}</b>
+              <b>
+                {selected.size} selecionado{selected.size > 1 ? "s" : ""}
+              </b>
               <a href={`/api/export/leads?ids=${[...selected].join(",")}`} download className="bulk-action">
                 <IconDownload size={15} /> Exportar
               </a>
@@ -360,19 +378,6 @@ export function LeadList({
 
       {panelOpen && (
         <div id="lead-filters" className="filter-panel stack" style={{ gap: 16 }}>
-          <FilterGroup label="Status">
-            {LEAD_SECTIONS.filter((s) => counts[s.key] > 0).map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                className="chip"
-                aria-pressed={filters.sections.includes(s.key)}
-                onClick={() => changeFilters((f) => ({ ...f, sections: toggle(f.sections, s.key) }))}
-              >
-                {s.label} <span className="chip-count">{counts[s.key]}</span>
-              </button>
-            ))}
-          </FilterGroup>
           {allCampaigns.length > 0 && (
             <FilterGroup label="Campanha">
               {[...allCampaigns, ...(hasNoCampaign ? [NO_CAMPAIGN] : [])].map((c) => (
@@ -485,7 +490,12 @@ export function LeadList({
                   <tr key={lead.id} onClick={() => router.push(`/leads/${lead.id}`)} aria-selected={selected.has(lead.id)}>
                     <td onClick={(e) => e.stopPropagation()}>
                       <label className="table-check">
-                        <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggleSelect(lead.id)} aria-label={`Selecionar ${fullName(lead)}`} />
+                        <input
+                          type="checkbox"
+                          checked={selected.has(lead.id)}
+                          onChange={() => toggleSelect(lead.id)}
+                          aria-label={`Selecionar ${fullName(lead)}`}
+                        />
                         <span className="checkbox">
                           <IconCheck size={13} strokeWidth={3.2} />
                         </span>
@@ -564,41 +574,61 @@ export function LeadList({
                         <Preview lead={lead} />
                       </div>
                     </div>
-                    {unread && <span className="unread-badge" aria-label="Mensagem nova">1</span>}
+                    {unread && (
+                      <span className="unread-badge" aria-label="Mensagem nova">
+                        1
+                      </span>
+                    )}
                   </Link>
                 </li>
               );
             })}
           </ul>
 
-          {(expanded || pages > 1) && (
-            <div className={`pager${expanded ? "" : " only-desktop"}`}>
-              <span className="small faint">
-                Mostrando {pageItems.length} de {visible.length} lead{visible.length !== 1 ? "s" : ""}
-              </span>
-              {pages > 1 && (
-                <nav className="pager-pages" aria-label="Páginas">
-                  <button type="button" className="pager-btn" onClick={() => setPage(current - 1)} disabled={current === 1} aria-label="Página anterior">
-                    <IconChevronLeft size={16} />
-                  </button>
-                  {pageNumbers(current, pages).map((p, i) =>
-                    p === "…" ? (
-                      <span key={`gap-${i}`} className="pager-gap">
-                        …
-                      </span>
-                    ) : (
-                      <button key={p} type="button" className="pager-btn" aria-current={p === current ? "page" : undefined} onClick={() => setPage(p)}>
-                        {p}
-                      </button>
-                    ),
-                  )}
-                  <button type="button" className="pager-btn" onClick={() => setPage(current + 1)} disabled={current === pages} aria-label="Próxima página">
-                    <IconChevronRight size={16} />
-                  </button>
-                </nav>
-              )}
-            </div>
-          )}
+          <div className="pager">
+            <span className="small faint">
+              Mostrando {pageItems.length} de {visible.length} lead{visible.length !== 1 ? "s" : ""}
+            </span>
+            {pages > 1 && (
+              <nav className="pager-pages" aria-label="Páginas">
+                <button
+                  type="button"
+                  className="pager-btn"
+                  onClick={() => setPage(current - 1)}
+                  disabled={current === 1}
+                  aria-label="Página anterior"
+                >
+                  <IconChevronLeft size={16} />
+                </button>
+                {pageNumbers(current, pages).map((p, i) =>
+                  p === "…" ? (
+                    <span key={`gap-${i}`} className="pager-gap">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      className="pager-btn"
+                      aria-current={p === current ? "page" : undefined}
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  className="pager-btn"
+                  onClick={() => setPage(current + 1)}
+                  disabled={current === pages}
+                  aria-label="Próxima página"
+                >
+                  <IconChevronRight size={16} />
+                </button>
+              </nav>
+            )}
+          </div>
         </>
       )}
     </section>

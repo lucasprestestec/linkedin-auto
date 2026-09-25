@@ -2,21 +2,18 @@
 
 import { useState } from "react";
 
+// Celular: duas abas. Computador: sem abas — a conversa fica no centro e o
+// "Sobre" já está no painel lateral.
 const TABS = [
   { key: "chat", label: "Conversa" },
-  { key: "profile", label: "Perfil" },
-  { key: "company", label: "Empresa", desktopOnly: true },
-  { key: "notes", label: "Notas" },
-  { key: "activity", label: "Atividades" },
+  { key: "about", label: "Sobre" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-// Abas da conversa (Conversa | Perfil | Empresa | Notas | Atividades). O
-// compositor só aparece na aba Conversa.
 // Cada aba vem como prop separada (não num array): elementos em array exigiriam key.
 export function LeadTabs({ composer, ...panels }: Record<TabKey, React.ReactNode> & { composer: React.ReactNode }) {
   const [active, setActive] = useState<TabKey>("chat");
-  const tabs = TABS.map((t) => ({ ...t, desktopOnly: "desktopOnly" in t, content: panels[t.key] }));
+  const tabs = TABS.map((t) => ({ ...t, content: panels[t.key] }));
 
   return (
     <>
@@ -29,7 +26,6 @@ export function LeadTabs({ composer, ...panels }: Record<TabKey, React.ReactNode
             id={`tab-${t.key}`}
             aria-controls={`panel-${t.key}`}
             aria-selected={active === t.key}
-            className={t.desktopOnly ? "only-desktop" : undefined}
             onClick={() => setActive(t.key)}
           >
             {t.label}
@@ -48,7 +44,7 @@ export function LeadTabs({ composer, ...panels }: Record<TabKey, React.ReactNode
           {t.content}
         </div>
       ))}
-      {active === "chat" && composer}
+      <div className={active === "chat" ? "composer-slot" : "composer-slot composer-off"}>{composer}</div>
     </>
   );
 }

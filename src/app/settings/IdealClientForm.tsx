@@ -26,7 +26,7 @@ export function IdealClientForm({ value }: { value: string }) {
       serialized={serialized}
       initial={initial}
       title="Quem você quer alcançar"
-      subtitle="A IA dá uma nota de encaixe pra cada sugestão da Prospecção"
+      subtitle="A IA usa isso pra sugerir pessoas e dizer quem combina mais com você"
       icon={<IconTarget size={19} />}
       iconStyle={{ background: "var(--success-soft)", color: "var(--success-ink)" }}
       status={serialized ? "Preencha só o que importa — campos vazios são ignorados" : "Sem descrição — as sugestões vêm sem nota"}
@@ -67,7 +67,7 @@ export function IdealClientForm({ value }: { value: string }) {
           suggestions={["Rio Grande do Sul", "Santa Catarina", "Paraná", "São Paulo"]}
         />
       </Field>
-      <Field icon={<IconBan size={15} />} label="Evitar" hint="Perfis assim recebem nota baixa (mas não são bloqueados — pra isso use a lista de exclusão).">
+      <Field icon={<IconBan size={15} />} label="Evitar" hint="Perfis assim ficam no fim da fila. Pra bloquear de vez, use &ldquo;Quem nunca contatar&rdquo;.">
         <TagInput
           label="Evitar"
           values={icp.avoid}

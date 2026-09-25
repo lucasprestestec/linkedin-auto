@@ -13,7 +13,7 @@ import { logout } from "@/app/actions";
 // Barra lateral escura do computador (≥1024px). Pode ser recolhida só pros ícones.
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
-  const { ownerName, unanswered } = useShell();
+  const { ownerName, needYouCount } = useShell();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const name = ownerName ?? "Seu perfil";
@@ -40,7 +40,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       <nav className="sidebar-nav">
         {NAV_ITEMS.map(({ href, label, Icon, badge }) => {
           const active = isActive(pathname, href);
-          const count = badge === "unanswered" ? unanswered : 0;
+          const count = badge === "attention" ? needYouCount : 0;
           return (
             <Link key={href} href={href} className="sidebar-item" aria-current={active ? "page" : undefined} title={collapsed ? label : undefined}>
               <Icon size={21} strokeWidth={active ? 2.2 : 1.9} />
@@ -51,20 +51,18 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         })}
       </nav>
 
-      <Link href="/prospect" className="sidebar-promo">
+      <Link href="/campaigns/new" className="sidebar-promo">
         <span className="promo-tag">
-          <IconSparkles size={12} /> NOVO
+          <IconSparkles size={12} /> COMECE AQUI
         </span>
         <strong className="display promo-title">
-          Mais
+          Nova
           <br />
-          leads,
+          campa-
           <br />
-          menos
-          <br />
-          esforço.
+          nha.
         </strong>
-        <span className="promo-text">Conecte seu LinkedIn, defina seu público e deixe a IA trabalhar por você.</span>
+        <span className="promo-text">Diga quem você quer alcançar e a IA faz o resto.</span>
         <span className="promo-arrow" aria-hidden="true">
           <IconArrowUpRight size={20} />
         </span>

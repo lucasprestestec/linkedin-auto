@@ -33,7 +33,7 @@ export function DesktopTopbar() {
         onSubmit={(e) => {
           e.preventDefault();
           const q = value.trim();
-          router.push(q ? `/?q=${encodeURIComponent(q)}#leads` : "/");
+          router.push(q ? `/conversations?q=${encodeURIComponent(q)}` : "/conversations");
         }}
       >
         <IconSearch size={20} />
@@ -42,15 +42,15 @@ export function DesktopTopbar() {
           type="search"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Buscar leads, cargos, empresas ou palavras-chave..."
+          placeholder="Buscar pessoa, cargo ou empresa nas conversas..."
           aria-label="Buscar leads"
         />
         <kbd>⌘ K</kbd>
       </form>
       <div className="row" style={{ gap: 12 }}>
         <NotificationBell />
-        <Link href="/prospect" className="btn btn-primary btn-pill">
-          <IconPlus size={18} strokeWidth={2.4} /> Novo lead
+        <Link href="/campaigns/new" className="btn btn-primary btn-pill">
+          <IconPlus size={18} strokeWidth={2.4} /> Nova campanha
         </Link>
       </div>
     </header>
