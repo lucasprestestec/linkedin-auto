@@ -6,7 +6,6 @@ import type { ProspectResult } from "@/lib/prospect";
 import { normalizeLinkedinUrl } from "@/lib/linkedin";
 import { nameFromProfileUrl } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
-import { CampaignPicker } from "./CampaignPicker";
 import { PeopleSearchBuilder } from "./PeopleSearchBuilder";
 import { IconAlert, IconCheck, IconClipboard, IconExternal, IconUserPlus } from "@/components/Icons";
 
@@ -22,22 +21,21 @@ function StepHeader({ n, title, subtitle, done }: { n: number; title: string; su
   );
 }
 
-function LinkedinSearchStep() {
+function LinkedinSearchStep({ initialKeywords }: { initialKeywords: string[] }) {
   return (
     <section id="search-step" className="card card-pad step rise" style={{ "--i": 1, scrollMarginTop: 16 } as React.CSSProperties}>
       <StepHeader n={1} title="Encontre pessoas" subtitle="Monte a busca com os filtros que quiser — é grátis, direto no LinkedIn." />
-      <PeopleSearchBuilder />
+      <PeopleSearchBuilder initialKeywords={initialKeywords} />
       <p className="hint">Abre numa aba nova. Escolha quem quiser e copie o link do perfil de cada pessoa.</p>
     </section>
   );
 }
 
-function ProspectResults({ results, campaigns }: { results: ProspectResult[]; campaigns: { id: string; name: string }[] }) {
+function ProspectResults({ results, campaignId }: { results: ProspectResult[]; campaignId?: string }) {
   const newResults = results.filter((r) => !r.alreadyLead && !r.excluded);
   const [selected, setSelected] = useState<Set<string>>(new Set(newResults.map((r) => r.linkedinProfileUrl)));
   const [inviteState, setInviteState] = useState<InviteState>(undefined);
   const [inviting, startInvite] = useTransition();
-  const [campaignId, setCampaignId] = useState("");
 
   const selectedResults = newResults.filter((r) => selected.has(r.linkedinProfileUrl));
   const allSelected = newResults.length > 0 && selectedResults.length === newResults.length;
@@ -57,7 +55,7 @@ function ProspectResults({ results, campaigns }: { results: ProspectResult[]; ca
 
   function handleInvite() {
     startInvite(async () => {
-      setInviteState(await invite(selectedResults, campaignId || undefined));
+      setInviteState(await invite(selectedResults, campaignId));
     });
   }
 
@@ -127,7 +125,7 @@ function ProspectResults({ results, campaigns }: { results: ProspectResult[]; ca
                   <span className="lead-sub tiny">linkedin.com/in/{slug}</span>
                 </span>
                 {r.alreadyLead || r.excluded ? (
-                  <span className="badge badge-plain">{r.alreadyLead ? "Já é lead" : "Na lista de exclusão"}</span>
+                  <span className="badge badge-plain">{r.alreadyLead ? "Já é lead" : "Está em Nunca contatar"}</span>
                 ) : (
                   <a
                     href={r.linkedinProfileUrl}
@@ -149,7 +147,6 @@ function ProspectResults({ results, campaigns }: { results: ProspectResult[]; ca
 
       {newResults.length > 0 && (
         <div className="sticky-cta stack" style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}>
-          <CampaignPicker campaigns={campaigns} value={campaignId} onChange={setCampaignId} />
           {inviteState?.error && (
             <p className="error-text">
               <IconAlert size={15} /> {inviteState.error}
@@ -180,7 +177,7 @@ function ProspectResults({ results, campaigns }: { results: ProspectResult[]; ca
   );
 }
 
-export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: string }[] }) {
+export function ProspectSearch({ campaignId, initialKeywords = [] }: { campaignId?: string; initialKeywords?: string[] }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
   const [clipboardError, setClipboardError] = useState(false);
@@ -209,7 +206,7 @@ export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: s
   return (
     <div className="search-flow">
       <div className="col">
-        <LinkedinSearchStep />
+        <LinkedinSearchStep initialKeywords={initialKeywords} />
       </div>
       <div className="col">
         <section id="paste-step" className="card card-pad step rise" style={{ "--i": 2, scrollMarginTop: 16 } as React.CSSProperties}>
@@ -253,7 +250,7 @@ export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: s
           </form>
         </section>
 
-        {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaigns={campaigns} />}
+        {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaignId={campaignId} />}
       </div>
     </div>
   );

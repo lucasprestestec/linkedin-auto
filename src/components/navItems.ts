@@ -1,17 +1,16 @@
-import { IconBars, IconHome, IconMegaphone, IconMessages, IconSettings, IconUserSearch } from "./Icons";
+import { IconHome, IconMegaphone, IconMessages, IconUser } from "./Icons";
 
-// Itens de navegação. A barra lateral (computador) mostra todos; o menu
-// inferior (celular) mostra os de `mobile` e junta o resto em "Mais".
+// As quatro telas do painel — iguais no celular (menu inferior) e no
+// computador (barra lateral).
 export const NAV_ITEMS = [
-  { href: "/", label: "Leads", Icon: IconHome, mobile: true },
-  { href: "/prospect", label: "Prospecção", Icon: IconUserSearch, mobile: true },
-  { href: "/messages", label: "Mensagens", Icon: IconMessages, mobile: true, badge: "unanswered" as const },
-  { href: "/settings#campanhas", label: "Campanhas", Icon: IconMegaphone, mobile: false },
-  { href: "/stats", label: "Estatísticas", Icon: IconBars, mobile: true },
-  { href: "/settings", label: "Configurações", Icon: IconSettings, mobile: false },
+  { href: "/", label: "Início", Icon: IconHome },
+  { href: "/campaigns", label: "Campanhas", Icon: IconMegaphone },
+  { href: "/conversations", label: "Conversas", Icon: IconMessages, badge: "attention" as const },
+  { href: "/settings", label: "Conta", Icon: IconUser },
 ];
 
 export function isActive(pathname: string, href: string) {
-  if (href.includes("#")) return false;
-  return href === "/" ? pathname === "/" || pathname.startsWith("/leads/") : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  if (href === "/conversations") return pathname.startsWith("/conversations") || pathname.startsWith("/leads/");
+  return pathname.startsWith(href);
 }

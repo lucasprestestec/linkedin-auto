@@ -50,7 +50,7 @@ export function ExclusionListForm({ value }: { value: string }) {
         />
       </Field>
       {lists.other.length > 0 && (
-        <Field icon={<IconBan size={15} />} label="Outros (nome ou empresa)" hint="Itens antigos, sem tipo: valem tanto como nome quanto como empresa.">
+        <Field icon={<IconBan size={15} />} label="Outros (nome ou empresa)" hint="Vale tanto pra nome quanto pra empresa.">
           <TagInput label="Outros" values={lists.other} onChange={(v) => set("other", v)} placeholder="Nome ou empresa" max={200} />
         </Field>
       )}

@@ -6,13 +6,10 @@ import { clockTime, dayLabel, relativeTime, sameDay, shortDate, splitHeadline } 
 import { STATUS_LABEL, STATUS_TONE } from "@/lib/status";
 import { EMPTY_SEARCH, buildLinkedinSearchUrl } from "@/lib/linkedin";
 import { Avatar } from "@/components/Avatar";
-import { CompanyMark } from "@/components/CompanyMark";
 import {
   IconArrowLeft,
-  IconArrowUpRight,
   IconBuilding,
   IconCheckCheck,
-  IconDots,
   IconFlame,
   IconLinkedin,
   IconSearch,
@@ -26,6 +23,9 @@ import { LeadCampaign } from "./LeadCampaign";
 import { LeadNotes } from "./LeadNotes";
 import { LeadActions } from "./LeadActions";
 import { HandoffCard } from "./HandoffCard";
+import { DetailsToggle, LeadWorkspace } from "./LeadWorkspace";
+import { ConversationList } from "@/components/ConversationList";
+import { getConversationItems } from "@/lib/conversations";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,7 @@ function StatusStepper({ status }: { status: LeadStatus }) {
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [lead, settings, campaigns, tagRows] = await Promise.all([
+  const [lead, settings, campaigns, tagRows, conversations] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
       include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true } } },
@@ -68,6 +68,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
     prisma.lead.findMany({ where: { tags: { isEmpty: false } }, select: { tags: true } }),
+    getConversationItems(),
   ]);
 
   if (!lead) notFound();
@@ -216,7 +217,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       )}
       <div>
         <dt>Campanha</dt>
-        <dd>{lead.campaign?.name ?? "Instruções gerais"}</dd>
+        <dd>{lead.campaign?.name ?? "Sem campanha"}</dd>
       </div>
       {lead.followUpsSent > 0 && (
         <div>
@@ -237,139 +238,101 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     </dl>
   );
 
-  const profileTab = (
-    <div className="stack tab-pad" style={{ gap: 14 }}>
-      <div className="only-mobile stack" style={{ gap: 14 }}>
-        {profileBadges}
-        {companyRow}
-        <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
-        {sideCards}
+  // Tudo o que não é a conversa, num card só: dados, empresa e histórico.
+  const moreInfo = (
+    <section className="side-card">
+      <div className="side-card-head">
+        <h3>Mais sobre {firstName}</h3>
       </div>
-      <section className="side-card">
-        <div className="side-card-head">
-          <h3>Sobre {firstName}</h3>
-        </div>
-        {facts}
-        <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }}>
-          <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Ver perfil completo no LinkedIn
+      {facts}
+      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+          <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Perfil no LinkedIn
         </a>
-      </section>
-    </div>
+        {company && (
+          <a
+            href={buildLinkedinSearchUrl({ ...EMPTY_SEARCH, companies: [company] })}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary btn-sm"
+          >
+            <IconSearch size={15} /> Outras pessoas da {company}
+          </a>
+        )}
+      </div>
+      <details className="history">
+        <summary>Histórico</summary>
+        <ol className="timeline">
+          {events.map((e, i) => (
+            <li key={i}>
+              <span className="timeline-dot" />
+              <div className="stack" style={{ gap: 2 }}>
+                <span className="small" style={{ fontWeight: 600 }}>
+                  {e.text}
+                </span>
+                <span className="tiny faint">
+                  {shortDate(e.when)} · {clockTime(e.when)}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </details>
+    </section>
   );
 
-  const companyTab = (
+  const aboutTab = (
     <div className="stack tab-pad" style={{ gap: 14 }}>
-      {company ? (
-        <section className="side-card">
-          <div className="row" style={{ gap: 14 }}>
-            <CompanyMark name={company} size={56} />
-            <div className="stack" style={{ minWidth: 0 }}>
-              <h3 style={{ fontSize: 20 }}>{company}</h3>
-              <span className="small faint">Tirado do cargo no LinkedIn: {lead.jobTitle}</span>
-            </div>
-          </div>
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <a
-              href={buildLinkedinSearchUrl({ ...EMPTY_SEARCH, companies: [company] })}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-primary btn-sm"
-            >
-              <IconSearch size={15} /> Outras pessoas da {company}
-            </a>
-            <a
-              href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(company)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-secondary btn-sm"
-            >
-              <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Página da empresa
-            </a>
-          </div>
-        </section>
-      ) : (
-        <p className="small faint" style={{ padding: 8 }}>
-          O cargo de {firstName} no LinkedIn não diz a empresa.
-        </p>
-      )}
-    </div>
-  );
-
-  const activityTab = (
-    <div className="tab-pad">
-      <ol className="timeline">
-        {events.map((e, i) => (
-          <li key={i}>
-            <span className="timeline-dot" />
-            <div className="stack" style={{ gap: 2 }}>
-              <span className="small" style={{ fontWeight: 600 }}>
-                {e.text}
-              </span>
-              <span className="tiny faint">
-                {shortDate(e.when)} · {clockTime(e.when)}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {profileBadges}
+      {companyRow}
+      <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
+      {sideCards}
+      <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
+      {moreInfo}
     </div>
   );
 
   return (
-    <div className="lead-layout">
-      <div className="chat-card">
-        <header className="chat-head">
-          <Link href="/" className="chat-back" aria-label="Voltar">
-            <IconArrowLeft size={22} />
-          </Link>
-          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={64} status={tone} />
-          <div className="chat-head-main">
-            <h1 className="chat-name">
-              <span className="display-desktop">{fullName}</span>
-              <IconLinkedin size={20} className="only-desktop li-badge" />
-            </h1>
-            {lead.jobTitle && <p className="chat-role">{company ? `${role} na ${company}` : lead.jobTitle}</p>}
-          </div>
-          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm only-desktop li-link">
-            Ver no LinkedIn <IconArrowUpRight size={16} />
-          </a>
-          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn">
-            <IconDots size={22} />
-          </a>
-        </header>
-
-        <LeadTabs
-          chat={conversation}
-          profile={profileTab}
-          company={companyTab}
-          notes={
-            <div className="tab-pad">
-              <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} variant="tab" />
-            </div>
-          }
-          activity={activityTab}
-          composer={<ReplyForm key="composer" leadId={lead.id} firstName={firstName} profileUrl={lead.linkedinProfileUrl} />}
-        />
-      </div>
-
-      <aside className="lead-side only-desktop" aria-label="Detalhes do lead">
-        <section className="side-card">
-          <div className="row" style={{ gap: 16, alignItems: "flex-start" }}>
-            <Avatar firstName={lead.firstName} lastName={lead.lastName} size={76} />
-            <div className="stack" style={{ minWidth: 0, flex: 1, gap: 4 }}>
-              <h2 className="display side-name">
-                {fullName} <IconLinkedin size={20} className="li-badge" />
-              </h2>
-              {lead.jobTitle && <p className="small muted">{lead.jobTitle}</p>}
-            </div>
-          </div>
-          {profileBadges}
-          {companyRow}
-          <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
-        </section>
-        {sideCards}
-        <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
+    <div className="conv-layout lead-view">
+      <aside className="conv-col only-desktop" aria-label="Lista de conversas">
+        <ConversationList items={conversations} activeId={lead.id} pane />
       </aside>
+
+      <LeadWorkspace>
+        <div className="chat-card">
+          <header className="chat-head">
+            <Link href="/conversations" className="chat-back only-mobile" aria-label="Voltar para Conversas">
+              <IconArrowLeft size={22} />
+            </Link>
+            <Avatar firstName={lead.firstName} lastName={lead.lastName} size={44} status={tone} />
+            <div className="chat-head-main">
+              <h1 className="chat-name">{fullName}</h1>
+              {lead.jobTitle && <p className="chat-role">{company ? `${role} · ${company}` : lead.jobTitle}</p>}
+            </div>
+            <DetailsToggle />
+            <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn" title="Ver no LinkedIn">
+              <IconLinkedin size={19} />
+            </a>
+          </header>
+
+          <LeadTabs
+            chat={conversation}
+            about={aboutTab}
+            composer={<ReplyForm key="composer" leadId={lead.id} firstName={firstName} profileUrl={lead.linkedinProfileUrl} />}
+          />
+        </div>
+
+        <aside className="lead-side" aria-label="Detalhes do lead">
+          <section className="side-card">
+            {profileBadges}
+            {companyRow}
+            <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
+          </section>
+          {sideCards}
+          <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
+          {moreInfo}
+        </aside>
+      </LeadWorkspace>
     </div>
   );
 }

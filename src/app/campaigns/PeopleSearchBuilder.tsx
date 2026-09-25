@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { PROSPECT_GO, type ProspectGoDetail } from "./prospectEvents";
+import { useState } from "react";
 import { TagInput } from "@/components/TagInput";
 import {
   IconBriefcase,
@@ -89,23 +88,11 @@ function joinOr(values: string[]) {
   return quoted.length <= 1 ? quoted.join("") : `${quoted.slice(0, -1).join(", ")} ou ${quoted[quoted.length - 1]}`;
 }
 
-export function PeopleSearchBuilder() {
-  const [filters, setFilters] = useState<PeopleSearchFilters>(EMPTY_SEARCH);
-  const [visible, setVisible] = useState<ListKey[]>(["titles", "locations"]);
+// initialKeywords: público da campanha (cargos/setores/empresas) já entra como palavra-chave.
+export function PeopleSearchBuilder({ initialKeywords = [] }: { initialKeywords?: string[] }) {
+  const [filters, setFilters] = useState<PeopleSearchFilters>({ ...EMPTY_SEARCH, keywords: initialKeywords });
+  const [visible, setVisible] = useState<ListKey[]>(initialKeywords.length ? ["titles", "locations", "keywords"] : ["titles", "locations"]);
 
-  // Busca rápida / perfil sugerido do topo da página entra como cargo.
-  useEffect(() => {
-    function onGo(e: Event) {
-      const title = (e as CustomEvent<ProspectGoDetail>).detail.title?.trim();
-      if (!title) return;
-      setFilters((prev) =>
-        prev.titles.some((t) => t.toLowerCase() === title.toLowerCase()) ? prev : { ...prev, titles: [...prev.titles, title] },
-      );
-      setVisible((prev) => (prev.includes("titles") ? prev : ["titles", ...prev]));
-    }
-    window.addEventListener(PROSPECT_GO, onGo);
-    return () => window.removeEventListener(PROSPECT_GO, onGo);
-  }, []);
 
   const hidden = FIELDS.filter((f) => !visible.includes(f.key));
   const active = FIELDS.filter((f) => filters[f.key].length > 0);

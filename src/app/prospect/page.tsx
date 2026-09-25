@@ -1,82 +1,38 @@
-import { ProspectSearch } from "./ProspectSearch";
-import { WarmSuggestions } from "./WarmSuggestions";
-import { AccountTypeNotice } from "./AccountTypeNotice";
-import { ProspectTabs } from "./ProspectTabs";
-import { FindMoreCard, ProfileShortcuts, QuickSearch } from "./ProspectHeroActions";
-import { remainingDailyInviteQuota } from "@/lib/prospect";
-import { parseIdealClient } from "@/lib/audience";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconShield, IconZap } from "@/components/Icons";
+import { IconArrowLeft, IconShield } from "@/components/Icons";
+import { AddPeople } from "./AddPeople";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_PROFILES = [
-  { title: "Diretor de RH", subtitle: "Recursos Humanos" },
-  { title: "CFO", subtitle: "Finanças" },
-  { title: "Sócio fundador", subtitle: "Empresas" },
-  { title: "Gerente administrativo", subtitle: "Administração" },
-];
-
-export default async function ProspectPage() {
-  const [remaining, settings, campaigns, recent] = await Promise.all([
+export default async function AddPeoplePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const [campaigns, remaining, settings] = await Promise.all([
+    prisma.campaign.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true, audience: true } }),
     remainingDailyInviteQuota(),
-    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
-    prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.lead.findMany({ orderBy: { createdAt: "desc" }, take: 4, select: { firstName: true, lastName: true } }),
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { dailyInviteLimit: true } }),
   ]);
+  const wanted = typeof params.campaign === "string" ? params.campaign : "";
+  const initialCampaignId = campaigns.some((c) => c.id === wanted) ? wanted : "";
   const left = Math.max(0, remaining);
 
-  // Perfis sugeridos: os cargos do cliente ideal (Ajustes); sem isso, os mais comuns.
-  const icp = parseIdealClient(settings.targetAudience);
-  const fromIcp = icp.titles.map((title, i) => ({ title, subtitle: icp.industries[i] ?? "Seu cliente ideal" }));
-  const profiles = [...fromIcp, ...DEFAULT_PROFILES.filter((d) => !icp.titles.some((t) => t.toLowerCase() === d.title.toLowerCase()))].slice(0, 6);
-
-  const quota = (
-    <span className="credit-pill" title={`${left} de ${settings.dailyInviteLimit} convites disponíveis hoje`}>
-      <IconZap size={16} /> {left}
-    </span>
-  );
-
   return (
-    <main className="page prospect">
-      <MobileHeader extra={quota} bell={false} />
-
-      <div className="prospect-top">
-        <section className="prospect-hero rise">
-          <div className="row only-desktop" style={{ gap: 10, marginBottom: 14 }}>
-            {quota}
-            <span className="small muted">
-              convite{left !== 1 ? "s" : ""} disponíve{left !== 1 ? "is" : "l"} hoje de {settings.dailyInviteLimit}
-            </span>
-          </div>
-          <h1 className="display prospect-title">
-            Prospecção
-            <br />
-            <span className="name-grad">sem esforço.</span>
-          </h1>
-          <p className="prospect-sub">Encontre as pessoas certas no LinkedIn e inicie conversas que geram oportunidade.</p>
-          <QuickSearch />
-          <p className="tiny faint row" style={{ gap: 5, marginTop: 10, color: "var(--success-ink)", fontWeight: 600 }}>
-            <IconShield size={14} /> Limite diário de {settings.dailyInviteLimit} convites protege sua conta
-          </p>
-        </section>
-
-        <div className="prospect-side stack rise" style={{ "--i": 1, gap: 22 } as React.CSSProperties}>
-          <ProfileShortcuts profiles={profiles} />
-          <FindMoreCard people={recent} />
-        </div>
-      </div>
-
-      <ProspectTabs
-        warm={
-          <>
-            <WarmSuggestions campaigns={campaigns} />
-            <AccountTypeNotice />
-          </>
-        }
-        search={<ProspectSearch campaigns={campaigns} />}
-      />
+    <main className="page">
+      <MobileHeader />
+      <Link href={initialCampaignId ? `/campaigns/${initialCampaignId}` : "/conversations"} className="back-link">
+        <IconArrowLeft size={18} /> {initialCampaignId ? "Campanha" : "Conversas"}
+      </Link>
+      <header>
+        <h1 className="display page-title">Adicionar pessoas</h1>
+        <p className="hero-sub">Encontre pessoas no LinkedIn e convide. Quando aceitarem, a IA começa a conversa.</p>
+        <p className="quota-note" style={{ marginTop: 10 }}>
+          <IconShield size={14} /> {left > 0 ? `Hoje ainda dá pra convidar ${left} pessoas` : "Limite de convites de hoje atingido"}
+          <span className="faint"> · máx. {settings.dailyInviteLimit}/dia</span>
+        </p>
+      </header>
+      <AddPeople campaigns={campaigns} initialCampaignId={initialCampaignId} />
     </main>
   );
 }

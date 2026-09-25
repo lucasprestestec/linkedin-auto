@@ -50,14 +50,29 @@ model Lead {
   messages          Message[]
 }
 
-// Campanha = um público com instruções próprias pro agente (ex.: "Saúde
-// empresarial" x "RC profissional"). Sem campanha, vale Settings.agentInstructions.
+// Campanha (opcional) = um público com uma oferta própria (ex.: "Saúde
+// empresarial" x "RC profissional"). O texto dela soma às instruções gerais.
 model Campaign {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   name         String
-  instructions String?  @db.Text
-  createdAt    DateTime @default(now())
+  // Objetivo, em uma frase — só pra organização do corretor.
+  description  String?
+  // Cargos/setores/empresas: já vêm preenchidos na busca ao adicionar pessoas.
+  audience     String[]       @default([])
+  // Oferta / mensagem principal: é o que a IA lê.
+  instructions String?        @db.Text
+  // Máximo de pessoas na campanha (null = sem limite).
+  maxLeads     Int?
+  // Pausada/finalizada: sem convites novos, aberturas nem follow-ups.
+  status       CampaignStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now())
   leads        Lead[]
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
 }
 
 // Inscrição de Web Push (um por navegador/aparelho do corretor).

@@ -5,7 +5,6 @@ import { inviteWarm, loadWarmSuggestions, type InviteState, type WarmState } fro
 import type { WarmSuggestion } from "@/lib/warm";
 import { relativeTime } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
-import { CampaignPicker } from "./CampaignPicker";
 import { IconAlert, IconCheck, IconEye, IconFlame, IconRefresh, IconUserPlus } from "@/components/Icons";
 
 function SourceBadges({ s }: { s: WarmSuggestion }) {
@@ -39,21 +38,20 @@ function FitBadge({ s }: { s: WarmSuggestion }) {
 
 function excludedSummary(ex: { anonymous: number; connections: number; leads: number; blocked: number }): string {
   const parts = [];
-  if (ex.blocked) parts.push(`${ex.blocked} na lista de exclusão`);
+  if (ex.blocked) parts.push(`${ex.blocked} em "Nunca contatar"`);
   if (ex.connections) parts.push(`${ex.connections} já ${ex.connections > 1 ? "são conexões" : "é conexão"}`);
   if (ex.leads) parts.push(`${ex.leads} já ${ex.leads > 1 ? "são leads" : "é lead"}`);
   if (ex.anonymous) parts.push(`${ex.anonymous} visita${ex.anonymous > 1 ? "s" : ""} anônima${ex.anonymous > 1 ? "s" : ""}`);
   return parts.length ? `Fora da lista: ${parts.join(" · ")}.` : "";
 }
 
-export function WarmSuggestions({ campaigns }: { campaigns: { id: string; name: string }[] }) {
+export function WarmSuggestions({ campaignId }: { campaignId?: string }) {
   const [state, setState] = useState<WarmState | undefined>(undefined);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inviteState, setInviteState] = useState<InviteState>(undefined);
   const [loading, startLoad] = useTransition();
   const [inviting, startInvite] = useTransition();
   const [onlyGoodFit, setOnlyGoodFit] = useState(false);
-  const [campaignId, setCampaignId] = useState("");
 
   const all = state?.ok ? state.suggestions : [];
   const scored = state?.ok && state.scoring === "ok";
@@ -83,7 +81,7 @@ export function WarmSuggestions({ campaigns }: { campaigns: { id: string; name: 
   }
 
   function handleInvite() {
-    startInvite(async () => setInviteState(await inviteWarm(chosen, campaignId || undefined)));
+    startInvite(async () => setInviteState(await inviteWarm(chosen, campaignId)));
   }
 
   const header = (
@@ -229,7 +227,6 @@ export function WarmSuggestions({ campaigns }: { campaigns: { id: string; name: 
             className={`${suggestions.length > 5 ? "sticky-cta " : ""}stack`}
             style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}
           >
-            <CampaignPicker campaigns={campaigns} value={campaignId} onChange={setCampaignId} />
             {inviteState?.error && (
               <p className="error-text">
                 <IconAlert size={15} /> {inviteState.error}

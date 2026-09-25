@@ -16,21 +16,15 @@ export interface ShellData {
   automationPaused: boolean;
   needYou: ShellNotification[];
   needYouCount: number;
-  // Conversas cuja última mensagem é do lead (ninguém respondeu ainda).
-  unanswered: number;
 }
 
 export async function getShellData(): Promise<ShellData> {
-  const [settings, urgent, open] = await Promise.all([
+  const [settings, urgent] = await Promise.all([
     prisma.settings.findUnique({ where: { id: "singleton" }, select: { ownerName: true, automationPaused: true } }),
     prisma.lead.findMany({
       where: { status: "NEEDS_HUMAN" },
       orderBy: { updatedAt: "desc" },
       select: { id: true, firstName: true, lastName: true, needsHumanReason: true, updatedAt: true },
-    }),
-    prisma.lead.findMany({
-      where: { status: { not: "LOST" }, messages: { some: {} } },
-      select: { messages: { orderBy: { deliveredAt: "desc" }, take: 1, select: { sender: true } } },
     }),
   ]);
 
@@ -44,7 +38,6 @@ export async function getShellData(): Promise<ShellData> {
       reason: l.needsHumanReason ?? "Precisa da sua resposta",
       when: relativeTime(l.updatedAt),
     })),
-    unanswered: open.filter((l) => l.messages[0]?.sender === "LEAD").length,
   };
 }
 
