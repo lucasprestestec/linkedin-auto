@@ -21,11 +21,13 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
   return (
     <main className="page">
       <MobileHeader />
-      <Link href={initialCampaignId ? `/campaigns/${initialCampaignId}` : "/conversations"} className="back-link">
-        <IconArrowLeft size={18} /> {initialCampaignId ? "Campanha" : "Conversas"}
-      </Link>
+      {initialCampaignId && (
+        <Link href={`/campaigns/${initialCampaignId}`} className="back-link">
+          <IconArrowLeft size={18} /> Campanha
+        </Link>
+      )}
       <header>
-        <h1 className="display page-title">Adicionar pessoas</h1>
+        <h1 className="display page-title">Prospectar</h1>
         <p className="hero-sub">Encontre pessoas no LinkedIn e convide. Quando aceitarem, a IA começa a conversa.</p>
         <p className="quota-note" style={{ marginTop: 10 }}>
           <IconShield size={14} /> {left > 0 ? `Hoje ainda dá pra convidar ${left} pessoas` : "Limite de convites de hoje atingido"}

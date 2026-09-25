@@ -1,9 +1,10 @@
-import { IconHome, IconMegaphone, IconMessages, IconUser } from "./Icons";
+import { IconHome, IconMegaphone, IconMessages, IconUser, IconUserSearch } from "./Icons";
 
-// As quatro telas do painel — iguais no celular (menu inferior) e no
+// As cinco telas do painel — iguais no celular (menu inferior) e no
 // computador (barra lateral).
 export const NAV_ITEMS = [
   { href: "/", label: "Início", Icon: IconHome },
+  { href: "/prospect", label: "Prospectar", Icon: IconUserSearch },
   { href: "/campaigns", label: "Campanhas", Icon: IconMegaphone },
   { href: "/conversations", label: "Conversas", Icon: IconMessages, badge: "attention" as const },
   { href: "/settings", label: "Conta", Icon: IconUser },
