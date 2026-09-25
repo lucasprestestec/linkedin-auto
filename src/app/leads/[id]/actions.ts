@@ -6,6 +6,7 @@ import { sendMessage } from "@/lib/edges";
 import { getActiveIdentityId } from "@/lib/identity";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
+import { validFollowUp } from "@/lib/settings-ranges";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -118,4 +119,15 @@ export async function suggestLeadReply(leadId: string): Promise<{ text?: string;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
   }
+}
+
+// Regra de follow-up só desta conversa (null = volta pra da campanha/conta).
+export async function updateLeadFollowUp(leadId: string, value: { count: number; days: number } | null) {
+  if (value && !validFollowUp(value.count, value.days * 24)) return { error: "Valores fora do permitido." };
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { followUpMaxCount: value?.count ?? null, followUpDelayHours: value ? value.days * 24 : null },
+  });
+  revalidatePath(`/leads/${leadId}`);
+  return { saved: true };
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
 import { sendPush } from "@/lib/push";
+import { validFollowUp } from "@/lib/settings-ranges";
 
 export async function getOrCreateIdentityLoginLink(): Promise<string> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
@@ -76,6 +77,16 @@ export async function sendTestPush() {
 export async function updateOwnerName(_prevState: unknown, formData: FormData) {
   const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 60);
   await prisma.settings.update({ where: { id: "singleton" }, data: { ownerName: ownerName || null } });
+  revalidatePath("/", "layout");
+  return { saved: true };
+}
+
+// Follow-up padrão da conta: vale pra toda conversa sem regra própria (nem da
+// campanha, nem da conversa).
+export async function updateFollowUpDefault(count: number, days: number) {
+  const delayHours = days * 24;
+  if (!validFollowUp(count, delayHours)) return { error: "Valores fora do permitido." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { followUpMaxCount: count, followUpDelayHours: delayHours } });
   revalidatePath("/", "layout");
   return { saved: true };
 }

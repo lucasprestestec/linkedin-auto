@@ -36,6 +36,9 @@ model Lead {
   invitedAt         DateTime?
   // Follow-ups enviados desde a última resposta do lead (zera quando ele responde).
   followUpsSent     Int       @default(0)
+  // Follow-up próprio desta conversa (null = usa o da campanha ou o da conta).
+  followUpMaxCount   Int?
+  followUpDelayHours Int?
   // CRM: anotações livres do corretor e etiquetas.
   notes             String?   @db.Text
   tags              String[]  @default([])
@@ -63,6 +66,9 @@ model Campaign {
   instructions String?        @db.Text
   // Máximo de pessoas na campanha (null = sem limite).
   maxLeads     Int?
+  // Follow-up próprio da campanha (null = usa o padrão da conta).
+  followUpMaxCount   Int?
+  followUpDelayHours Int?
   // Pausada/finalizada: sem convites novos, aberturas nem follow-ups.
   status       CampaignStatus @default(ACTIVE)
   createdAt    DateTime       @default(now())

@@ -11,6 +11,7 @@ import { runEngagement, type EngagementResult } from "@/lib/engagement";
 import { instructionsFor } from "@/lib/campaigns";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { PROACTIVE_STATUSES } from "@/lib/status";
+import { followUpRuleFor } from "@/lib/followupPolicy";
 
 // Parte proativa do cron: o agente fala primeiro e retoma conversas paradas.
 // Tudo aqui usa só ações Engagement da edges.run (lista de conexões e envio
@@ -137,14 +138,23 @@ async function sendFollowUps(
   settings: Settings,
   budget: number,
 ): Promise<{ sent: number; lost: number }> {
-  const cutoff = new Date(Date.now() - settings.followUpDelayHours * 60 * 60 * 1000);
-  const leads = await prisma.lead.findMany({
-    where: { status: { in: PROACTIVE_STATUSES }, ...IN_ACTIVE_CAMPAIGN },
-    include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
-  });
+  const now = Date.now();
+  const leads = (
+    await prisma.lead.findMany({
+      where: { status: { in: PROACTIVE_STATUSES }, ...IN_ACTIVE_CAMPAIGN },
+      include: {
+        messages: { orderBy: { deliveredAt: "desc" }, take: 1 },
+        campaign: { select: { followUpMaxCount: true, followUpDelayHours: true } },
+      },
+    })
+  ).map((l) => ({ ...l, rule: followUpRuleFor(l, l.campaign, settings) }));
   const rules = parseExclusionList(settings.exclusionList);
+  // Cada lead segue a própria regra: conversa > campanha > padrão da conta.
   const due = leads
-    .filter((l) => l.messages[0] && l.messages[0].sender !== "LEAD" && l.messages[0].deliveredAt < cutoff)
+    .filter(
+      (l) =>
+        l.messages[0] && l.messages[0].sender !== "LEAD" && l.messages[0].deliveredAt.getTime() < now - l.rule.delayHours * 60 * 60 * 1000,
+    )
     // Lista de exclusão: nem follow-up nem "perdido" — o corretor conduz.
     .filter((l) => !isExcluded({ ...l, headline: l.jobTitle }, rules))
     .sort((a, b) => a.messages[0].deliveredAt.getTime() - b.messages[0].deliveredAt.getTime());
@@ -152,7 +162,7 @@ async function sendFollowUps(
   let sent = 0;
   let lost = 0;
   for (const lead of due) {
-    if (lead.followUpsSent >= settings.followUpMaxCount) {
+    if (lead.followUpsSent >= lead.rule.maxCount) {
       await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST" } });
       lost++;
       continue;
@@ -169,10 +179,10 @@ async function sendFollowUps(
       const previous = new Set(history.filter((m) => m.sender !== "LEAD").map((m) => normalizeText(m.content)));
 
       const instructions = await instructionsFor(lead, settings);
-      let content = await generateFollowUp(instructions, lead, history, attempt, settings.followUpMaxCount);
+      let content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount);
       if (previous.has(normalizeText(content))) {
         // Repetiu uma mensagem anterior: uma segunda tentativa; se repetir de novo, não envia.
-        content = await generateFollowUp(instructions, lead, history, attempt, settings.followUpMaxCount);
+        content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount);
         if (previous.has(normalizeText(content))) throw new Error("o agente repetiu uma mensagem anterior");
       }
 

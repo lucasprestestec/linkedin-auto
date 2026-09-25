@@ -7,6 +7,7 @@ import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
 import { IdealClientForm } from "./IdealClientForm";
 import { OwnerNameForm } from "./OwnerNameForm";
+import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
 import { IconChevronRight, IconDownload, IconLinkedin, IconLogout } from "@/components/Icons";
@@ -84,6 +85,14 @@ export default async function SettingsPage() {
         <section id="alcance" className="group rise" style={{ scrollMarginTop: 90 }}>
           <h2 className="group-title">Quem você quer alcançar</h2>
           <IdealClientForm value={settings.targetAudience ?? ""} />
+        </section>
+
+        <section className="group rise">
+          <h2 className="group-title">Follow-up</h2>
+          <FollowUpDefaultForm
+            count={Math.min(10, settings.followUpMaxCount)}
+            days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
+          />
         </section>
 
         <section className="group rise">

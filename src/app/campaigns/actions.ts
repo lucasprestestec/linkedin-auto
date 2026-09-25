@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { validFollowUp } from "@/lib/settings-ranges";
 import { parsePastedProfiles, inviteProspects, type ProspectResult } from "@/lib/prospect";
 import { findWarmSuggestions, type WarmResult, type WarmSuggestion } from "@/lib/warm";
 import { findLeadByProfileUrl } from "@/lib/leads";
@@ -81,12 +82,18 @@ function readCampaign(formData: FormData) {
     if (Array.isArray(parsed)) audience = parsed.map((v) => String(v).trim().slice(0, 60)).filter(Boolean).slice(0, 20);
   } catch {}
   const max = Number(formData.get("maxLeads"));
+  // Follow-up próprio (opcional); fora da faixa permitida, volta pro padrão.
+  const fuCount = Number(formData.get("followUpCount"));
+  const fuHours = Number(formData.get("followUpDays")) * 24;
+  const customFollowUp = formData.get("followUpCustom") === "1" && validFollowUp(fuCount, fuHours);
   return {
     name: String(formData.get("name") ?? "").trim().slice(0, 60),
     description: String(formData.get("description") ?? "").trim().slice(0, 200) || null,
     audience,
     instructions: String(formData.get("instructions") ?? "").trim().slice(0, 4000) || null,
     maxLeads: Number.isInteger(max) && max > 0 ? Math.min(max, 5000) : null,
+    followUpMaxCount: customFollowUp ? fuCount : null,
+    followUpDelayHours: customFollowUp ? fuHours : null,
   };
 }
 
