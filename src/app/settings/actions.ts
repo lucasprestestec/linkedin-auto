@@ -90,3 +90,16 @@ export async function updateFollowUpDefault(count: number, days: number) {
   revalidatePath("/", "layout");
   return { saved: true };
 }
+
+// Desconecta o LinkedIn: apaga a identidade na edges.run (a mesma chamada que
+// já é usada ao gerar um link novo) e limpa o vínculo. Depois disso o botão
+// "Conectar" volta e dá pra entrar com outra conta — ou com a mesma de novo.
+export async function disconnectLinkedin() {
+  const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { linkedinIdentityId: true } });
+  if (settings.linkedinIdentityId) await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
+  await prisma.settings.update({
+    where: { id: "singleton" },
+    data: { linkedinIdentityId: null, linkedinNeedsReconnect: false, linkedinReconnectReason: null },
+  });
+  revalidatePath("/", "layout");
+}

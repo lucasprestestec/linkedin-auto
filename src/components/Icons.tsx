@@ -362,8 +362,8 @@ export const IconLinkedin = ({ size = 20, ...props }: IconProps) => (
 // sólidas: gradiente com id repetido some quando o primeiro SVG está oculto.
 export const LogoMark = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-    <rect x="4" y="2" width="12" height="26" rx="6" fill="#6a4ff7" />
-    <circle cx="20.5" cy="20.5" r="8" fill="#a996ff" fillOpacity="0.95" />
+    <rect x="4" y="2" width="12" height="26" rx="6" fill="#4d6fa6" />
+    <circle cx="20.5" cy="20.5" r="8" fill="#b4c7e6" fillOpacity="0.95" />
     <circle cx="10" cy="8" r="3" fill="#ffffff" />
   </svg>
 );
