@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
-import { parseProfiles, invite, searchPeople, type FoundResult, type InviteState } from "./actions";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { parseProfiles, invite, searchPeople, type FoundResult } from "./actions";
 import type { PeopleSearchFilters } from "@/lib/linkedin";
 import { FoundPeople } from "./FoundPeople";
 import type { ProspectResult } from "@/lib/prospect";
@@ -9,7 +9,8 @@ import { normalizeLinkedinUrl } from "@/lib/linkedin";
 import { nameFromProfileUrl } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { PeopleSearchBuilder } from "./PeopleSearchBuilder";
-import { IconAlert, IconCheck, IconClipboard, IconExternal, IconUserPlus } from "@/components/Icons";
+import { InviteSheet, SelectionBar } from "./InviteSheet";
+import { IconAlert, IconCheck, IconClipboard, IconClock, IconExternal } from "@/components/Icons";
 
 function StepHeader({ n, title, subtitle, done }: { n: number; title: string; subtitle: string; done?: boolean }) {
   return (
@@ -33,11 +34,12 @@ function LinkedinSearchStep({ initialKeywords }: { initialKeywords: string[] }) 
   );
 }
 
-function ProspectResults({ results, campaignId }: { results: ProspectResult[]; campaignId?: string }) {
-  const newResults = results.filter((r) => !r.alreadyLead && !r.excluded);
+function ProspectResults({ results }: { results: ProspectResult[] }) {
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const isLead = (r: ProspectResult) => r.alreadyLead || invited.has(r.linkedinProfileUrl);
+  const newResults = results.filter((r) => !isLead(r) && !r.excluded);
   const [selected, setSelected] = useState<Set<string>>(new Set(newResults.map((r) => r.linkedinProfileUrl)));
-  const [inviteState, setInviteState] = useState<InviteState>(undefined);
-  const [inviting, startInvite] = useTransition();
 
   const selectedResults = newResults.filter((r) => selected.has(r.linkedinProfileUrl));
   const allSelected = newResults.length > 0 && selectedResults.length === newResults.length;
@@ -55,31 +57,9 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
     setSelected(allSelected ? new Set() : new Set(newResults.map((r) => r.linkedinProfileUrl)));
   }
 
-  function handleInvite() {
-    startInvite(async () => {
-      setInviteState(await invite(selectedResults, campaignId));
-    });
-  }
-
-  if (inviteState && !inviteState.error) {
-    return (
-      <section className="card success-card">
-        <span className="success-icon">
-          <IconCheck size={30} strokeWidth={3} />
-        </span>
-        <h2 className="title-lg">
-          {inviteState.scheduled} convite{inviteState.scheduled !== 1 ? "s" : ""} agendado{inviteState.scheduled !== 1 ? "s" : ""}
-        </h2>
-        <p className="small muted" style={{ maxWidth: 290 }}>
-          Os convites saem ao longo do dia, espaçados para parecer natural. Quem aceitar aparece na sua lista de leads.
-        </p>
-        {inviteState.skippedForLimit > 0 && (
-          <span className="badge badge-invite" style={{ marginTop: 6 }}>
-            {inviteState.skippedForLimit} ficaram de fora pelo limite diário
-          </span>
-        )}
-      </section>
-    );
+  function finishInvite() {
+    setInvited((prev) => new Set([...prev, ...selectedResults.map((r) => r.linkedinProfileUrl)]));
+    setSelected(new Set());
   }
 
   return (
@@ -87,7 +67,7 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
       <div style={{ padding: "0 18px" }}>
         <StepHeader
           n={3}
-          title="Revise e convide"
+          title="Marque quem convidar"
           subtitle={`${results.length} perfi${results.length !== 1 ? "s" : "l"} reconhecido${results.length !== 1 ? "s" : ""}${
             results.length > newResults.length ? ` · ${results.length - newResults.length} não podem ser convidados` : ""
           }`}
@@ -110,8 +90,8 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
           const { firstName, lastName, slug } = nameFromProfileUrl(r.linkedinProfileUrl);
           return (
             <li key={r.linkedinProfileUrl}>
-              <label className="check-row" style={r.alreadyLead || r.excluded ? { opacity: 0.5, cursor: "default" } : undefined}>
-                {!r.alreadyLead && !r.excluded && (
+              <label className="check-row" style={isLead(r) || r.excluded ? { opacity: 0.5, cursor: "default" } : undefined}>
+                {!isLead(r) && !r.excluded && (
                   <>
                     <input type="checkbox" checked={selected.has(r.linkedinProfileUrl)} onChange={() => toggle(r.linkedinProfileUrl)} />
                     <span className="checkbox">
@@ -126,8 +106,8 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
                   </span>
                   <span className="lead-sub tiny">linkedin.com/in/{slug}</span>
                 </span>
-                {r.alreadyLead || r.excluded ? (
-                  <span className="badge badge-plain">{r.alreadyLead ? "Já é lead" : "Está em Nunca contatar"}</span>
+                {isLead(r) || r.excluded ? (
+                  <span className="badge badge-plain">{invited.has(r.linkedinProfileUrl) ? "Convidado agora" : r.alreadyLead ? "Já é lead" : "Está em Nunca contatar"}</span>
                 ) : (
                   <a
                     href={r.linkedinProfileUrl}
@@ -147,49 +127,66 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
         })}
       </ul>
 
-      {newResults.length > 0 && (
-        <div className="sticky-cta stack" style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}>
-          {inviteState?.error && (
-            <p className="error-text">
-              <IconAlert size={15} /> {inviteState.error}
-            </p>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary btn-lg btn-block"
-            onClick={handleInvite}
-            disabled={inviting || selectedResults.length === 0}
-          >
-            {inviting ? (
-              <>
-                <span className="spinner" /> Agendando convites…
-              </>
-            ) : selectedResults.length === 0 ? (
-              "Selecione ao menos 1 pessoa"
-            ) : (
-              <>
-                <IconUserPlus size={19} />
-                Convidar {selectedResults.length} pessoa{selectedResults.length > 1 ? "s" : ""}
-              </>
-            )}
-          </button>
-        </div>
+      <SelectionBar count={selectedResults.length} onContinue={() => setSheetOpen(true)} />
+      {sheetOpen && (
+        <InviteSheet
+          count={selectedResults.length}
+          onInvite={(campaignId) => invite(selectedResults, campaignId)}
+          onClose={() => setSheetOpen(false)}
+          onDone={finishInvite}
+        />
       )}
     </section>
   );
 }
 
+const RECENT_KEY = "prospect:recent-searches";
+
+function readRecent(): PeopleSearchFilters[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw.slice(0, 5) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecent(f: PeopleSearchFilters) {
+  try {
+    const key = JSON.stringify(f);
+    const next = [f, ...readRecent().filter((r) => JSON.stringify(r) !== key)].slice(0, 5);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+function recentLabel(f: PeopleSearchFilters) {
+  const parts = [f.titles, f.locations, f.companies, f.industries, f.keywords, f.firstNames, f.lastNames, f.schools]
+    .filter((v) => v.length > 0)
+    .map((v) => v.join(" / "));
+  return parts.join(" · ");
+}
+
 // Com a busca pelo Google configurada: filtros → "Buscar pessoas" → lista aqui
-// mesmo, com caixinhas. Colar links fica como alternativa recolhida.
-function GoogleSearchFlow({ campaignId, initialKeywords, searchesLeft }: { campaignId?: string; initialKeywords: string[]; searchesLeft: number }) {
+// mesmo, com caixinhas. Buscas recentes repetem a leva de ontem num toque.
+// Colar links fica como alternativa recolhida.
+function GoogleSearchFlow({ initialKeywords, searchesLeft }: { initialKeywords: string[]; searchesLeft: number }) {
   const [filters, setFilters] = useState<PeopleSearchFilters | null>(null);
   const [people, setPeople] = useState<FoundResult[] | null>(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [left, setLeft] = useState(searchesLeft);
   const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<PeopleSearchFilters[]>([]);
+  const [builder, setBuilder] = useState<{ key: number; filters?: PeopleSearchFilters }>({ key: 0 });
   const [searching, startSearch] = useTransition();
   const [loadingMore, startMore] = useTransition();
+
+  // localStorage só existe no navegador: lê depois de montar.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setRecent(readRecent()), []);
 
   function run(f: PeopleSearchFilters) {
     setError(null);
@@ -201,8 +198,15 @@ function GoogleSearchFlow({ campaignId, initialKeywords, searchesLeft }: { campa
       setPage(0);
       setHasMore(r.hasMore);
       setLeft(r.left);
+      const next = saveRecent(f);
+      if (next) setRecent(next);
       requestAnimationFrame(() => document.getElementById("found-people")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     });
+  }
+
+  function repeat(f: PeopleSearchFilters) {
+    setBuilder((b) => ({ key: b.key + 1, filters: f }));
+    run(f);
   }
 
   function more() {
@@ -222,9 +226,24 @@ function GoogleSearchFlow({ campaignId, initialKeywords, searchesLeft }: { campa
 
   return (
     <div className="stack" style={{ gap: 16 }}>
+      {recent.length > 0 && (
+        <section className="recent-searches" aria-label="Buscas recentes">
+          <span className="recent-title">
+            <IconClock size={14} /> Repetir uma busca
+          </span>
+          <div className="recent-list">
+            {recent.map((f) => (
+              <button key={JSON.stringify(f)} type="button" className="chip recent-chip" disabled={searching || left <= 0} onClick={() => repeat(f)}>
+                {recentLabel(f)}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section id="search-step" className="card card-pad step rise" style={{ scrollMarginTop: 16 }}>
         <StepHeader n={1} title="Quem você procura?" subtitle="Preencha os filtros e toque em Buscar. As pessoas aparecem aqui mesmo." />
-        <PeopleSearchBuilder initialKeywords={initialKeywords} onSearch={run} searching={searching} />
+        <PeopleSearchBuilder key={builder.key} initialKeywords={initialKeywords} initialFilters={builder.filters} onSearch={run} searching={searching} />
         {left <= 0 && <p className="hint">As buscas grátis deste mês acabaram. Voltam no dia 1º — até lá, use &ldquo;abrir no LinkedIn&rdquo;.</p>}
         {error && (
           <p className="error-text">
@@ -235,52 +254,42 @@ function GoogleSearchFlow({ campaignId, initialKeywords, searchesLeft }: { campa
 
       <div id="found-people" style={{ scrollMarginTop: 16 }}>
         {people && (
-          <FoundPeople
-            key={JSON.stringify(filters)}
-            people={people}
-            hasMore={hasMore}
-            loadingMore={loadingMore}
-            onLoadMore={more}
-            campaignId={campaignId}
-            left={left}
-          />
+          <FoundPeople key={JSON.stringify(filters)} people={people} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={more} left={left} />
         )}
       </div>
 
       <details className="paste-alt">
         <summary>Já tem os links dos perfis? Cole aqui</summary>
-        <PasteFlow campaignId={campaignId} />
+        <PasteFlow />
       </details>
     </div>
   );
 }
 
 export function ProspectSearch({
-  campaignId,
   initialKeywords = [],
   searchEnabled = false,
   searchesLeft = 0,
 }: {
-  campaignId?: string;
   initialKeywords?: string[];
   searchEnabled?: boolean;
   searchesLeft?: number;
 }) {
-  if (searchEnabled) return <GoogleSearchFlow campaignId={campaignId} initialKeywords={initialKeywords} searchesLeft={searchesLeft} />;
+  if (searchEnabled) return <GoogleSearchFlow initialKeywords={initialKeywords} searchesLeft={searchesLeft} />;
   return (
     <div className="search-flow">
       <div className="col">
         <LinkedinSearchStep initialKeywords={initialKeywords} />
       </div>
       <div className="col">
-        <PasteFlow campaignId={campaignId} numbered />
+        <PasteFlow numbered />
       </div>
     </div>
   );
 }
 
 // Colar links de perfis (um por linha) → revisar → convidar.
-function PasteFlow({ campaignId, numbered = false }: { campaignId?: string; numbered?: boolean }) {
+function PasteFlow({ numbered = false }: { numbered?: boolean }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
   const [clipboardError, setClipboardError] = useState(false);
@@ -349,7 +358,7 @@ function PasteFlow({ campaignId, numbered = false }: { campaignId?: string; numb
           </form>
         </section>
 
-        {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaignId={campaignId} />}
+        {state && !state.error && <ProspectResults key={state.parseId} results={state.results} />}
     </>
   );
 }

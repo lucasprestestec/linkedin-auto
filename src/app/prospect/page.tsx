@@ -12,7 +12,7 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const searchEnabled = webSearchEnabled();
   const [campaigns, remaining, settings, searchesLeft] = await Promise.all([
-    prisma.campaign.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true, audience: true } }),
+    prisma.campaign.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true, description: true, audience: true } }),
     remainingDailyInviteQuota(),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { dailyInviteLimit: true } }),
     searchEnabled ? searchesLeftThisMonth() : Promise.resolve(0),
@@ -31,13 +31,20 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
       )}
       <header>
         <h1 className="display page-title">Prospectar</h1>
-        <p className="hero-sub">Encontre pessoas e convide. Quando aceitarem, a IA começa a conversa.</p>
+        <p className="hero-sub">Busque, marque quem te interessa e convide. Quando aceitarem, a IA começa a conversa.</p>
         <p className="quota-note" style={{ marginTop: 10 }}>
           <IconShield size={14} /> {left > 0 ? `Hoje ainda dá pra convidar ${left} pessoas` : "Limite de convites de hoje atingido"}
           <span className="faint"> · máx. {settings.dailyInviteLimit}/dia</span>
         </p>
       </header>
-      <AddPeople campaigns={campaigns} initialCampaignId={initialCampaignId} searchEnabled={searchEnabled} searchesLeft={searchesLeft} />
+      <AddPeople
+        campaigns={campaigns.map(({ id, name, description }) => ({ id, name, description }))}
+        initialCampaignId={initialCampaignId}
+        initialKeywords={campaigns.find((c) => c.id === initialCampaignId)?.audience ?? []}
+        invitesLeft={left}
+        searchEnabled={searchEnabled}
+        searchesLeft={searchesLeft}
+      />
     </main>
   );
 }

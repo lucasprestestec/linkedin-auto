@@ -10,7 +10,9 @@ import { OwnerNameForm } from "./OwnerNameForm";
 import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
-import { IconChevronRight, IconDownload, IconLinkedin, IconLogout } from "@/components/Icons";
+import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
+import { describeRule } from "@/lib/followupPolicy";
+import { IconBan, IconBell, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,52 @@ async function getConnectionStatus(identityId: string | null) {
   } catch {
     return { connected: false, error: true };
   }
+}
+
+// Uma linha que mostra o valor atual e abre pra editar — a página inteira cabe
+// numa olhada e ninguém precisa rolar por formulários que não vai mexer.
+function SettingItem({
+  icon,
+  tone,
+  title,
+  summary,
+  children,
+}: {
+  icon: React.ReactNode;
+  tone: string;
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="setting-item">
+      <summary className="setting-row">
+        <span className={`setting-icon tone-${tone}`}>{icon}</span>
+        <span className="setting-text">
+          <b>{title}</b>
+          <span className="tiny faint setting-summary">{summary}</span>
+        </span>
+        <IconChevronDown size={18} className="chev" />
+      </summary>
+      <div className="setting-body">{children}</div>
+    </details>
+  );
+}
+
+function audienceSummary(raw: string | null) {
+  const icp = parseIdealClient(raw);
+  const parts = [...icp.titles.slice(0, 2), ...icp.industries.slice(0, 1), ...icp.regions.slice(0, 1)];
+  return parts.length ? parts.join(" · ") : "Ainda não definido";
+}
+
+function exclusionSummary(raw: string | null) {
+  const l = parseExclusionLines(raw);
+  const parts = [
+    l.companies.length && `${l.companies.length} empresa${l.companies.length > 1 ? "s" : ""}`,
+    l.people.length + l.profiles.length && `${l.people.length + l.profiles.length} pessoa${l.people.length + l.profiles.length > 1 ? "s" : ""}`,
+    l.other.length && `${l.other.length} outro${l.other.length > 1 ? "s" : ""}`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : "Ninguém por enquanto";
 }
 
 export default async function SettingsPage() {
@@ -36,15 +84,10 @@ export default async function SettingsPage() {
         <h1 className="display page-title">
           Sua <span className="name-grad">conta.</span>
         </h1>
-        <p className="hero-sub">Só o essencial: sua conta do LinkedIn e quem a automação deve (e não deve) procurar.</p>
+        <p className="hero-sub">Seu LinkedIn e como a automação deve abordar as pessoas. Toque num item pra mudar.</p>
       </header>
 
       <div className="account-col">
-        <section className="group rise">
-          <h2 className="group-title">Você</h2>
-          <OwnerNameForm value={settings.ownerName ?? ""} />
-        </section>
-
         <section className="group rise">
           <h2 className="group-title">LinkedIn</h2>
           <section className="card card-pad connection rise" aria-label="Conta do LinkedIn">
@@ -82,31 +125,39 @@ export default async function SettingsPage() {
           </section>
         </section>
 
+        <section className="group rise">
+          <h2 className="group-title">Você</h2>
+          <OwnerNameForm value={settings.ownerName ?? ""} />
+        </section>
+
         <section id="alcance" className="group rise" style={{ scrollMarginTop: 90 }}>
-          <h2 className="group-title">Quem você quer alcançar</h2>
-          <IdealClientForm value={settings.targetAudience ?? ""} />
+          <h2 className="group-title">Sua abordagem</h2>
+          <div className="card setting-list">
+            <SettingItem icon={<IconTarget size={19} />} tone="brand" title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
+              <IdealClientForm value={settings.targetAudience ?? ""} />
+            </SettingItem>
+            <SettingItem
+              icon={<IconClock size={19} />}
+              tone="waiting"
+              title="Follow-up"
+              summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
+            >
+              <FollowUpDefaultForm
+                count={Math.min(10, settings.followUpMaxCount)}
+                days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
+              />
+            </SettingItem>
+            <SettingItem icon={<IconBan size={19} />} tone="urgent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
+              <ExclusionListForm value={settings.exclusionList ?? ""} />
+            </SettingItem>
+            {/* Sem as chaves de push no servidor, o card só mostraria um aviso técnico. */}
+            {pushPublicKey() && (
+              <SettingItem icon={<IconBell size={19} />} tone="open" title="Avisos no celular" summary="Quando alguém precisar de você">
+                <NotificationsCard publicKey={pushPublicKey()} />
+              </SettingItem>
+            )}
+          </div>
         </section>
-
-        <section className="group rise">
-          <h2 className="group-title">Follow-up</h2>
-          <FollowUpDefaultForm
-            count={Math.min(10, settings.followUpMaxCount)}
-            days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
-          />
-        </section>
-
-        <section className="group rise">
-          <h2 className="group-title">Quem nunca contatar</h2>
-          <ExclusionListForm value={settings.exclusionList ?? ""} />
-        </section>
-
-        {/* Sem as chaves de push no servidor, o card só mostraria um aviso técnico. */}
-        {pushPublicKey() && (
-          <section className="group rise">
-            <h2 className="group-title">Avisos</h2>
-            <NotificationsCard publicKey={pushPublicKey()} />
-          </section>
-        )}
 
         <div className="card rise" style={{ overflow: "hidden" }}>
           <a href="/api/export/leads" className="setting-row" download>

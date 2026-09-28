@@ -94,15 +94,22 @@ function joinOr(values: string[]) {
 // e "Abrir no LinkedIn" vira alternativa.
 export function PeopleSearchBuilder({
   initialKeywords = [],
+  initialFilters,
   onSearch,
   searching = false,
 }: {
   initialKeywords?: string[];
+  // Busca recente escolhida: já abre com esses filtros preenchidos.
+  initialFilters?: PeopleSearchFilters;
   onSearch?: (filters: PeopleSearchFilters) => void;
   searching?: boolean;
 }) {
-  const [filters, setFilters] = useState<PeopleSearchFilters>({ ...EMPTY_SEARCH, keywords: initialKeywords });
-  const [visible, setVisible] = useState<ListKey[]>(initialKeywords.length ? ["titles", "locations", "keywords"] : ["titles", "locations"]);
+  const [filters, setFilters] = useState<PeopleSearchFilters>(initialFilters ?? { ...EMPTY_SEARCH, keywords: initialKeywords });
+  const [visible, setVisible] = useState<ListKey[]>(() => {
+    const base: ListKey[] = ["titles", "locations"];
+    const filled = FIELDS.map((f) => f.key).filter((k) => (initialFilters ?? { ...EMPTY_SEARCH, keywords: initialKeywords })[k].length > 0);
+    return [...base, ...filled.filter((k) => !base.includes(k))];
+  });
 
   const hidden = FIELDS.filter((f) => !visible.includes(f.key));
   const active = FIELDS.filter((f) => filters[f.key].length > 0);

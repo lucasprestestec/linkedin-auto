@@ -5,7 +5,7 @@ import { IconFlame, IconSearch } from "@/components/Icons";
 
 type Tab = "warm" | "search";
 
-// Dois jeitos de achar gente pra campanha: montar uma busca no LinkedIn ou
+// Dois jeitos de achar gente: buscar por cargo/cidade/empresa ou
 // convidar quem já te notou (visitou o perfil / te segue). As duas abas ficam
 // montadas pra não perder o que foi digitado ao trocar.
 export function ProspectTabs({ warm, search }: { warm: React.ReactNode; search: React.ReactNode }) {
@@ -17,7 +17,7 @@ export function ProspectTabs({ warm, search }: { warm: React.ReactNode; search: 
         <button type="button" role="tab" id="tab-search" aria-controls="panel-search" aria-selected={tab === "search"} onClick={() => setTab("search")}>
           <IconSearch size={16} />
           <span>
-            <b>Buscar no LinkedIn</b>
+            <b>Buscar pessoas</b>
             <small>Por cargo, cidade, empresa…</small>
           </span>
         </button>

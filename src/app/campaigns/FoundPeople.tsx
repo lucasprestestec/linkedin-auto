@@ -1,33 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { IconAlert, IconCheck, IconExternal, IconUserPlus } from "@/components/Icons";
-import { inviteFound, type FoundResult, type InviteState } from "./actions";
+import { IconCheck, IconExternal } from "@/components/Icons";
+import { inviteFound, type FoundResult } from "./actions";
+import { InviteSheet, SelectionBar } from "./InviteSheet";
 
 const GOOD_FIT = 60;
 
-// Resultado da busca pelo Google: marca quem quer e convida, sem sair do sistema.
+// Resultado da busca pelo Google: marca quem quer e, no fim, escolhe a campanha.
 export function FoundPeople({
   people,
   hasMore,
   loadingMore,
   onLoadMore,
-  campaignId,
   left,
 }: {
   people: FoundResult[];
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
-  campaignId?: string;
   left: number;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [inviteState, setInviteState] = useState<InviteState>(undefined);
-  const [inviting, startInvite] = useTransition();
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const available = people.filter((p) => !p.alreadyLead && !p.excluded);
+  const isLead = (p: FoundResult) => p.alreadyLead || invited.has(p.linkedinProfileUrl);
+  const available = people.filter((p) => !isLead(p) && !p.excluded);
   const chosen = available.filter((p) => selected.has(p.linkedinProfileUrl));
   const allSelected = available.length > 0 && chosen.length === available.length;
 
@@ -40,28 +40,9 @@ export function FoundPeople({
     });
   }
 
-  if (inviteState && !inviteState.error) {
-    return (
-      <section className="card success-card">
-        <span className="success-icon">
-          <IconCheck size={30} strokeWidth={3} />
-        </span>
-        <h2 className="title-lg">
-          {inviteState.scheduled} convite{inviteState.scheduled !== 1 ? "s" : ""} agendado{inviteState.scheduled !== 1 ? "s" : ""}
-        </h2>
-        <p className="small muted" style={{ maxWidth: 290 }}>
-          Os convites saem ao longo do dia. Quem aceitar aparece em Conversas, e a IA começa a conversa.
-        </p>
-        {inviteState.skippedForLimit > 0 && (
-          <span className="badge badge-invite" style={{ marginTop: 6 }}>
-            {inviteState.skippedForLimit} ficaram de fora pelo limite diário
-          </span>
-        )}
-        <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => setInviteState(undefined)}>
-          Voltar aos resultados
-        </button>
-      </section>
-    );
+  function finishInvite() {
+    setInvited((prev) => new Set([...prev, ...chosen.map((p) => p.linkedinProfileUrl)]));
+    setSelected(new Set());
   }
 
   return (
@@ -93,7 +74,7 @@ export function FoundPeople({
       ) : (
         <ul className="rows found-rows">
           {people.map((p) => {
-            const blocked = p.alreadyLead || p.excluded;
+            const blocked = isLead(p) || p.excluded;
             const tone = p.icpScore == null ? "" : p.icpScore >= 80 ? "badge-qualified" : p.icpScore >= GOOD_FIT ? "badge-open" : p.icpScore >= 40 ? "badge-invite" : "";
             return (
               <li key={p.linkedinProfileUrl}>
@@ -116,7 +97,7 @@ export function FoundPeople({
                       </span>
                       {blocked ? (
                         <span className="badge badge-plain" style={{ height: 22, fontSize: 11 }}>
-                          {p.alreadyLead ? "Já é lead" : "Nunca contatar"}
+                          {invited.has(p.linkedinProfileUrl) ? "Convidado agora" : p.alreadyLead ? "Já é lead" : "Nunca contatar"}
                         </span>
                       ) : (
                         p.icpScore != null && (
@@ -162,32 +143,14 @@ export function FoundPeople({
         </div>
       )}
 
-      {available.length > 0 && (
-        <div className="sticky-cta stack" style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}>
-          {inviteState?.error && (
-            <p className="error-text">
-              <IconAlert size={15} /> {inviteState.error}
-            </p>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary btn-lg btn-block"
-            disabled={inviting || chosen.length === 0}
-            onClick={() => startInvite(async () => setInviteState(await inviteFound(chosen, campaignId)))}
-          >
-            {inviting ? (
-              <>
-                <span className="spinner" /> Agendando convites…
-              </>
-            ) : chosen.length === 0 ? (
-              "Marque quem você quer convidar"
-            ) : (
-              <>
-                <IconUserPlus size={19} /> Convidar {chosen.length} pessoa{chosen.length > 1 ? "s" : ""}
-              </>
-            )}
-          </button>
-        </div>
+      <SelectionBar count={chosen.length} onContinue={() => setSheetOpen(true)} />
+      {sheetOpen && (
+        <InviteSheet
+          count={chosen.length}
+          onInvite={(campaignId) => inviteFound(chosen, campaignId)}
+          onClose={() => setSheetOpen(false)}
+          onDone={finishInvite}
+        />
       )}
     </section>
   );
