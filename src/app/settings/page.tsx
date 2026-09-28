@@ -3,6 +3,7 @@ import { getIdentity } from "@/lib/edges";
 import { logout } from "../actions";
 import { ConnectButton } from "./ConnectButton";
 import { RefreshStatusButton } from "./RefreshStatusButton";
+import { DisconnectButton } from "./DisconnectButton";
 import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
 import { IdealClientForm } from "./IdealClientForm";
@@ -122,6 +123,7 @@ export default async function SettingsPage() {
                 <RefreshStatusButton />
               </>
             )}
+            {settings.linkedinIdentityId && <DisconnectButton />}
           </section>
         </section>
 

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { NAV_ITEMS, isActive } from "./navItems";
 import { Brand } from "./Brand";
-import { IconBars, IconDots, IconDownload, IconLogout } from "./Icons";
+import { IconArrowUpRight, IconDots, IconDownload, IconLogout, IconSparkles } from "./Icons";
 import { useShell } from "./ShellContext";
 import { initials, avatarGradient } from "@/lib/format";
 import { logout } from "@/app/actions";
@@ -46,10 +46,14 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="sidebar-tagline">
-        <IconBars size={20} />
-        <p>Seu crescimento começa com boas conversas.</p>
-      </div>
+      <Link href="/prospect" className="sidebar-promo">
+        <IconSparkles size={20} className="promo-spark" />
+        <strong className="promo-title">Turbo com IA</strong>
+        <p className="promo-text">Encontre, conecte e converta mais leads no LinkedIn.</p>
+        <span className="promo-arrow" aria-hidden>
+          <IconArrowUpRight size={18} />
+        </span>
+      </Link>
 
       <div className="sidebar-user" ref={menuRef}>
         <Link href="/settings" className="sidebar-user-link">

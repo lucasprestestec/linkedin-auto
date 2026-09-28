@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { dayKeyOf, dayLabel, greeting, weekdayShort } from "@/lib/format";
+import { dayKeyOf, dayLabel, greeting, todayLabel, weekdayShort } from "@/lib/format";
 import { firstNameOf } from "@/lib/shell";
 import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
-import { ConversationRow } from "@/components/ConversationRow";
+import { Avatar } from "@/components/Avatar";
 import { Sparkline } from "@/components/Sparkline";
-import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconUserPlus } from "@/components/Icons";
+import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconMessages, IconUserPlus } from "@/components/Icons";
 import { AutomationBar } from "./AutomationBar";
+import { HomeConversations } from "./HomeConversations";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,7 @@ async function getData() {
     invitesToday: Math.max(0, settings.dailyInviteLimit - remaining),
     kpis: {
       contacted,
+      replied: repliedAfterContact,
       rate: contacted ? Math.round((repliedAfterContact / contacted) * 100) : null,
       active,
       qualified,
@@ -99,10 +101,15 @@ async function getData() {
     spark: {
       sent: series(recentMsgs.filter((m) => m.sender !== "LEAD").map((m) => m.deliveredAt)),
       received: series(recentMsgs.filter((m) => m.sender === "LEAD").map((m) => m.deliveredAt)),
-      all: series(recentMsgs.map((m) => m.deliveredAt)),
       qualified: series(recentQualified.map((l) => l.updatedAt)),
     },
   };
+}
+
+function listNames(names: string[]) {
+  if (names.length <= 1) return names.join("");
+  if (names.length <= 3) return `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
+  return `${names.slice(0, 2).join(", ")} e mais ${names.length - 2}`;
 }
 
 export default async function HomePage() {
@@ -110,11 +117,10 @@ export default async function HomePage() {
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
 
-  // Quem precisa de você primeiro; depois quem respondeu e ainda não teve resposta.
+  // Sua vez: quem precisa de você primeiro; depois quem respondeu e ainda não teve resposta.
   const needYou = conversations
     .filter((c) => c.status === "NEEDS_HUMAN" || (c.unanswered && c.status !== "LOST"))
     .sort((a, b) => Number(b.status === "NEEDS_HUMAN") - Number(a.status === "NEEDS_HUMAN") || b.whenTs - a.whenTs);
-  const urgentCount = conversations.filter((c) => c.status === "NEEDS_HUMAN").length;
 
   const steps = [
     { done: linkedinOk, label: "Conectar seu LinkedIn", href: "/settings" },
@@ -124,48 +130,39 @@ export default async function HomePage() {
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
-  const kpiItems = [
-    { value: kpis.contacted, label: "Leads contatados", spark: spark.sent },
-    { value: kpis.rate === null ? "—" : `${kpis.rate}%`, label: "Taxa de resposta", spark: spark.received },
-    { value: kpis.active, label: "Conversas ativas", spark: spark.all },
+  const quick = [
+    { value: kpis.contacted, label: "Contatados", spark: spark.sent },
+    { value: kpis.replied, label: "Respostas", note: kpis.rate === null ? null : `${kpis.rate}% de resposta`, spark: spark.received },
     { value: kpis.qualified, label: "Oportunidades", spark: spark.qualified },
   ];
 
   return (
-    <main className="page home-v5">
+    <main className="page home-lux">
       <MobileHeader />
 
-      <header className="rise">
-        <h1 className="display page-title greet">
+      <header className="lux-hero rise">
+        <p className="overline">{todayLabel()}</p>
+        <h1 className="serif-title">
           {greeting()}
           {name ? (
             <>
               ,<br />
-              <span className="name-grad">{name}.</span>
+              <span className="gold-text">{name}.</span>
             </>
           ) : (
-            <span className="name-grad">.</span>
+            <span className="gold-text">.</span>
           )}
         </h1>
-        <p className="hero-sub">
-          {urgentCount > 0 ? (
+        <p className="lux-sub">
+          {needYou.length > 0 ? (
             <>
-              {urgentCount} conversa{urgentCount > 1 ? "s" : ""} esperando você.
-              <span className="only-mobile-inline"> O resto a IA está cuidando.</span>
+              Você tem <b>{needYou.length} conversa{needYou.length > 1 ? "s" : ""}</b> que precisa{needYou.length > 1 ? "m" : ""} da sua atenção.
             </>
           ) : (
             "Tudo em dia. A IA avisa aqui quando alguém precisar de você."
           )}
         </p>
       </header>
-
-      <div id="auto">
-        <AutomationBar
-          paused={settings.automationPaused}
-          connected={linkedinOk}
-          today={`${invitesToday} convites e ${messagesToday} mensagens hoje`}
-        />
-      </div>
 
       {settings.linkedinNeedsReconnect && (
         <Link href="/settings" className="alert">
@@ -180,124 +177,172 @@ export default async function HomePage() {
         </Link>
       )}
 
-      {doneCount < steps.length && (
-        <section className="setup-v5" aria-label="Primeiros passos">
-          <div className="sec-head">
-            <h2>Primeiros passos</h2>
-            <span className="small faint">
-              {doneCount} de {steps.length}
-            </span>
-          </div>
-          <ol className="setup-steps">
-            {steps.map((s, i) => (
-              <li key={s.label}>
-                <Link href={s.href} className={s.done ? "done" : undefined}>
-                  <span className="setup-num">{s.done ? <IconCheck size={13} strokeWidth={3} /> : i + 1}</span>
-                  {s.label}
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      <div className="home-grid-lux">
+        <div className="home-main">
+          {doneCount < steps.length && (
+            <section className="panel setup-panel" aria-label="Primeiros passos">
+              <div className="panel-head">
+                <h2>
+                  Primeiros passos <span className="count-pill">{doneCount}/{steps.length}</span>
+                </h2>
+              </div>
+              <ol className="setup-steps">
+                {steps.map((s, i) => (
+                  <li key={s.label}>
+                    <Link href={s.href} className={s.done ? "done" : undefined}>
+                      <span className="setup-num">{s.done ? <IconCheck size={13} strokeWidth={3} /> : i + 1}</span>
+                      {s.label}
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
 
-      <section className="batch-cta" aria-label="Nova leva de convites">
-        <span className="batch-cta-icon">
-          <IconUserPlus size={24} />
-        </span>
-        <div className="batch-cta-text">
-          <h2>Nova leva de convites</h2>
-          <p>
-            {remaining > 0
-              ? `Hoje ainda dá pra convidar ${remaining} pessoa${remaining !== 1 ? "s" : ""}.`
-              : "O limite de hoje já foi usado. Amanhã tem mais."}
-          </p>
-        </div>
-        <Link href="/prospect" className="btn btn-primary batch-cta-btn">
-          Prospectar <IconArrowRight size={16} />
-        </Link>
-      </section>
+          <HomeConversations items={conversations} />
 
-      <section aria-labelledby="needyou-title" className="stack" style={{ gap: 6 }}>
-        <div className="sec-head">
-          <h2 id="needyou-title">Conversas que precisam de você</h2>
-          <Link href="/conversations" className="sec-link">
-            Ver todas <IconArrowRight size={14} />
-          </Link>
-        </div>
-        {needYou.length === 0 ? (
-          <p className="empty-line">
-            <IconCheck size={16} strokeWidth={3} /> Ninguém esperando resposta sua agora.
-          </p>
-        ) : (
-          <ul className="rows boxed">
-            {needYou.slice(0, 5).map((c) => (
-              <li key={c.id}>
-                <ConversationRow c={c} withReply />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="results-title" className="stack" style={{ gap: 10 }}>
-        <div className="sec-head">
-          <h2 id="results-title">Resultados</h2>
-          <span className="small faint">últimos {DAYS} dias</span>
-        </div>
-        <dl className="kpis">
-          {kpiItems.map((k) => (
-            <div key={k.label} className="kpi-item">
-              <dd>{k.value}</dd>
-              <dt>{k.label}</dt>
-              <span className="only-desktop kpi-spark">
-                <Sparkline values={k.spark} />
-              </span>
+          <section className="panel" aria-labelledby="results-title">
+            <div className="panel-head">
+              <h2 id="results-title">Resultados por leva</h2>
+              <span className="panel-note">últimos {DAYS} dias</span>
             </div>
-          ))}
-        </dl>
+            {levas.length === 0 ? (
+              <p className="panel-empty">Quando você convidar pessoas, cada leva aparece aqui com quantas aceitaram e responderam.</p>
+            ) : (
+              <ul className="levas">
+                {levas.map((l) => (
+                  <li key={l.key} className="leva">
+                    <div className="leva-head">
+                      <span className="leva-day">
+                        <b>{dayLabel(l.date)}</b>
+                        <span className="faint"> · {weekdayShort(l.date)}</span>
+                      </span>
+                      <span className="leva-camps">{l.campaigns.join(", ")}</span>
+                    </div>
+                    <dl className="leva-funnel">
+                      <div>
+                        <dd>{l.people}</dd>
+                        <dt>{l.queued > 0 ? `convidadas · ${l.queued} na fila` : "convidadas"}</dt>
+                      </div>
+                      <div>
+                        <dd>{l.accepted}</dd>
+                        <dt>aceitaram</dt>
+                      </div>
+                      <div>
+                        <dd>{l.replied}</dd>
+                        <dt>responderam</dt>
+                      </div>
+                      <div>
+                        <dd>{l.qualified}</dd>
+                        <dt>oportunidades</dt>
+                      </div>
+                    </dl>
+                    <span className="leva-bar" aria-hidden>
+                      <i style={{ width: `${(l.accepted / l.people) * 100}%` }} />
+                      <i className="replied" style={{ width: `${(l.replied / l.people) * 100}%` }} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
 
+        <aside className="home-rail" aria-label="Resumo">
+          <section className="panel rail-card" aria-labelledby="yourturn-title">
+            <Link href="/conversations?status=urgent" className="panel-head panel-link">
+              <h2 id="yourturn-title">
+                Sua vez <span className="count-pill">{needYou.length}</span>
+              </h2>
+              <IconChevronRight size={18} />
+            </Link>
+            {needYou.length === 0 ? (
+              <p className="panel-empty">
+                <IconCheck size={16} strokeWidth={3} /> Ninguém esperando resposta sua.
+              </p>
+            ) : (
+              <ul className="turn-list">
+                {needYou.slice(0, 3).map((c) => (
+                  <li key={c.id}>
+                    <Link href={`/leads/${c.id}`} className="turn-card">
+                      <span className={`lux-dot ${c.status === "NEEDS_HUMAN" ? "dot-urgent" : "dot-waiting"}`} aria-hidden />
+                      <Avatar firstName={c.firstName} lastName={c.lastName} size={40} />
+                      <span className="turn-main">
+                        <span className="turn-top">
+                          <b>
+                            {c.firstName} {c.lastName}
+                          </b>
+                          <small>{c.when}</small>
+                        </span>
+                        {c.company && <small className="turn-sub">{c.company}</small>}
+                        <span className="turn-msg">
+                          {c.status === "NEEDS_HUMAN" && c.needsHumanReason ? c.needsHumanReason : (c.lastMessage?.content ?? "")}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-        {levas.length === 0 ? (
-          <p className="empty-line">Quando você convidar pessoas, cada leva aparece aqui com quantas aceitaram e responderam.</p>
-        ) : (
-          <ul className="levas">
-            {levas.map((l) => (
-              <li key={l.key} className="leva">
-                <div className="leva-head">
-                  <span className="leva-day">
-                    <b>{dayLabel(l.date)}</b>
-                    <span className="faint"> · {weekdayShort(l.date)}</span>
-                  </span>
-                  <span className="leva-camps">{l.campaigns.join(", ")}</span>
-                </div>
-                <dl className="leva-funnel">
-                  <div>
-                    <dd>{l.people}</dd>
-                    <dt>{l.queued > 0 ? `convidadas · ${l.queued} na fila` : "convidadas"}</dt>
-                  </div>
-                  <div>
-                    <dd>{l.accepted}</dd>
-                    <dt>aceitaram</dt>
-                  </div>
-                  <div>
-                    <dd>{l.replied}</dd>
-                    <dt>responderam</dt>
-                  </div>
-                  <div>
-                    <dd>{l.qualified}</dd>
-                    <dt>oportunidades</dt>
-                  </div>
-                </dl>
-                <span className="leva-bar" aria-hidden>
-                  <i style={{ width: `${(l.accepted / l.people) * 100}%` }} />
-                  <i className="replied" style={{ width: `${(l.replied / l.people) * 100}%` }} />
+          <section id="auto" className="panel rail-card" aria-labelledby="today-title">
+            <div className="panel-head">
+              <h2 id="today-title">Hoje</h2>
+            </div>
+            <div className="today-list">
+              <Link href="/conversations?status=urgent" className="today-item">
+                <span className="today-icon">
+                  <IconMessages size={18} />
                 </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                <span className="today-text">
+                  <b>
+                    {needYou.length} conversa{needYou.length !== 1 ? "s" : ""} para responder
+                  </b>
+                  <small>{needYou.length ? listNames(needYou.map((c) => c.firstName ?? "Lead")) : "Nada pendente"}</small>
+                </span>
+              </Link>
+              <Link href="/prospect" className="today-item">
+                <span className="today-icon">
+                  <IconUserPlus size={18} />
+                </span>
+                <span className="today-text">
+                  <b>
+                    {invitesToday} convite{invitesToday !== 1 ? "s" : ""} enviado{invitesToday !== 1 ? "s" : ""}
+                  </b>
+                  <small>{remaining > 0 ? `Ainda cabem ${remaining} · nova leva` : "Limite de hoje atingido"}</small>
+                </span>
+                <IconArrowRight size={16} className="today-go" />
+              </Link>
+              <AutomationBar
+                variant="item"
+                paused={settings.automationPaused}
+                connected={linkedinOk}
+                today={`${messagesToday} mensage${messagesToday !== 1 ? "ns" : "m"} enviada${messagesToday !== 1 ? "s" : ""} hoje`}
+              />
+            </div>
+          </section>
+
+          <section className="panel rail-card" aria-labelledby="quick-title">
+            <div className="panel-head">
+              <h2 id="quick-title">Visão rápida</h2>
+              <span className="panel-select">Últimos {DAYS} dias</span>
+            </div>
+            <dl className="quick-stats">
+              {quick.map((k) => (
+                <div key={k.label}>
+                  <dd>{k.value}</dd>
+                  <dt>{k.label}</dt>
+                  {k.note && <span className="quick-note">{k.note}</span>}
+                  <span className="quick-spark">
+                    <Sparkline values={k.spark} />
+                  </span>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }

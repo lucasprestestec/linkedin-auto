@@ -18,7 +18,7 @@ export default function LoginPage() {
           <span>
             LinkedIn
             <br />
-            Leads
+            <span className="brand-accent">Leads</span>
           </span>
         </span>
         <h1 className="login-title display">

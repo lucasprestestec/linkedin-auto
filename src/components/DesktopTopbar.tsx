@@ -2,11 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { IconSearch } from "./Icons";
-import { UserAvatar } from "./UserAvatar";
+import Link from "next/link";
+import { IconPlus, IconSearch } from "./Icons";
 import { NotificationBell } from "./NotificationBell";
 
-// Barra de cima do computador: busca global (⌘K), sino e atalho pra prospectar.
+// Barra de cima do computador: busca global (⌘K), sino e atalho pra nova campanha.
 export function DesktopTopbar() {
   const router = useRouter();
   const params = useSearchParams();
@@ -47,9 +47,11 @@ export function DesktopTopbar() {
         />
         <kbd>⌘ K</kbd>
       </form>
-      <div className="row" style={{ gap: 12 }}>
+      <div className="row" style={{ gap: 14 }}>
         <NotificationBell />
-        <UserAvatar size={44} />
+        <Link href="/campaigns/new" className="btn btn-gold topbar-cta">
+          <IconPlus size={18} strokeWidth={2.4} /> Nova campanha
+        </Link>
       </div>
     </header>
   );

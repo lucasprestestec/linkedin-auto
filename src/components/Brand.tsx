@@ -8,7 +8,7 @@ export function Brand({ size = 34, className = "" }: { size?: number; className?
       <span className="brand-name">
         LinkedIn
         <br />
-        Leads
+        <span className="brand-accent">Leads</span>
       </span>
     </Link>
   );

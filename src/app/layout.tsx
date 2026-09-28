@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Inter } from "next/font/google";
+import { Archivo, Fraunces, Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import "./theme.css";
 import "./ui.css";
+import "./lux.css";
 import { AppShell } from "@/components/AppShell";
 import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
 import { getShellData } from "@/lib/shell";
@@ -22,6 +23,14 @@ const archivo = Archivo({
   display: "swap",
 });
 
+// Títulos grandes (saudação, nome das telas): serifada de alto contraste.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-serif",
+  axes: ["opsz"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "LinkedIn Leads",
   description: "Conversas e leads do LinkedIn",
@@ -35,10 +44,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f1fb" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0a16" },
-  ],
+  themeColor: "#0b0c0f",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -50,7 +56,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const shell = authed ? await getShellData() : null;
 
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${archivo.variable}`}>
+    <html lang="pt-BR" className={`${inter.variable} ${archivo.variable} ${fraunces.variable}`}>
       <body>
         <AppShell data={shell}>{children}</AppShell>
       </body>
