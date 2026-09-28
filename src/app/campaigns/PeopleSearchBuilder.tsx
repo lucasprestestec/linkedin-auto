@@ -12,6 +12,7 @@ import {
   IconLinkedin,
   IconMapPin,
   IconPlus,
+  IconSearch,
   IconUser,
   IconX,
 } from "@/components/Icons";
@@ -89,10 +90,19 @@ function joinOr(values: string[]) {
 }
 
 // initialKeywords: público da campanha (cargos/setores/empresas) já entra como palavra-chave.
-export function PeopleSearchBuilder({ initialKeywords = [] }: { initialKeywords?: string[] }) {
+// onSearch: com a busca pelo Google ligada, o botão principal busca aqui mesmo
+// e "Abrir no LinkedIn" vira alternativa.
+export function PeopleSearchBuilder({
+  initialKeywords = [],
+  onSearch,
+  searching = false,
+}: {
+  initialKeywords?: string[];
+  onSearch?: (filters: PeopleSearchFilters) => void;
+  searching?: boolean;
+}) {
   const [filters, setFilters] = useState<PeopleSearchFilters>({ ...EMPTY_SEARCH, keywords: initialKeywords });
   const [visible, setVisible] = useState<ListKey[]>(initialKeywords.length ? ["titles", "locations", "keywords"] : ["titles", "locations"]);
-
 
   const hidden = FIELDS.filter((f) => !visible.includes(f.key));
   const active = FIELDS.filter((f) => filters[f.key].length > 0);
@@ -143,6 +153,7 @@ export function PeopleSearchBuilder({ initialKeywords = [] }: { initialKeywords?
         </div>
       )}
 
+      {!onSearch && (
       <label className="setting-row filter-toggle">
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: "block", fontWeight: 700 }}>Só quem ainda não é conexão</span>
@@ -156,13 +167,42 @@ export function PeopleSearchBuilder({ initialKeywords = [] }: { initialKeywords?
         />
         <span className="switch switch-light" role="switch" aria-checked={filters.onlyNotConnected} aria-hidden="true" />
       </label>
+      )}
 
       <div className="search-summary" aria-live="polite">
         <span className="label">Você vai buscar</span>
-        <p>{summary}</p>
-        {ready && <span className="tiny muted">O LinkedIn procura esses termos no perfil inteiro (cargo, empresa, resumo). Confira os resultados antes de copiar os links.</span>}
+        <p>{onSearch && ready ? summary.replace(", que ainda não são suas conexões", "") : summary}</p>
+        {ready && (
+          <span className="tiny muted">
+            {onSearch
+              ? "A busca procura esses termos nos perfis públicos do LinkedIn (cargo, empresa, cidade)."
+              : "O LinkedIn procura esses termos no perfil inteiro (cargo, empresa, resumo). Confira os resultados antes de copiar os links."}
+          </span>
+        )}
       </div>
 
+      {onSearch && (
+        <div className="stack" style={{ gap: 8 }}>
+          <button type="button" className="btn btn-primary btn-lg btn-block" disabled={!ready || searching} onClick={() => onSearch(filters)}>
+            {searching ? (
+              <>
+                <span className="spinner" /> Buscando…
+              </>
+            ) : (
+              <>
+                <IconSearch size={18} /> Buscar pessoas
+              </>
+            )}
+          </button>
+          {ready && (
+            <a href={buildLinkedinSearchUrl(filters)} target="_blank" rel="noopener noreferrer" className="link-btn" style={{ alignSelf: "center" }}>
+              ou abrir a mesma busca no LinkedIn <IconExternal size={13} />
+            </a>
+          )}
+        </div>
+      )}
+
+      {!onSearch && (
       <div className="row" style={{ gap: 8 }}>
         {ready && (
           <button
@@ -189,6 +229,7 @@ export function PeopleSearchBuilder({ initialKeywords = [] }: { initialKeywords?
           <IconExternal size={16} style={{ opacity: 0.6 }} />
         </a>
       </div>
+      )}
     </div>
   );
 }

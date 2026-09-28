@@ -81,6 +81,18 @@ enum CampaignStatus {
   FINISHED
 }
 
+// Cada busca de pessoas feita pelo Google (SerpApi/Serper). Serve pra contar o
+// uso do mês e nunca passar da cota gratuita do provedor.
+model WebSearchLog {
+  id        String   @id @default(cuid())
+  query     String   @db.Text
+  page      Int      @default(0)
+  results   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // Inscrição de Web Push (um por navegador/aparelho do corretor).
 model PushSubscription {
   id        String   @id @default(cuid())

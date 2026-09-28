@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
-import { parseProfiles, invite, type InviteState } from "./actions";
+import { parseProfiles, invite, searchPeople, type FoundResult, type InviteState } from "./actions";
+import type { PeopleSearchFilters } from "@/lib/linkedin";
+import { FoundPeople } from "./FoundPeople";
 import type { ProspectResult } from "@/lib/prospect";
 import { normalizeLinkedinUrl } from "@/lib/linkedin";
 import { nameFromProfileUrl } from "@/lib/format";
@@ -177,7 +179,108 @@ function ProspectResults({ results, campaignId }: { results: ProspectResult[]; c
   );
 }
 
-export function ProspectSearch({ campaignId, initialKeywords = [] }: { campaignId?: string; initialKeywords?: string[] }) {
+// Com a busca pelo Google configurada: filtros → "Buscar pessoas" → lista aqui
+// mesmo, com caixinhas. Colar links fica como alternativa recolhida.
+function GoogleSearchFlow({ campaignId, initialKeywords, searchesLeft }: { campaignId?: string; initialKeywords: string[]; searchesLeft: number }) {
+  const [filters, setFilters] = useState<PeopleSearchFilters | null>(null);
+  const [people, setPeople] = useState<FoundResult[] | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [left, setLeft] = useState(searchesLeft);
+  const [error, setError] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
+  const [loadingMore, startMore] = useTransition();
+
+  function run(f: PeopleSearchFilters) {
+    setError(null);
+    startSearch(async () => {
+      const r = await searchPeople(f, 0);
+      if (!r.ok) return setError(r.error);
+      setFilters(f);
+      setPeople(r.people);
+      setPage(0);
+      setHasMore(r.hasMore);
+      setLeft(r.left);
+      requestAnimationFrame(() => document.getElementById("found-people")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    });
+  }
+
+  function more() {
+    if (!filters) return;
+    startMore(async () => {
+      const r = await searchPeople(filters, page + 1);
+      if (!r.ok) return setError(r.error);
+      setPeople((prev) => {
+        const seen = new Set((prev ?? []).map((p) => p.linkedinProfileUrl));
+        return [...(prev ?? []), ...r.people.filter((p) => !seen.has(p.linkedinProfileUrl))];
+      });
+      setPage(page + 1);
+      setHasMore(r.hasMore);
+      setLeft(r.left);
+    });
+  }
+
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      <section id="search-step" className="card card-pad step rise" style={{ scrollMarginTop: 16 }}>
+        <StepHeader n={1} title="Quem você procura?" subtitle="Preencha os filtros e toque em Buscar. As pessoas aparecem aqui mesmo." />
+        <PeopleSearchBuilder initialKeywords={initialKeywords} onSearch={run} searching={searching} />
+        {left <= 0 && <p className="hint">As buscas grátis deste mês acabaram. Voltam no dia 1º — até lá, use &ldquo;abrir no LinkedIn&rdquo;.</p>}
+        {error && (
+          <p className="error-text">
+            <IconAlert size={15} /> {error}
+          </p>
+        )}
+      </section>
+
+      <div id="found-people" style={{ scrollMarginTop: 16 }}>
+        {people && (
+          <FoundPeople
+            key={JSON.stringify(filters)}
+            people={people}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onLoadMore={more}
+            campaignId={campaignId}
+            left={left}
+          />
+        )}
+      </div>
+
+      <details className="paste-alt">
+        <summary>Já tem os links dos perfis? Cole aqui</summary>
+        <PasteFlow campaignId={campaignId} />
+      </details>
+    </div>
+  );
+}
+
+export function ProspectSearch({
+  campaignId,
+  initialKeywords = [],
+  searchEnabled = false,
+  searchesLeft = 0,
+}: {
+  campaignId?: string;
+  initialKeywords?: string[];
+  searchEnabled?: boolean;
+  searchesLeft?: number;
+}) {
+  if (searchEnabled) return <GoogleSearchFlow campaignId={campaignId} initialKeywords={initialKeywords} searchesLeft={searchesLeft} />;
+  return (
+    <div className="search-flow">
+      <div className="col">
+        <LinkedinSearchStep initialKeywords={initialKeywords} />
+      </div>
+      <div className="col">
+        <PasteFlow campaignId={campaignId} numbered />
+      </div>
+    </div>
+  );
+}
+
+// Colar links de perfis (um por linha) → revisar → convidar.
+function PasteFlow({ campaignId, numbered = false }: { campaignId?: string; numbered?: boolean }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
   const [clipboardError, setClipboardError] = useState(false);
@@ -204,13 +307,9 @@ export function ProspectSearch({ campaignId, initialKeywords = [] }: { campaignI
   const hasResults = Boolean(state && !state.error);
 
   return (
-    <div className="search-flow">
-      <div className="col">
-        <LinkedinSearchStep initialKeywords={initialKeywords} />
-      </div>
-      <div className="col">
+    <>
         <section id="paste-step" className="card card-pad step rise" style={{ "--i": 2, scrollMarginTop: 16 } as React.CSSProperties}>
-          <StepHeader n={2} title="Cole os perfis escolhidos" subtitle="Um link por linha — pode colar vários de uma vez." done={hasResults} />
+          {numbered && <StepHeader n={2} title="Cole os perfis escolhidos" subtitle="Um link por linha — pode colar vários de uma vez." done={hasResults} />}
           <form action={formAction} className="stack" style={{ gap: 12 }}>
             <div className="stack" style={{ gap: 10 }}>
               <textarea
@@ -251,7 +350,6 @@ export function ProspectSearch({ campaignId, initialKeywords = [] }: { campaignI
         </section>
 
         {state && !state.error && <ProspectResults key={state.parseId} results={state.results} campaignId={campaignId} />}
-      </div>
-    </div>
+    </>
   );
 }
