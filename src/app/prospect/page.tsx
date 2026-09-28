@@ -4,15 +4,18 @@ import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { MobileHeader } from "@/components/MobileHeader";
 import { IconArrowLeft, IconShield } from "@/components/Icons";
 import { AddPeople } from "./AddPeople";
+import { searchesLeftThisMonth, webSearchEnabled } from "@/lib/websearch";
 
 export const dynamic = "force-dynamic";
 
 export default async function AddPeoplePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const [campaigns, remaining, settings] = await Promise.all([
+  const searchEnabled = webSearchEnabled();
+  const [campaigns, remaining, settings, searchesLeft] = await Promise.all([
     prisma.campaign.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true, audience: true } }),
     remainingDailyInviteQuota(),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { dailyInviteLimit: true } }),
+    searchEnabled ? searchesLeftThisMonth() : Promise.resolve(0),
   ]);
   const wanted = typeof params.campaign === "string" ? params.campaign : "";
   const initialCampaignId = campaigns.some((c) => c.id === wanted) ? wanted : "";
@@ -28,13 +31,13 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
       )}
       <header>
         <h1 className="display page-title">Prospectar</h1>
-        <p className="hero-sub">Encontre pessoas no LinkedIn e convide. Quando aceitarem, a IA começa a conversa.</p>
+        <p className="hero-sub">Encontre pessoas e convide. Quando aceitarem, a IA começa a conversa.</p>
         <p className="quota-note" style={{ marginTop: 10 }}>
           <IconShield size={14} /> {left > 0 ? `Hoje ainda dá pra convidar ${left} pessoas` : "Limite de convites de hoje atingido"}
           <span className="faint"> · máx. {settings.dailyInviteLimit}/dia</span>
         </p>
       </header>
-      <AddPeople campaigns={campaigns} initialCampaignId={initialCampaignId} />
+      <AddPeople campaigns={campaigns} initialCampaignId={initialCampaignId} searchEnabled={searchEnabled} searchesLeft={searchesLeft} />
     </main>
   );
 }

@@ -5,14 +5,19 @@ import { ProspectTabs } from "../campaigns/ProspectTabs";
 import { ProspectSearch } from "../campaigns/ProspectSearch";
 import { WarmSuggestions } from "../campaigns/WarmSuggestions";
 
-// Adicionar pessoas: campanha é opcional. Trocar a campanha recria a busca
-// (o público dela entra como palavra-chave).
+// Adicionar pessoas: campanha é opcional. O público da campanha escolhida ao
+// abrir a tela já entra como palavra-chave; trocar depois não apaga a busca —
+// a campanha vale pra quem for convidado dali em diante.
 export function AddPeople({
   campaigns,
   initialCampaignId,
+  searchEnabled,
+  searchesLeft,
 }: {
   campaigns: { id: string; name: string; audience: string[] }[];
   initialCampaignId: string;
+  searchEnabled: boolean;
+  searchesLeft: number;
 }) {
   const [campaignId, setCampaignId] = useState(initialCampaignId);
   const campaign = campaigns.find((c) => c.id === campaignId);
@@ -36,9 +41,15 @@ export function AddPeople({
         </label>
       )}
       <ProspectTabs
-        key={campaignId}
         warm={<WarmSuggestions campaignId={campaignId || undefined} />}
-        search={<ProspectSearch campaignId={campaignId || undefined} initialKeywords={campaign?.audience ?? []} />}
+        search={
+          <ProspectSearch
+            campaignId={campaignId || undefined}
+            initialKeywords={campaign?.audience ?? []}
+            searchEnabled={searchEnabled}
+            searchesLeft={searchesLeft}
+          />
+        }
       />
     </div>
   );
