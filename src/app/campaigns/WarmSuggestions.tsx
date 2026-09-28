@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { inviteWarm, loadWarmSuggestions, type InviteState, type WarmState } from "./actions";
+import { inviteWarm, loadWarmSuggestions, type WarmState } from "./actions";
+import { InviteSheet, SelectionBar } from "./InviteSheet";
 import type { WarmSuggestion } from "@/lib/warm";
 import { relativeTime } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
-import { IconAlert, IconCheck, IconEye, IconFlame, IconRefresh, IconUserPlus } from "@/components/Icons";
+import { IconAlert, IconCheck, IconEye, IconFlame, IconRefresh } from "@/components/Icons";
 
 function SourceBadges({ s }: { s: WarmSuggestion }) {
   return (
@@ -45,21 +46,20 @@ function excludedSummary(ex: { anonymous: number; connections: number; leads: nu
   return parts.length ? `Fora da lista: ${parts.join(" · ")}.` : "";
 }
 
-export function WarmSuggestions({ campaignId }: { campaignId?: string }) {
+export function WarmSuggestions() {
   const [state, setState] = useState<WarmState | undefined>(undefined);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [inviteState, setInviteState] = useState<InviteState>(undefined);
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [loading, startLoad] = useTransition();
-  const [inviting, startInvite] = useTransition();
   const [onlyGoodFit, setOnlyGoodFit] = useState(false);
 
-  const all = state?.ok ? state.suggestions : [];
+  const all = state?.ok ? state.suggestions.filter((s) => !invited.has(s.linkedinProfileUrl)) : [];
   const scored = state?.ok && state.scoring === "ok";
   const suggestions = scored && onlyGoodFit ? all.filter((s) => (s.icpScore ?? 0) >= GOOD_FIT) : all;
   const chosen = suggestions.filter((s) => selected.has(s.linkedinProfileUrl));
 
   function load() {
-    setInviteState(undefined);
     startLoad(async () => {
       const result = await loadWarmSuggestions();
       setState(result);
@@ -80,8 +80,9 @@ export function WarmSuggestions({ campaignId }: { campaignId?: string }) {
     });
   }
 
-  function handleInvite() {
-    startInvite(async () => setInviteState(await inviteWarm(chosen, campaignId)));
+  function finishInvite() {
+    setInvited((prev) => new Set([...prev, ...chosen.map((s) => s.linkedinProfileUrl)]));
+    setSelected(new Set());
   }
 
   const header = (
@@ -95,30 +96,6 @@ export function WarmSuggestions({ campaignId }: { campaignId?: string }) {
       </div>
     </div>
   );
-
-  if (inviteState && !inviteState.error) {
-    return (
-      <section className="card success-card">
-        <span className="success-icon">
-          <IconCheck size={30} strokeWidth={3} />
-        </span>
-        <h2 className="title-lg">
-          {inviteState.scheduled} convite{inviteState.scheduled !== 1 ? "s" : ""} agendado{inviteState.scheduled !== 1 ? "s" : ""}
-        </h2>
-        <p className="small muted" style={{ maxWidth: 290 }}>
-          Quem aceitar recebe a mensagem de abertura da IA automaticamente.
-        </p>
-        {inviteState.skippedForLimit > 0 && (
-          <span className="badge badge-invite" style={{ marginTop: 6 }}>
-            {inviteState.skippedForLimit} ficaram de fora pelo limite diário
-          </span>
-        )}
-        <button type="button" className="btn btn-ghost btn-sm" onClick={load} style={{ marginTop: 6 }}>
-          <IconRefresh size={15} /> Buscar de novo
-        </button>
-      </section>
-    );
-  }
 
   return (
     <section className="card step rise" style={{ padding: "18px 0 0", overflow: "hidden" }}>
@@ -222,31 +199,16 @@ export function WarmSuggestions({ campaignId }: { campaignId?: string }) {
               </li>
             ))}
           </ul>
-          {/* Fixo só com lista longa: em lista curta o botão cabe na tela e, fixo, cobriria as últimas pessoas. */}
-          <div
-            className={`${suggestions.length > 5 ? "sticky-cta " : ""}stack`}
-            style={{ gap: 10, padding: "12px 18px 18px", background: "var(--surface)" }}
-          >
-            {inviteState?.error && (
-              <p className="error-text">
-                <IconAlert size={15} /> {inviteState.error}
-              </p>
-            )}
-            <button type="button" className="btn btn-primary btn-lg btn-block" onClick={handleInvite} disabled={inviting || chosen.length === 0}>
-              {inviting ? (
-                <>
-                  <span className="spinner" /> Agendando convites…
-                </>
-              ) : chosen.length === 0 ? (
-                "Selecione ao menos 1 pessoa"
-              ) : (
-                <>
-                  <IconUserPlus size={19} /> Convidar {chosen.length} pessoa{chosen.length > 1 ? "s" : ""}
-                </>
-              )}
-            </button>
-          </div>
+          <SelectionBar count={chosen.length} onContinue={() => setSheetOpen(true)} />
         </>
+      )}
+      {sheetOpen && (
+        <InviteSheet
+          count={chosen.length}
+          onInvite={(campaignId) => inviteWarm(chosen, campaignId)}
+          onClose={() => setSheetOpen(false)}
+          onDone={finishInvite}
+        />
       )}
     </section>
   );

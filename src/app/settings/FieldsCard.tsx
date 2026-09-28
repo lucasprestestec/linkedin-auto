@@ -34,7 +34,7 @@ export function FieldsCard({
   return (
     <form action={formAction} className="card card-pad stack" style={{ gap: 16 }}>
       <input type="hidden" name={name} value={serialized} />
-      <div className="row" style={{ gap: 14 }}>
+      <div className="row fields-head" style={{ gap: 14 }}>
         <span className="setting-icon" style={iconStyle}>
           {icon}
         </span>

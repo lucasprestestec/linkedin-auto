@@ -1,21 +1,31 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { dayKeyOf, greeting, shortDate } from "@/lib/format";
+import { dayKeyOf, dayLabel, greeting, weekdayShort } from "@/lib/format";
 import { firstNameOf } from "@/lib/shell";
-import { campaignNumbers } from "@/lib/campaignStats";
 import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ConversationRow } from "@/components/ConversationRow";
-import { CampaignStatus } from "@/components/CampaignStatus";
 import { Sparkline } from "@/components/Sparkline";
-import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconMegaphone, IconPlus } from "@/components/Icons";
+import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconUserPlus } from "@/components/Icons";
 import { AutomationBar } from "./AutomationBar";
 
 export const dynamic = "force-dynamic";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAYS = 14;
+const LEVAS = 6;
+
+type Leva = {
+  key: string;
+  date: Date;
+  people: number;
+  queued: number;
+  accepted: number;
+  replied: number;
+  qualified: number;
+  campaigns: string[];
+};
 
 async function getData() {
   const startOfDay = new Date();
@@ -25,14 +35,20 @@ async function getData() {
   const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] } } };
   const inbound = { some: { sender: "LEAD" as const } };
 
-  const [settings, conversations, campaigns, messagesToday, remaining, contacted, repliedAfterContact, active, qualified, recentMsgs, recentQualified] =
+  const [settings, conversations, recentLeads, messagesToday, remaining, contacted, repliedAfterContact, active, qualified, recentMsgs, recentQualified] =
     await Promise.all([
       prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
       getConversationItems(),
-      prisma.campaign.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 4,
-        include: { leads: { select: { status: true, messages: { select: { sender: true } } } } },
+      // Cada leva = pessoas adicionadas no mesmo dia.
+      prisma.lead.findMany({
+        where: { createdAt: { gte: since } },
+        select: {
+          createdAt: true,
+          invitedAt: true,
+          status: true,
+          campaign: { select: { name: true } },
+          messages: { where: { sender: "LEAD" }, select: { id: true }, take: 1 },
+        },
       }),
       prisma.message.count({ where: { sender: { not: "LEAD" }, createdAt: { gte: startOfDay } } }),
       remainingDailyInviteQuota(),
@@ -52,10 +68,26 @@ async function getData() {
     return keys.map((k) => count.get(k) ?? 0);
   };
 
+  const byDay = new Map<string, Leva>();
+  for (const l of recentLeads) {
+    const key = dayKeyOf(l.createdAt);
+    const leva = byDay.get(key) ?? { key, date: l.createdAt, people: 0, queued: 0, accepted: 0, replied: 0, qualified: 0, campaigns: [] };
+    leva.people++;
+    if (!l.invitedAt && l.status === "INVITE_SENT") leva.queued++;
+    if (l.status !== "INVITE_SENT" && l.status !== "LOST") leva.accepted++;
+    if (l.messages.length > 0) leva.replied++;
+    if (l.status === "QUALIFIED") leva.qualified++;
+    const camp = l.campaign?.name ?? "Sem campanha";
+    if (!leva.campaigns.includes(camp)) leva.campaigns.push(camp);
+    byDay.set(key, leva);
+  }
+  const levas = [...byDay.values()].sort((a, b) => b.key.localeCompare(a.key)).slice(0, LEVAS);
+
   return {
     settings,
     conversations,
-    campaigns,
+    levas,
+    remaining: Math.max(0, remaining),
     messagesToday,
     invitesToday: Math.max(0, settings.dailyInviteLimit - remaining),
     kpis: {
@@ -74,7 +106,7 @@ async function getData() {
 }
 
 export default async function HomePage() {
-  const { settings, conversations, campaigns, messagesToday, invitesToday, kpis, spark } = await getData();
+  const { settings, conversations, levas, remaining, messagesToday, invitesToday, kpis, spark } = await getData();
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
 
@@ -148,18 +180,6 @@ export default async function HomePage() {
         </Link>
       )}
 
-      <dl className="kpis">
-        {kpiItems.map((k) => (
-          <div key={k.label} className="kpi-item">
-            <dd>{k.value}</dd>
-            <dt>{k.label}</dt>
-            <span className="only-desktop kpi-spark">
-              <Sparkline values={k.spark} />
-            </span>
-          </div>
-        ))}
-      </dl>
-
       {doneCount < steps.length && (
         <section className="setup-v5" aria-label="Primeiros passos">
           <div className="sec-head">
@@ -180,6 +200,23 @@ export default async function HomePage() {
           </ol>
         </section>
       )}
+
+      <section className="batch-cta" aria-label="Nova leva de convites">
+        <span className="batch-cta-icon">
+          <IconUserPlus size={24} />
+        </span>
+        <div className="batch-cta-text">
+          <h2>Nova leva de convites</h2>
+          <p>
+            {remaining > 0
+              ? `Hoje ainda dá pra convidar ${remaining} pessoa${remaining !== 1 ? "s" : ""}.`
+              : "O limite de hoje já foi usado. Amanhã tem mais."}
+          </p>
+        </div>
+        <Link href="/prospect" className="btn btn-primary batch-cta-btn">
+          Prospectar <IconArrowRight size={16} />
+        </Link>
+      </section>
 
       <section aria-labelledby="needyou-title" className="stack" style={{ gap: 6 }}>
         <div className="sec-head">
@@ -203,87 +240,62 @@ export default async function HomePage() {
         )}
       </section>
 
-      <section aria-labelledby="camps-title" className="stack" style={{ gap: 6 }}>
+      <section aria-labelledby="results-title" className="stack" style={{ gap: 10 }}>
         <div className="sec-head">
-          <h2 id="camps-title">Suas campanhas</h2>
-          <Link href="/campaigns" className="sec-link">
-            Ver todas <IconArrowRight size={14} />
-          </Link>
+          <h2 id="results-title">Resultados</h2>
+          <span className="small faint">últimos {DAYS} dias</span>
         </div>
-        {campaigns.length === 0 ? (
-          <div className="empty-line">
-            <span>Campanhas são opcionais: servem pra agrupar pessoas por oferta.</span>
-            <Link href="/campaigns/new" className="sec-link" style={{ color: "var(--brand)" }}>
-              <IconPlus size={14} /> Criar campanha
-            </Link>
-          </div>
+        <dl className="kpis">
+          {kpiItems.map((k) => (
+            <div key={k.label} className="kpi-item">
+              <dd>{k.value}</dd>
+              <dt>{k.label}</dt>
+              <span className="only-desktop kpi-spark">
+                <Sparkline values={k.spark} />
+              </span>
+            </div>
+          ))}
+        </dl>
+
+
+        {levas.length === 0 ? (
+          <p className="empty-line">Quando você convidar pessoas, cada leva aparece aqui com quantas aceitaram e responderam.</p>
         ) : (
-          <>
-            <ul className="rows only-mobile">
-              {campaigns.map((c) => {
-                const n = campaignNumbers(c.leads);
-                return (
-                  <li key={c.id}>
-                    <Link href={`/campaigns/${c.id}`} className="row-item">
-                      <span className="camp-tile">
-                        <IconMegaphone size={20} />
-                      </span>
-                      <span className="row-main">
-                        <span className="row-top">
-                          <span className="row-name">{c.name}</span>
-                          <CampaignStatus status={c.status} />
-                        </span>
-                        {c.description && <span className="row-sub">{c.description}</span>}
-                        <span className="mini-stats">
-                          <span>
-                            <b>{n.leads}</b> Leads
-                          </span>
-                          <span>
-                            <b>{n.rate === null ? "—" : `${n.rate}%`}</b> Resposta
-                          </span>
-                          <span>
-                            <b>{n.qualified}</b> Oportun.
-                          </span>
-                        </span>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-            <table className="simple-table only-desktop">
-              <thead>
-                <tr>
-                  <th>Campanha</th>
-                  <th>Leads</th>
-                  <th>Resposta</th>
-                  <th>Oportunidades</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((c) => {
-                  const n = campaignNumbers(c.leads);
-                  return (
-                    <tr key={c.id}>
-                      <td>
-                        <Link href={`/campaigns/${c.id}`} className="stack">
-                          <b>{c.name}</b>
-                          <span className="tiny faint">{shortDate(c.createdAt)}</span>
-                        </Link>
-                      </td>
-                      <td>{n.leads}</td>
-                      <td>{n.rate === null ? "—" : `${n.rate}%`}</td>
-                      <td>{n.qualified}</td>
-                      <td>
-                        <CampaignStatus status={c.status} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </>
+          <ul className="levas">
+            {levas.map((l) => (
+              <li key={l.key} className="leva">
+                <div className="leva-head">
+                  <span className="leva-day">
+                    <b>{dayLabel(l.date)}</b>
+                    <span className="faint"> · {weekdayShort(l.date)}</span>
+                  </span>
+                  <span className="leva-camps">{l.campaigns.join(", ")}</span>
+                </div>
+                <dl className="leva-funnel">
+                  <div>
+                    <dd>{l.people}</dd>
+                    <dt>{l.queued > 0 ? `convidadas · ${l.queued} na fila` : "convidadas"}</dt>
+                  </div>
+                  <div>
+                    <dd>{l.accepted}</dd>
+                    <dt>aceitaram</dt>
+                  </div>
+                  <div>
+                    <dd>{l.replied}</dd>
+                    <dt>responderam</dt>
+                  </div>
+                  <div>
+                    <dd>{l.qualified}</dd>
+                    <dt>oportunidades</dt>
+                  </div>
+                </dl>
+                <span className="leva-bar" aria-hidden>
+                  <i style={{ width: `${(l.accepted / l.people) * 100}%` }} />
+                  <i className="replied" style={{ width: `${(l.replied / l.people) * 100}%` }} />
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </main>
