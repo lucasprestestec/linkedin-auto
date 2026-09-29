@@ -10,6 +10,7 @@ import { WorkHoursForm } from "./WorkHoursForm";
 import { EngagementForm } from "./EngagementForm";
 import { AccountTypeNotice } from "./AccountTypeNotice";
 import { adminLogout } from "./actions";
+import { AgentEval } from "./eval/AgentEval";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -47,6 +48,15 @@ export default async function AdminPage() {
           </button>
         </form>
       </header>
+
+      <section className="group">
+        <h2 className="group-title">Agente de IA — banco de testes e modelo</h2>
+        <p className="tiny faint" style={{ padding: "0 4px 8px" }}>
+          Roda situações difíceis de conversa em cada modelo e mostra quem decide melhor, escreve mais natural e erra menos. Depois é só escolher
+          qual usar nas conversas.
+        </p>
+        <AgentEval />
+      </section>
 
       <div className="settings-grid">
         <div className="settings-col">
