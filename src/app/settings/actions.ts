@@ -6,28 +6,38 @@ import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
 import { sendPush } from "@/lib/push";
 import { validFollowUp } from "@/lib/settings-ranges";
 
-export async function getOrCreateIdentityLoginLink(): Promise<string> {
+// Quanto tempo um link de login ainda não usado é reaproveitado. Depois disso
+// (ou se a pessoa pedir um link novo), a identidade pendente é trocada.
+const LOGIN_LINK_REUSE_MS = 12 * 60 * 60 * 1000;
+
+// Link pra conectar o LinkedIn. A edges.run só entrega o link ao CRIAR a
+// identidade, e cada identidade criada entra na cobrança do mês. Por isso:
+// enquanto a identidade pendente existir e o link for recente, devolve o
+// MESMO link; só cria outra se o link expirou ou se pediram um novo (fresh).
+export async function getOrCreateIdentityLoginLink(fresh = false): Promise<string> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   if (settings.linkedinIdentityId) {
-    // A Edges só devolve o link de login no momento da criação. Se já existe
-    // uma identidade mas ela nunca chegou a conectar (usuário fechou a aba,
-    // por exemplo), apaga essa e cria outra para gerar um link novo — evita
-    // acumular identidades órfãs (cada uma tem custo mensal).
     const existing = await getIdentity(settings.linkedinIdentityId).catch(() => null);
     if (existing?.integrations.includes("linkedin")) {
       throw new Error("Essa conta já está conectada.");
     }
+    if (existing && !fresh) {
+      const recent = settings.linkedinLoginLinkAt && Date.now() - settings.linkedinLoginLinkAt.getTime() < LOGIN_LINK_REUSE_MS;
+      const link = existing.identity_login_links?.linkedin || (recent ? settings.linkedinLoginLink : null);
+      if (link) return link;
+    }
+    // Pendente sem link aproveitável (ou link novo pedido): troca por outra,
+    // sem deixar identidade órfã sendo cobrada.
     await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
   }
 
   const identity = await createIdentity("Cliente", "America/Sao_Paulo");
+  const link = identity.identity_login_links?.linkedin;
   await prisma.settings.update({
     where: { id: "singleton" },
-    data: { linkedinIdentityId: identity.uid },
+    data: { linkedinIdentityId: identity.uid, linkedinLoginLink: link ?? null, linkedinLoginLinkAt: link ? new Date() : null },
   });
-
-  const link = identity.identity_login_links?.linkedin;
   if (!link) throw new Error("A Edges não retornou o link de conexão.");
 
   revalidatePath("/settings");
@@ -99,7 +109,7 @@ export async function disconnectLinkedin() {
   if (settings.linkedinIdentityId) await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
   await prisma.settings.update({
     where: { id: "singleton" },
-    data: { linkedinIdentityId: null, linkedinNeedsReconnect: false, linkedinReconnectReason: null },
+    data: { linkedinIdentityId: null, linkedinLoginLink: null, linkedinLoginLinkAt: null, linkedinNeedsReconnect: false, linkedinReconnectReason: null },
   });
   revalidatePath("/", "layout");
 }
