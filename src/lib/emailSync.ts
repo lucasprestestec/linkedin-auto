@@ -2,6 +2,7 @@ import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fetchNewEmails } from "@/lib/email";
 import { markNeedsHuman } from "@/lib/handoff";
+import { captureContactsSafely } from "@/lib/contactCapture";
 
 // Lê a caixa do corretor e grava, na conversa certa, os e-mails de pessoas que
 // já estão no sistema (casando pelo e-mail da ficha). E-mail de quem não é
@@ -31,6 +32,7 @@ export async function syncEmailInbox(): Promise<{ read: number; saved: number; l
       data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, emailThreadId: e.threadId, deliveredAt: e.date },
     });
     saved++;
+    await captureContactsSafely(lead.id, e.text);
     // Respondeu: conversa aberta e sem follow-up pendente.
     const updated = await prisma.lead.update({
       where: { id: lead.id },

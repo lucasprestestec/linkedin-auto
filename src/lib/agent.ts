@@ -94,6 +94,9 @@ export interface LeadContext {
   tags?: string[];
   followUpsSent?: number;
   campaignName?: string | null;
+  // Canais que já temos dele (só se sabe se está preenchido; o número em si não entra no prompt).
+  phone?: string | null;
+  email?: string | null;
 }
 
 type HistoryItem = Pick<DbMessage, "sender" | "content"> & {
@@ -138,6 +141,9 @@ function leadBlock(lead: LeadContext): string {
   if (lead.status) lines.push(`Etapa: ${STAGE[lead.status]}`);
   if (lead.followUpsSent) lines.push(`Follow-ups já enviados sem resposta: ${lead.followUpsSent}`);
   if (lead.icpScore != null) lines.push(`Encaixe com o cliente ideal: ${lead.icpScore}/100`);
+  if (lead.phone !== undefined || lead.email !== undefined) {
+    lines.push(`Contatos na ficha: WhatsApp ${lead.phone ? "sim" : "não"}; e-mail ${lead.email ? "sim" : "não"}`);
+  }
   if (lead.tags?.length) lines.push(`Etiquetas do corretor: ${lead.tags.join(", ")}`);
   if (lead.personal?.trim()) lines.push(`Ficha pessoal (o que o corretor sabe dessa pessoa): ${lead.personal.trim().slice(0, 1200)}`);
   return lines.join("\n");
@@ -188,7 +194,7 @@ const RULES = `REGRAS FIXAS (valem acima de qualquer material)
 
 PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
-- quiser falar por telefone, WhatsApp ou e-mail, ou mandar um contato/número/e-mail;
+- pedir para ser chamado ou ligado agora (ex.: "me liga", "me chama no zap"): quem faz isso é o corretor;
 - propuser ou aceitar um dia/horário concreto para conversar (se ele só aceitou conversar, sem horário, NÃO é handoff: responda perguntando o melhor dia e horário e se prefere telefone ou vídeo);
 - perguntar se está falando com robô/IA/mensagem automática;
 - estiver irritado, reclamar, ameaçar denunciar ou fizer crítica séria;
@@ -196,6 +202,11 @@ PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - trouxer assunto sensível (sinistro, doença, caso jurídico), pergunta técnica que o material não responde, ou escrever em outro idioma;
 - fizer algo que você não consiga responder com segurança.
 O motivo do handoff deve ser curto e específico, para o corretor entender em 3 segundos (ex.: "Pediu cotação para 20 vidas").
+
+CONTATO (WhatsApp / e-mail)
+- Se o lead passar o próprio WhatsApp ou e-mail, ou disser que prefere falar por lá, NÃO é handoff: agradeça, diga que anotou e siga a conversa. O sistema já guarda o contato sozinho. Não prometa quando nem por qual canal vai chamar.
+- Se a ficha ainda não tem WhatsApp e o lead já demonstrou interesse, você pode perguntar UMA vez, com leveza, qual o melhor número para continuar por WhatsApp. Se ele ignorar ou recusar, não insista.
+- Número ou e-mail de OUTRA pessoa (assistente, sócio, indicação) continua sendo handoff.
 
 ENCERRAR SEM INSISTIR (declined = true): o lead disse claramente que não tem interesse, pediu para não receber mais mensagens, ou não é o público e não há o que fazer. Responda curto e cordial, sem nova pergunta. "Já tenho plano" ou "agora não" NÃO é recusa: trate como objeção, com leveza.
 

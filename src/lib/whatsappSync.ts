@@ -2,6 +2,7 @@ import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fetchWhatsappUpdates } from "@/lib/deskcomm";
 import { markNeedsHuman } from "@/lib/handoff";
+import { captureContactsSafely } from "@/lib/contactCapture";
 
 // Traz do Deskcomm as mensagens novas das conversas de WhatsApp que a
 // secretária abriu (só as conhecidas — o resto da caixa do CRM não é dela).
@@ -35,7 +36,10 @@ export async function syncWhatsapp(): Promise<{ checked: number; saved: number; 
         data: { leadId: lead.id, sender: inbound ? "LEAD" : "HUMAN", channel: "WHATSAPP", content: text, whatsappMessageId: m.id, deliveredAt: at },
       });
       saved++;
-      if (inbound) leadWrote = true;
+      if (inbound) {
+        leadWrote = true;
+        await captureContactsSafely(lead.id, text);
+      }
     }
     await prisma.lead.update({ where: { id: lead.id }, data: { whatsappLastAt: u.lastAt } });
     if (mediaOnly && !leadWrote) {

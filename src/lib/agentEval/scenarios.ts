@@ -273,8 +273,10 @@ export const SCENARIOS: Scenario[] = [
     category: "handoff",
     lead: L("Camila", "Ribeiro", "Head de Marketing · Orbit"),
     history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Manda mais informações no meu e-mail: camila@orbit.com.br" }],
-    expect: "handoff",
-    rubric: "Handoff com o e-mail no motivo. Não repetir o e-mail na mensagem ao lead.",
+    expect: "either",
+    rubric:
+      "O lead passou o e-mail e pediu material. Ou responde agradecendo e seguindo a conversa (sem prometer material que não existe, sem repetir o e-mail), " +
+      "ou passa pro corretor mencionando o pedido. Nunca inventa conteúdo de proposta.",
   },
   {
     id: "h11",
@@ -468,7 +470,48 @@ export const SCENARIOS: Scenario[] = [
     qualified: true,
     rubric: "Explica o processo em 1-2 frases (olha o plano atual, mostra opções) e propõe a conversa de 15 min.",
   },
+  // --- contato (captura de WhatsApp/e-mail na conversa)
+  {
+    id: "c01",
+    title: "Passa o WhatsApp por conta própria",
+    category: "avanço",
+    lead: L("Renata", "Alves", "Gerente de RH · Alves & Filhos", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Temos interesse sim. Pode falar comigo pelo WhatsApp: 51 99999-1234" }],
+    expect: "reply",
+    rubric:
+      "NÃO é handoff. Agradece, diz que anotou e segue a conversa (ex.: pergunta sobre o benefício atual). " +
+      "Não repete o número, não promete quando nem por qual canal vai chamar, não confirma horário.",
+  },
+  {
+    id: "c02",
+    title: "Interesse sem WhatsApp na ficha",
+    category: "avanço",
+    lead: L("Bruno", "Martins", "Sócio · Martins Logística", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Interessante. Hoje temos um plano, mas está caro. Como funciona a comparação?" }],
+    expect: "reply",
+    rubric:
+      "Explica a comparação em 1-2 frases sem citar preço. Pode perguntar, uma única vez e com leveza, qual o melhor número de WhatsApp para continuar. " +
+      "No máximo 2 perguntas no total.",
+  },
+  {
+    id: "c03",
+    title: "Passa o contato da assistente",
+    category: "handoff",
+    lead: L("Fernanda", "Rocha", "Diretora Administrativa · Rocha Têxtil", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Isso é com a minha assistente, a Paula. Fala com ela: 51 98888-7777" }],
+    expect: "handoff",
+    rubric: "Handoff: o contato é de OUTRA pessoa. O motivo cita que indicou a assistente Paula e o número.",
+  },
+  {
+    id: "c04",
+    title: "Pede para ser chamado no WhatsApp",
+    category: "handoff",
+    lead: L("Thiago", "Nunes", "CEO · Nunes Tech", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Me chama no zap agora, 51 97777-6666, prefiro resolver por lá" }],
+    expect: "handoff",
+    rubric: "Handoff: o lead pede contato imediato no WhatsApp, que é do corretor. Motivo cita o pedido e o número.",
+  },
 ];
 
 // Modo rápido: os cenários que mais separam um bom agente de um ruim.
-export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02"];
+export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02", "c01", "c03"];
