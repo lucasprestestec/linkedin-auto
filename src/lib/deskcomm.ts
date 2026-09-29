@@ -160,6 +160,17 @@ export interface SentWhatsapp {
   sentAt: Date;
 }
 
+// O Deskcomm grava a mensagem antes de entregar, então uma recusa (ex.: modo de
+// teste do canal) volta como chamada bem-sucedida com status "failed". Aqui
+// vira erro legível — levando a conversa, que já existe lá.
+export class WhatsappNotSentError extends DeskcommError {
+  constructor(public readonly conversationId: string) {
+    super(
+      "O Deskcomm recusou o envio. Se o número estiver em modo de teste, autorize o destino em Conexões → Configurar acesso da IA; o motivo aparece na conversa dentro do Deskcomm.",
+    );
+  }
+}
+
 // Manda uma mensagem pro número da ficha. Primeira vez abre a conversa no
 // canal configurado; depois segue na mesma conversa.
 export async function sendWhatsapp(input: { conversationId: string | null; phone: string; name: string | null; body: string; idempotencyKey: string }): Promise<SentWhatsapp> {
@@ -167,21 +178,23 @@ export async function sendWhatsapp(input: { conversationId: string | null; phone
   if (!cfg) throw new DeskcommError("WhatsApp (Deskcomm) não conectado.");
   return withClient(cfg, async (client) => {
     if (input.conversationId) {
-      const r = await client.call<{ message_id: string; sent_at?: string | null }>("crm_send_whatsapp_message", {
+      const r = await client.call<{ message_id: string; status?: string; sent_at?: string | null }>("crm_send_whatsapp_message", {
         conversation_id: input.conversationId,
         body: input.body,
         idempotency_key: input.idempotencyKey,
       });
+      if (r.status === "failed") throw new WhatsappNotSentError(input.conversationId);
       return { conversationId: input.conversationId, messageId: r.message_id, sentAt: r.sent_at ? new Date(r.sent_at) : new Date() };
     }
     if (!cfg.channelId) throw new DeskcommError("Falta escolher o número (canal) do Deskcomm de onde as conversas novas saem. Veja em Canais.");
-    const r = await client.call<{ conversation_id: string; message_id: string; sent_at?: string | null }>("crm_start_conversation_and_send", {
+    const r = await client.call<{ conversation_id: string; message_id: string; status?: string; sent_at?: string | null }>("crm_start_conversation_and_send", {
       channel_session_id: cfg.channelId,
       phone_number: `+${input.phone.replace(/\D/g, "")}`,
       ...(input.name ? { name: input.name } : {}),
       body: input.body,
       idempotency_key: input.idempotencyKey,
     });
+    if (r.status === "failed") throw new WhatsappNotSentError(r.conversation_id);
     return { conversationId: r.conversation_id, messageId: r.message_id, sentAt: r.sent_at ? new Date(r.sent_at) : new Date() };
   });
 }
