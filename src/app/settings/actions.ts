@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
 import { sendPush } from "@/lib/push";
 import { validFollowUp } from "@/lib/settings-ranges";
+import { disconnectGoogle } from "@/lib/gmail";
 
 // Quanto tempo um link de login ainda não usado é reaproveitado. Depois disso
 // (ou se a pessoa pedir um link novo), a identidade pendente é trocada.
@@ -112,4 +113,10 @@ export async function disconnectLinkedin() {
     data: { linkedinIdentityId: null, linkedinLoginLink: null, linkedinLoginLinkAt: null, linkedinNeedsReconnect: false, linkedinReconnectReason: null },
   });
   revalidatePath("/", "layout");
+}
+
+// E-mail do Google: revoga o acesso e para de enviar/ler por lá.
+export async function disconnectEmail() {
+  await disconnectGoogle();
+  revalidatePath("/settings");
 }

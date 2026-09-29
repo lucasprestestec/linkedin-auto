@@ -1,27 +1,20 @@
+import { randomBytes } from "crypto";
 import type { Lead, MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
-import { emailEnabled, sendEmail } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
 
 // Um lugar só pra "mandar uma mensagem pra essa pessoa por este canal" e
 // gravar no histórico. A secretária decide O QUE e ONDE; aqui é só o COMO.
 
 export const CHANNEL_LABEL: Record<MessageChannel, string> = { LINKEDIN: "LinkedIn", EMAIL: "E-mail", WHATSAPP: "WhatsApp" };
 
-// Canais que dá pra usar com essa pessoa agora.
-export function availableChannels(lead: Pick<Lead, "linkedinProfileUrl" | "email" | "phone">, opts: { linkedinConnected: boolean }): MessageChannel[] {
-  const list: MessageChannel[] = [];
-  if (opts.linkedinConnected && lead.linkedinProfileUrl) list.push("LINKEDIN");
-  if (emailEnabled() && lead.email) list.push("EMAIL");
-  return list;
-}
-
-// Assunto da resposta: "Re: <assunto do último e-mail da conversa>".
-async function replyThread(leadId: string): Promise<{ subject: string; inReplyTo: string | null; references: string[] }> {
+// Assunto e thread da resposta: "Re: <assunto do último e-mail da conversa>".
+async function replyThread(leadId: string) {
   const thread = await prisma.message.findMany({
     where: { leadId, channel: "EMAIL" },
     orderBy: { deliveredAt: "asc" },
-    select: { subject: true, emailMessageId: true },
+    select: { subject: true, emailMessageId: true, emailThreadId: true },
   });
   const last = thread.at(-1);
   const base = (last?.subject ?? "").replace(/^((re|res|fw|fwd|enc):\s*)+/i, "").trim();
@@ -29,6 +22,7 @@ async function replyThread(leadId: string): Promise<{ subject: string; inReplyTo
     subject: base ? `Re: ${base}` : "Nossa conversa",
     inReplyTo: last?.emailMessageId ?? null,
     references: thread.map((m) => m.emailMessageId).filter((x): x is string => Boolean(x)),
+    threadId: thread.findLast((m) => m.emailThreadId)?.emailThreadId ?? null,
   };
 }
 
@@ -50,9 +44,11 @@ export async function sendOnChannel(
     if (!lead.email) throw new Error("Essa pessoa não tem e-mail na ficha.");
     const thread = await replyThread(lead.id);
     const subject = opts.subject?.trim() || thread.subject;
-    const r = await sendEmail({ to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references });
+    // Código único da imagem invisível: quando ela carrega, o e-mail foi aberto.
+    const openToken = randomBytes(18).toString("base64url");
+    const r = await sendEmail({ to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken });
     return prisma.message.create({
-      data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, deliveredAt: r.date },
+      data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date },
     });
   }
   throw new Error("WhatsApp ainda não está conectado.");

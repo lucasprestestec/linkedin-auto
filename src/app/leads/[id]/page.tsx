@@ -87,7 +87,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const highIntent = lead.icpScore != null && lead.icpScore >= 70;
   // Canais do composer: LinkedIn sempre; e-mail se a caixa está configurada e a
   // ficha tem e-mail. Começa no canal em que a pessoa escreveu por último.
-  const replyChannels: ("LINKEDIN" | "EMAIL")[] = emailEnabled() && lead.email ? ["LINKEDIN", "EMAIL"] : ["LINKEDIN"];
+  const replyChannels: ("LINKEDIN" | "EMAIL")[] = lead.email && (await emailEnabled()) ? ["LINKEDIN", "EMAIL"] : ["LINKEDIN"];
   const lastLeadChannel = lead.messages.findLast((m) => m.sender === "LEAD")?.channel;
   const replyDefault = lastLeadChannel === "EMAIL" ? "EMAIL" : "LINKEDIN";
 
@@ -193,6 +193,13 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 {message.channel === "EMAIL" && (
                   <div className="msg-channel">
                     <IconMail size={12} /> E-mail{message.subject ? ` · ${message.subject}` : ""}
+                    {!fromLead && message.openToken && (
+                      <span className={message.openCount > 0 ? "open-badge opened" : "open-badge"}>
+                        {message.openCount > 0
+                          ? `Aberto${message.openCount > 1 ? ` ${message.openCount}x` : ""} · ${dayLabel(message.lastOpenedAt!)} ${clockTime(message.lastOpenedAt!)}`
+                          : "Não aberto"}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="bubble">{message.content}</div>

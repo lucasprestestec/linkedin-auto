@@ -1182,6 +1182,39 @@ html:root:not([data-lux="off"]) .handoff-card {
   justify-content: flex-end;
 }
 
+.open-badge {
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.open-badge.opened {
+  border-color: rgba(63, 208, 122, 0.4);
+  background: rgba(63, 208, 122, 0.1);
+  color: #3fd07a;
+}
+
+.mail-mark {
+  background: rgba(216, 178, 122, 0.12);
+  color: var(--gold);
+}
+
+.google-btn {
+  gap: 10px;
+}
+
+.google-btn svg {
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px;
+  width: 22px;
+  height: 22px;
+}
+
 /* Ficha pessoal */
 .profile-line {
   display: flex;

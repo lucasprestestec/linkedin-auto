@@ -174,7 +174,7 @@ async function sendFollowUps(
       const history = await prisma.message.findMany({
         where: { leadId: lead.id },
         orderBy: { deliveredAt: "asc" },
-        select: { sender: true, content: true, deliveredAt: true, channel: true },
+        select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true },
       });
       // Retoma no canal em que a conversa parou (e-mail continua por e-mail).
       const channel = lead.messages[0].channel === "EMAIL" ? "EMAIL" : "LINKEDIN";

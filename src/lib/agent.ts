@@ -96,7 +96,13 @@ export interface LeadContext {
   campaignName?: string | null;
 }
 
-type HistoryItem = Pick<DbMessage, "sender" | "content"> & { deliveredAt?: Date; channel?: MessageChannel };
+type HistoryItem = Pick<DbMessage, "sender" | "content"> & {
+  deliveredAt?: Date;
+  channel?: MessageChannel;
+  // E-mails enviados com rastreio: quantas vezes a imagem de abertura carregou.
+  openToken?: string | null;
+  openCount?: number;
+};
 
 const CHANNEL_NAME: Record<MessageChannel, string> = { LINKEDIN: "LinkedIn", EMAIL: "e-mail", WHATSAPP: "WhatsApp" };
 
@@ -141,7 +147,8 @@ function transcriptOf(history: HistoryItem[]): string {
     .map((m) => {
       const who = m.sender === "LEAD" ? "LEAD" : m.sender === "AGENT" ? "VOCÊ (automático)" : "VOCÊ (corretor digitou)";
       const date = m.deliveredAt ? m.deliveredAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TIME_ZONE }) : "";
-      const tag = [date, m.channel && m.channel !== "LINKEDIN" ? CHANNEL_NAME[m.channel] : ""].filter(Boolean).join(", ");
+      const opened = m.sender !== "LEAD" && m.openToken ? (m.openCount ? `aberto ${m.openCount}x` : "ainda não aberto") : "";
+      const tag = [date, m.channel && m.channel !== "LINKEDIN" ? CHANNEL_NAME[m.channel] : "", opened].filter(Boolean).join(", ");
       return `${who}${tag ? ` [${tag}]` : ""}: ${m.content}`;
     })
     .join("\n");
@@ -154,6 +161,7 @@ const STYLE = `COMO ESCREVER
 - Espelhe o tom do lead: se ele é breve, seja breve; se é formal, seja um pouco mais formal. Emoji só se ele usou (no máximo 1).
 - Não repita o nome do lead em toda mensagem, não repita frases que já mandou, não comece com "Ótima pergunta", "Perfeito!" ou elogios vazios.
 - Sem listas, negrito, links ou assinatura. Sem "[Nome]" ou campos a preencher.
+- E-MAIL ABERTO: o histórico pode marcar e-mails como "aberto Nx" ou "ainda não aberto". É só um indício (alguns apps abrem sozinhos, outros bloqueiam) e serve pra VOCÊ calibrar o tom e a insistência. Nunca diga ou insinue que sabe que a pessoa abriu ou leu.
 - FICHA PESSOAL: se houver, use no máximo UM detalhe por mensagem e só quando encaixar com naturalidade (ex.: na abertura, numa retomada, no aniversário). Nunca diga que tem ficha/anotações. Nada delicado (saúde, problemas pessoais, família em dificuldade) se o lead não trouxe o assunto.
 - O objetivo é entender a situação do lead e, no ritmo dele, chegar a um próximo passo concreto com o corretor (uma conversa rápida). Não empurre.
 

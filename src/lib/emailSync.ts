@@ -1,6 +1,6 @@
 import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { emailEnabled, fetchNewEmails } from "@/lib/email";
+import { fetchNewEmails } from "@/lib/email";
 import { markNeedsHuman } from "@/lib/handoff";
 
 // Lê a caixa do corretor e grava, na conversa certa, os e-mails de pessoas que
@@ -8,7 +8,6 @@ import { markNeedsHuman } from "@/lib/handoff";
 // lead é ignorado: a caixa é pessoal, não uma fila de atendimento.
 // Devolve os leads que escreveram, pra secretária responder.
 export async function syncEmailInbox(): Promise<{ read: number; saved: number; leads: Lead[] }> {
-  if (!emailEnabled()) return { read: 0, saved: 0, leads: [] };
   const emails = await fetchNewEmails();
   if (emails.length === 0) return { read: 0, saved: 0, leads: [] };
 
@@ -29,7 +28,7 @@ export async function syncEmailInbox(): Promise<{ read: number; saved: number; l
       continue;
     }
     await prisma.message.create({
-      data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, deliveredAt: e.date },
+      data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, emailThreadId: e.threadId, deliveredAt: e.date },
     });
     saved++;
     // Respondeu: conversa aberta e sem follow-up pendente.

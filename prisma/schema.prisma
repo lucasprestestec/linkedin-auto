@@ -125,6 +125,14 @@ model Message {
   // E-mail: Message-ID (dedupe e resposta na mesma thread) e assunto.
   emailMessageId String? @unique
   subject   String?
+  // Gmail: conversa (thread) em que a mensagem está, pra responder nela.
+  emailThreadId String?
+  // Rastreio de abertura dos e-mails enviados (imagem invisível). Sinal fraco:
+  // alguns apps abrem sozinhos (Apple Mail), outros bloqueiam imagens (Outlook).
+  openToken    String?   @unique
+  openCount    Int       @default(0)
+  firstOpenedAt DateTime?
+  lastOpenedAt  DateTime?
   deliveredAt DateTime
   createdAt DateTime      @default(now())
 }
@@ -166,7 +174,12 @@ model Settings {
   archiveLostEnabled     Boolean @default(false)
   receivedInvitesCheckedAt DateTime?
   withdrawCheckedAt        DateTime?
-  // Caixa de e-mail (IMAP): último UID lido, pra não reprocessar.
+  // E-mail conectado com "Entrar com Google": endereço, refresh token
+  // (criptografado com SESSION_SECRET) e até onde a caixa já foi lida.
+  googleEmail         String?
+  googleRefreshToken  String? @db.Text
+  googleHistoryId     String?
+  // Plano B (senha de app via variáveis de ambiente, IMAP): último UID lido.
   emailLastUid        Int?
   emailUidValidity    String?
   linkedinNeedsReconnect Boolean @default(false)

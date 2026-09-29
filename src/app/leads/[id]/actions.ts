@@ -92,7 +92,7 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
 async function leadWithHistory(leadId: string) {
   return prisma.lead.findUniqueOrThrow({
     where: { id: leadId },
-    include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true, deliveredAt: true, channel: true } } },
+    include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true } } },
   });
 }
 

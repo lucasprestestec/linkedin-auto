@@ -17,7 +17,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     prisma.message.findMany({
       where: { leadId: lead.id },
       orderBy: { deliveredAt: "asc" },
-      select: { sender: true, content: true, deliveredAt: true, channel: true },
+      select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true },
     }),
     lead.campaignId ? prisma.campaign.findUnique({ where: { id: lead.campaignId }, select: { name: true } }) : null,
   ]);
