@@ -1,8 +1,9 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import type { Lead, MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
 import { sendEmail } from "@/lib/email";
+import { sendWhatsapp } from "@/lib/deskcomm";
 
 // Um lugar só pra "mandar uma mensagem pra essa pessoa por este canal" e
 // gravar no histórico. A secretária decide O QUE e ONDE; aqui é só o COMO.
@@ -51,5 +52,23 @@ export async function sendOnChannel(
       data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date },
     });
   }
-  throw new Error("WhatsApp ainda não está conectado.");
+  if (channel === "WHATSAPP") {
+    if (!lead.phone) throw new Error("Essa pessoa não tem WhatsApp na ficha.");
+    const r = await sendWhatsapp({
+      conversationId: lead.whatsappConversationId,
+      phone: lead.phone,
+      name: [lead.firstName, lead.lastName].filter(Boolean).join(" ") || null,
+      body: content,
+      // Mesmo texto pra mesma pessoa no mesmo minuto = não reenvia (retry).
+      idempotencyKey: `la-${lead.id}-${createHash("sha256").update(content).digest("hex").slice(0, 16)}-${Math.floor(Date.now() / 60000)}`,
+    });
+    if (r.conversationId !== lead.whatsappConversationId) {
+      // Conversa nova: a leitura começa daqui (o que havia antes no CRM não é resposta a nós).
+      await prisma.lead.update({ where: { id: lead.id }, data: { whatsappConversationId: r.conversationId, whatsappLastAt: r.sentAt } });
+    }
+    return prisma.message.create({
+      data: { leadId: lead.id, sender, channel, content, whatsappMessageId: r.messageId, deliveredAt: r.sentAt },
+    });
+  }
+  throw new Error("Canal desconhecido.");
 }

@@ -21,7 +21,7 @@ export interface DailyReport {
   since: Date;
   invites: number;
   accepted: number;
-  sent: Record<"LINKEDIN" | "EMAIL", number>;
+  sent: Record<MessageChannel, number>;
   sentByYou: number;
   replies: { leadId: string; name: string; channel: MessageChannel }[];
   opens: { leadId: string; name: string; count: number }[];
@@ -58,7 +58,7 @@ export async function dailyReport(since = startOfLocalDay()): Promise<DailyRepor
     }),
   ]);
 
-  const sent = { LINKEDIN: 0, EMAIL: 0 };
+  const sent: Record<MessageChannel, number> = { LINKEDIN: 0, EMAIL: 0, WHATSAPP: 0 };
   let sentByYou = 0;
   const replies = new Map<string, { leadId: string; name: string; channel: MessageChannel }>();
   const timeline: TimelineItem[] = [];
@@ -69,7 +69,7 @@ export async function dailyReport(since = startOfLocalDay()): Promise<DailyRepor
       replies.set(m.lead.id, { leadId: m.lead.id, name, channel: m.channel });
       timeline.push({ at: m.createdAt, kind: "reply", leadId: m.lead.id, name, text: `respondeu pelo ${CHANNEL[m.channel]}` });
     } else if (m.sender === "AGENT") {
-      if (m.channel === "LINKEDIN" || m.channel === "EMAIL") sent[m.channel]++;
+      sent[m.channel]++;
       timeline.push({ at: m.createdAt, kind: "sent", leadId: m.lead.id, name, text: `a secretária escreveu pelo ${CHANNEL[m.channel]}` });
     } else {
       sentByYou++;
@@ -131,7 +131,7 @@ function names(list: { name: string }[], max = 3) {
 export function reportHeadline(r: DailyReport): string {
   const parts = [
     r.invites && plural(r.invites, "convite", "convites"),
-    r.sent.LINKEDIN + r.sent.EMAIL && plural(r.sent.LINKEDIN + r.sent.EMAIL, "mensagem", "mensagens"),
+    r.sent.LINKEDIN + r.sent.EMAIL + r.sent.WHATSAPP && plural(r.sent.LINKEDIN + r.sent.EMAIL + r.sent.WHATSAPP, "mensagem", "mensagens"),
     r.replies.length && plural(r.replies.length, "resposta", "respostas"),
     r.opens.length && plural(r.opens.length, "e-mail aberto", "e-mails abertos"),
     r.needYou.length && `${r.needYou.length} precisa${r.needYou.length === 1 ? "" : "m"} de você`,
@@ -144,7 +144,7 @@ export function reportText(r: DailyReport, ownerFirstName: string | null, appUrl
   const lines: string[] = [`Oi${ownerFirstName ? `, ${ownerFirstName}` : ""}! Aqui vai o resumo do dia da sua secretária.`, ""];
   lines.push(`• Convites enviados no LinkedIn: ${r.invites}`);
   if (r.accepted) lines.push(`• Aceitaram o convite: ${r.accepted}`);
-  lines.push(`• Mensagens da secretária: ${r.sent.LINKEDIN} no LinkedIn, ${r.sent.EMAIL} por e-mail`);
+  lines.push(`• Mensagens da secretária: ${r.sent.LINKEDIN} no LinkedIn, ${r.sent.EMAIL} por e-mail, ${r.sent.WHATSAPP} no WhatsApp`);
   if (r.replies.length) lines.push(`• Responderam: ${names(r.replies, 6)}`);
   if (r.opens.length) lines.push(`• Abriram seu e-mail: ${names(r.opens, 6)}`);
   if (r.qualified.length) lines.push(`• Viraram oportunidade: ${names(r.qualified, 6)}`);

@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconChat, IconClock, IconEye, IconSparkles } from "@/components/Icons";
+import { IconClock, IconEye, IconSparkles } from "@/components/Icons";
 import { emailConnection } from "@/lib/email";
-import { emailsSentToday, messagesSentToday } from "@/lib/limits";
+import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { WhatsappCard } from "./WhatsappCard";
 import { EmailCard } from "../settings/EmailCard";
 import { EmailChannelOptions } from "./EmailChannelOptions";
 import { LinkedinCard, linkedinStatus } from "./LinkedinCard";
@@ -23,11 +24,12 @@ async function emailWeek() {
 export default async function ChannelsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const emailResult = (await searchParams).email;
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [status, email, linkedinToday, emailToday, { sentWeek, openedWeek }] = await Promise.all([
+  const [status, email, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }] = await Promise.all([
     linkedinStatus(settings),
     emailConnection(),
     messagesSentToday(),
     emailsSentToday(),
+    whatsappSentToday(),
     emailWeek(),
   ]);
 
@@ -72,23 +74,13 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
 
         <section className="group rise">
           <h2 className="group-title">WhatsApp</h2>
-          <section className="card card-pad connection" aria-label="WhatsApp">
-            <div className="row" style={{ gap: 14 }}>
-              <span className="li-mark wa-mark">
-                <IconChat size={24} />
-              </span>
-              <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
-                <span className="title-md">WhatsApp</span>
-                <span className="row small faint" style={{ fontWeight: 700 }}>
-                  Em breve
-                </span>
-              </div>
-            </div>
-            <p className="small muted">
-              Vai funcionar pelo seu número, conectado ao Deskcomm. Por segurança, a secretária só usa o WhatsApp com quem já deu algum sinal de
-              interesse — mensagem fria no WhatsApp pode bloquear o número.
-            </p>
-          </section>
+          <WhatsappCard
+            host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
+            channelId={settings.deskcommChannelId}
+            enabled={settings.whatsappChannelEnabled}
+            dailyLimit={settings.dailyWhatsappLimit}
+            sentToday={whatsappToday}
+          />
         </section>
 
         <section className="group rise">

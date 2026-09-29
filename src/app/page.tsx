@@ -128,7 +128,7 @@ function listNames(names: string[]) {
 
 export default async function HomePage() {
   const { report, settings, conversations, levas, remaining, messagesToday, invitesToday, kpis, spark } = await getData();
-  const sentToday = report.sent.LINKEDIN + report.sent.EMAIL;
+  const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
 
@@ -341,7 +341,11 @@ export default async function HomePage() {
               <div>
                 <dd>{sentToday}</dd>
                 <dt>mensagens</dt>
-                {report.sent.EMAIL > 0 && <span className="today-note">{report.sent.EMAIL} por e-mail</span>}
+                {report.sent.EMAIL + report.sent.WHATSAPP > 0 && (
+                  <span className="today-note">
+                    {[report.sent.EMAIL && `${report.sent.EMAIL} e-mail`, report.sent.WHATSAPP && `${report.sent.WHATSAPP} WhatsApp`].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </div>
               <div>
                 <dd>{report.replies.length}</dd>

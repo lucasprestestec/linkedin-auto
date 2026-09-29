@@ -16,7 +16,8 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
 
   // Canal escolhido no composer; se não vier (ou não for válido), LinkedIn.
-  const channel: MessageChannel = formData.get("channel") === "EMAIL" ? "EMAIL" : "LINKEDIN";
+  const raw = formData.get("channel");
+  const channel: MessageChannel = raw === "EMAIL" || raw === "WHATSAPP" ? raw : "LINKEDIN";
 
   try {
     const identityId = channel === "LINKEDIN" ? await activeIdentityIdOrNull() : null;
@@ -110,7 +111,7 @@ export async function suggestLeadReply(leadId: string, channel: MessageChannel =
   try {
     const lead = await leadWithHistory(leadId);
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-    return { text: await suggestReply(await instructionsFor(lead, settings), lead, lead.messages, channel === "EMAIL" ? "EMAIL" : "LINKEDIN") };
+    return { text: await suggestReply(await instructionsFor(lead, settings), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN") };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
   }

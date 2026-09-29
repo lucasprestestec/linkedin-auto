@@ -91,8 +91,8 @@ export default async function SettingsPage() {
                 <span className={email ? "chip on" : "chip"}>
                   <IconMail size={13} /> {email ? "Conectado" : "Opcional"}
                 </span>
-                <span className="chip">
-                  <IconChat size={13} /> Em breve
+                <span className={settings.deskcommUrl ? "chip on" : "chip"}>
+                  <IconChat size={13} /> {settings.deskcommUrl ? "Conectado" : "Opcional"}
                 </span>
               </span>
             </span>

@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import {
   IconArrowLeft,
   IconBuilding,
+  IconChat,
   IconCheckCheck,
   IconFlame,
   IconLinkedin,
@@ -30,6 +31,7 @@ import { describeRule, followUpRuleFor } from "@/lib/followupPolicy";
 import { DetailsToggle, LeadWorkspace } from "./LeadWorkspace";
 import { ConversationList } from "@/components/ConversationList";
 import { emailEnabled } from "@/lib/email";
+import { deskcommConfigOf } from "@/lib/deskcomm";
 import { getConversationItems } from "@/lib/conversations";
 
 export const dynamic = "force-dynamic";
@@ -87,9 +89,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const highIntent = lead.icpScore != null && lead.icpScore >= 70;
   // Canais do composer: LinkedIn sempre; e-mail se a caixa está configurada e a
   // ficha tem e-mail. Começa no canal em que a pessoa escreveu por último.
-  const replyChannels: ("LINKEDIN" | "EMAIL")[] = lead.email && (await emailEnabled()) ? ["LINKEDIN", "EMAIL"] : ["LINKEDIN"];
-  const lastLeadChannel = lead.messages.findLast((m) => m.sender === "LEAD")?.channel;
-  const replyDefault = lastLeadChannel === "EMAIL" ? "EMAIL" : "LINKEDIN";
+  const replyChannels: ("LINKEDIN" | "EMAIL" | "WHATSAPP")[] = ["LINKEDIN"];
+  if (lead.email && (await emailEnabled())) replyChannels.push("EMAIL");
+  if (lead.phone && deskcommConfigOf(settings)) replyChannels.push("WHATSAPP");
+  const lastLeadChannel = lead.messages.findLast((m) => m.sender === "LEAD")?.channel ?? "LINKEDIN";
 
   // ---- Atividades: linha do tempo montada com o que já está no banco ----
   const firstOut = lead.messages.find((m) => m.sender !== "LEAD");
@@ -190,6 +193,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 </span>
               )}
               <div className="msg-body">
+                {message.channel === "WHATSAPP" && (
+                  <div className="msg-channel">
+                    <IconChat size={12} /> WhatsApp
+                  </div>
+                )}
                 {message.channel === "EMAIL" && (
                   <div className="msg-channel">
                     <IconMail size={12} /> E-mail{message.subject ? ` · ${message.subject}` : ""}
@@ -375,7 +383,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 firstName={firstName}
                 profileUrl={lead.linkedinProfileUrl}
                 channels={replyChannels}
-                defaultChannel={replyDefault}
+                defaultChannel={lastLeadChannel}
               />}
           />
         </div>

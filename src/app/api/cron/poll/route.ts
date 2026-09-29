@@ -8,6 +8,8 @@ import { runProactive } from "@/lib/followup";
 import { isWithinWorkHours } from "@/lib/schedule";
 import { prisma } from "@/lib/prisma";
 import { syncEmailInbox } from "@/lib/emailSync";
+import { syncWhatsapp } from "@/lib/whatsappSync";
+import { deskcommConfigOf } from "@/lib/deskcomm";
 import { maybeSendDailySummary } from "@/lib/dailySummary";
 
 // Geração de texto + envio por lead somam alguns segundos; a parte proativa é
@@ -40,7 +42,20 @@ export async function GET(request: Request) {
     email.error = err instanceof Error ? err.message : "erro desconhecido";
   }
 
-  // Canais independentes: sem LinkedIn conectado, o e-mail segue sozinho.
+  // WhatsApp (Deskcomm): mesmas regras do e-mail — grava e responde no canal.
+  let whatsapp: { checked: number; saved: number; error?: string } = { checked: 0, saved: 0 };
+  if (deskcommConfigOf(settings)) {
+    try {
+      const r = await syncWhatsapp();
+      whatsapp = { checked: r.checked, saved: r.saved };
+      if (canReplyNow) for (const lead of r.leads) await handleIncomingMessage(lead, identityId);
+    } catch (err) {
+      console.error("Falha ao ler o WhatsApp (Deskcomm)", err);
+      whatsapp.error = err instanceof Error ? err.message : "erro desconhecido";
+    }
+  }
+
+  // Canais independentes: sem LinkedIn conectado, e-mail e WhatsApp seguem sozinhos.
   const conversations = identityId ? await extractConversations(identityId) : [];
   let updatedLeads = 0;
   let newIncomingMessages = 0;
@@ -86,5 +101,5 @@ export async function GET(request: Request) {
     summary = { error: err instanceof Error ? err.message : "erro desconhecido" };
   }
 
-  return NextResponse.json({ summary, email, linkedin: identityId ? "conectado" : "não conectado", updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
+  return NextResponse.json({ summary, email, whatsapp, linkedin: identityId ? "conectado" : "não conectado", updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
 }

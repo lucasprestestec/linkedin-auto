@@ -22,7 +22,7 @@ export async function maybeSendDailySummary(settings: Settings, now = new Date()
 
   const report = await dailyReport();
   const quiet =
-    !report.invites && !report.accepted && !report.sent.LINKEDIN && !report.sent.EMAIL && !report.replies.length && !report.opens.length && !report.needYou.length;
+    !report.invites && !report.accepted && !report.sent.LINKEDIN && !report.sent.EMAIL && !report.sent.WHATSAPP && !report.replies.length && !report.opens.length && !report.needYou.length;
   if (quiet) return { sent: false, reason: "dia sem novidades" };
 
   const headline = reportHeadline(report);
