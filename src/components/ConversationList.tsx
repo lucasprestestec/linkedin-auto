@@ -61,7 +61,7 @@ export function ConversationList({
       {pane && (
         <div className="conv-pane-head only-desktop">
           <h2 className="display">Conversas</h2>
-          <Link href="/prospect" className="square-btn brand" aria-label="Adicionar pessoas" title="Adicionar pessoas">
+          <Link href="/contacts/new" className="square-btn brand" aria-label="Adicionar contato" title="Adicionar contato">
             <IconPlus size={18} />
           </Link>
         </div>

@@ -36,6 +36,7 @@ export async function sendOnChannel(
   const sender = opts.sender ?? "AGENT";
   if (channel === "LINKEDIN") {
     if (!opts.identityId) throw new Error("Nenhuma conta do LinkedIn conectada.");
+    if (!lead.linkedinProfileUrl) throw new Error("Essa pessoa não tem LinkedIn. Preencha o e-mail ou o WhatsApp na ficha pessoal (e conecte o canal em Canais).");
     const r = await sendMessage(opts.identityId, lead.linkedinProfileUrl, content);
     return prisma.message.create({
       data: { leadId: lead.id, sender, channel, content, linkedinMessageId: r.linkedin_message_id, deliveredAt: new Date(r.delivered_at) },

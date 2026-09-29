@@ -2,7 +2,7 @@ import type { Lead, MessageChannel, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
 import { extractConnections, type EdgesConnection } from "@/lib/edges";
-import { decideNextStep, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
+import { decideNextStep, generateFirstContact, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { emailEnabled } from "@/lib/email";
@@ -31,6 +31,7 @@ export interface ProactiveResult {
   repliesSent: number;
   openingsSent: number;
   introEmailsSent: number;
+  firstContactsSent: number;
   followUpsSent: number;
   waiting: number;
   markedLost: number;
@@ -49,7 +50,7 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
   if (Date.now() - checkedAt < CONNECTIONS_CHECK_INTERVAL_MS) return 0;
 
   // Convite pendente = ainda não conectado (pode estar conversando por e-mail).
-  const pending = await prisma.lead.findMany({ where: { linkedinConnected: false, status: { not: "LOST" } } });
+  const pending = await prisma.lead.findMany({ where: { linkedinConnected: false, linkedinProfileUrl: { not: null }, status: { not: "LOST" } } });
   if (pending.length === 0) return 0;
 
   // Marca a checagem antes de chamar: se a chamada falhar, não tenta de novo
@@ -209,6 +210,44 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
       sent++;
     } catch (err) {
       await markNeedsHuman(lead.id, `Falha ao enviar o e-mail de apresentação: ${errorMessage(err)}`);
+    }
+  }
+  return sent;
+}
+
+// Contato adicionado à mão com "a secretária faz o primeiro contato": ela se
+// apresenta no canal escolhido (e-mail ou WhatsApp), dentro do horário e dos
+// limites de cada canal. Depois disso segue o fluxo normal de retomadas.
+async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WHATSAPP: boolean }, budget: Budget): Promise<number> {
+  if (budget.total <= 0) return 0;
+  const leads = await prisma.lead.findMany({
+    where: { status: "NEW", firstContactChannel: { in: ["EMAIL", "WHATSAPP"] }, messages: { none: {} }, ...IN_ACTIVE_CAMPAIGN },
+    orderBy: { createdAt: "asc" },
+  });
+  const rules = parseExclusionList(settings.exclusionList);
+  let sent = 0;
+  for (const lead of leads) {
+    const channel = lead.firstContactChannel as "EMAIL" | "WHATSAPP";
+    if (budget.total <= 0) break;
+    if (!ready[channel] || budget[channel] <= 0) continue;
+    if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
+    try {
+      const content = await generateFirstContact(await instructionsFor(lead, settings), lead, channel);
+      await sendOnChannel(lead, channel, content, channel === "EMAIL" ? { subject: `Tudo bem, ${lead.firstName ?? ""}?`.replace(" ?", "?") } : {});
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          status: "WAITING_REPLY",
+          firstContactChannel: null,
+          followUpsSent: 0,
+          nextStep: `Fiz o primeiro contato por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"}.`,
+          nextStepAt: null,
+        },
+      });
+      spend(budget, channel);
+      sent++;
+    } catch (err) {
+      await markNeedsHuman(lead.id, `Falha no primeiro contato por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"}: ${errorMessage(err)}`);
     }
   }
   return sent;
@@ -393,7 +432,7 @@ export async function emailChannelReady(settings: Settings): Promise<boolean> {
 }
 
 export async function runProactive(identityId: string | null): Promise<ProactiveResult> {
-  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0 };
+  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // Mesmas travas do handleIncomingMessage: pausado, nada acontece sozinho.
@@ -428,6 +467,22 @@ export async function runProactive(identityId: string | null): Promise<Proactive
 
   if (identityId) result.openingsSent = await sendOpenings(identityId, settings, budget);
   result.introEmailsSent = await sendIntroEmails(settings, emailReady, budget);
+  // Pedido explícito do corretor: vale com o canal conectado, mesmo que a
+  // secretária não use aquele canal por conta própria.
+  const firstBudget: Budget = {
+    ...budget,
+    EMAIL: emailReady ? budget.EMAIL : Math.max(0, settings.dailyEmailLimit - (await emailsSentToday())),
+    WHATSAPP: whatsappReady ? budget.WHATSAPP : Math.max(0, settings.dailyWhatsappLimit - (await whatsappSentToday())),
+  };
+  result.firstContactsSent = await sendFirstContacts(
+    settings,
+    { EMAIL: await emailEnabled(), WHATSAPP: deskcommConfigOf(settings) !== null },
+    firstBudget,
+  );
+  // O que saiu no primeiro contato conta pro resto da rodada.
+  budget.total = firstBudget.total;
+  if (emailReady) budget.EMAIL = firstBudget.EMAIL;
+  if (whatsappReady) budget.WHATSAPP = firstBudget.WHATSAPP;
 
   const followUps = await sendFollowUps(identityId, settings, emailReady, whatsappReady, budget);
   result.followUpsSent = followUps.sent;

@@ -66,7 +66,8 @@ const LINKEDIN_PROFILE_URL = /^https?:\/\/(?:[a-z]{2,3}\.|www\.)?linkedin\.com\/
 // É o que dá pra comparar entre fontes diferentes (link colado pelo corretor,
 // callback do convite, conversa extraída pela edges.run), que variam em
 // www/subdomínio, barra final, query string e caixa.
-export function linkedinProfileSlug(raw: string): string | null {
+export function linkedinProfileSlug(raw: string | null | undefined): string | null {
+  if (!raw) return null;
   const match = raw.trim().match(LINKEDIN_PROFILE_URL);
   if (!match) return null;
   try {

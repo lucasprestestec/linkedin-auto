@@ -1,6 +1,7 @@
 import type { LeadStatus } from "@prisma/client";
 
 export const STATUS_LABEL: Record<LeadStatus, string> = {
+  NEW: "Novo contato",
   NEEDS_HUMAN: "Precisa de você",
   CONVERSATION_OPEN: "Conversando",
   WAITING_REPLY: "Aguardando resposta",
@@ -13,6 +14,7 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
 export type StatusTone = "urgent" | "open" | "waiting" | "qualified" | "invite" | "lost";
 
 export const STATUS_TONE: Record<LeadStatus, StatusTone> = {
+  NEW: "invite",
   NEEDS_HUMAN: "urgent",
   CONVERSATION_OPEN: "open",
   WAITING_REPLY: "waiting",
@@ -31,7 +33,7 @@ export const LEAD_SECTIONS: LeadSection[] = [
   { key: "urgent", label: "Precisa de você", statuses: ["NEEDS_HUMAN"] },
   { key: "open", label: "Conversando", statuses: ["CONVERSATION_OPEN", "QUALIFIED"] },
   { key: "waiting", label: "Aguardando resposta", statuses: ["WAITING_REPLY"] },
-  { key: "invited", label: "Convites", statuses: ["INVITE_SENT"] },
+  { key: "invited", label: "Convites e novos contatos", statuses: ["INVITE_SENT", "NEW"] },
   { key: "lost", label: "Sem resposta", statuses: ["LOST"] },
 ];
 

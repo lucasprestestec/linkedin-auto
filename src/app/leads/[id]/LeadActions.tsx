@@ -7,7 +7,7 @@ import { leadAction, type LeadActionKind } from "./actions";
 
 // Botão principal + "Mais ações". Qualificar tira o lead da automação
 // proativa; assumir faz a IA parar de responder até você devolver.
-export function LeadActions({ leadId, status, profileUrl }: { leadId: string; status: LeadStatus; profileUrl: string }) {
+export function LeadActions({ leadId, status, profileUrl }: { leadId: string; status: LeadStatus; profileUrl: string | null }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
@@ -62,9 +62,11 @@ export function LeadActions({ leadId, status, profileUrl }: { leadId: string; st
                 <IconBan size={16} /> Marcar sem resposta
               </button>
             )}
-            <a href={profileUrl} target="_blank" rel="noreferrer" className="menu-item" role="menuitem">
-              <IconExternal size={16} /> Ver no LinkedIn
-            </a>
+            {profileUrl && (
+              <a href={profileUrl} target="_blank" rel="noreferrer" className="menu-item" role="menuitem">
+                <IconExternal size={16} /> Ver no LinkedIn
+              </a>
+            )}
           </div>
         )}
       </div>

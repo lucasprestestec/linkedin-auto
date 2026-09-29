@@ -8,6 +8,7 @@ import type { MessageChannel } from "@prisma/client";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
 import { validFollowUp } from "@/lib/settings-ranges";
+import { parseEmail, parsePhone } from "@/lib/contactFields";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -131,15 +132,13 @@ export async function updateLeadFollowUp(leadId: string, value: { count: number;
 // Ficha pessoal: canais (e-mail, WhatsApp) e o que o corretor sabe da pessoa.
 // A secretária usa isso pra escolher o canal e personalizar as mensagens.
 export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string }) {
-  const email = data.email.trim().toLowerCase();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." };
-  const digits = data.phone.replace(/\D/g, "");
-  if (digits && (digits.length < 10 || digits.length > 13)) return { error: "WhatsApp inválido. Use DDD + número (ex.: 51 99999-0000)." };
-  // Guarda só dígitos com DDI: 51999990000 → 5551999990000.
-  const phone = digits ? (digits.length <= 11 ? `55${digits}` : digits) : null;
+  const e = parseEmail(data.email);
+  if ("error" in e) return { error: e.error };
+  const p = parsePhone(data.phone);
+  if ("error" in p) return { error: p.error };
   await prisma.lead.update({
     where: { id: leadId },
-    data: { email: email || null, phone, personal: data.personal.trim().slice(0, 2000) || null },
+    data: { email: e.email, phone: p.phone, personal: data.personal.trim().slice(0, 2000) || null },
   });
   revalidatePath(`/leads/${leadId}`);
   return { saved: true };

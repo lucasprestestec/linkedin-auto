@@ -20,7 +20,7 @@ export default async function ConversationsPage({ searchParams }: PageProps<"/co
         <header className="only-mobile">
           <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
             <h1 className="display page-title">Conversas</h1>
-            <Link href="/prospect" className="btn btn-primary btn-sm" style={{ marginBottom: 6 }}>
+            <Link href="/contacts/new" className="btn btn-primary btn-sm" style={{ marginBottom: 6 }}>
               <IconPlus size={16} /> Adicionar
             </Link>
           </div>

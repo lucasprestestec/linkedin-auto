@@ -7,6 +7,7 @@ datasource db {
 }
 
 enum LeadStatus {
+  NEW              // adicionado à mão, ainda sem nenhuma mensagem
   INVITE_SENT      // convite mandado, aguardando aceite
   WAITING_REPLY    // conectado; mandamos mensagem (abertura/follow-up) e o lead ainda não respondeu
   CONVERSATION_OPEN // o lead já respondeu pelo menos uma vez — conversa de verdade
@@ -29,7 +30,8 @@ enum MessageSender {
 
 model Lead {
   id                String    @id @default(cuid())
-  linkedinProfileUrl String   @unique
+  // Opcional: contato adicionado à mão pode não ter LinkedIn.
+  linkedinProfileUrl String?  @unique
   linkedinProfileId  String?
   firstName         String?
   lastName          String?
@@ -39,6 +41,9 @@ model Lead {
   // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
   // a pessoa pode estar conversando por e-mail com o convite ainda pendente.
   linkedinConnected Boolean   @default(false)
+  // Contato adicionado à mão: canal em que a secretária faz o primeiro contato
+  // (null = o corretor mesmo começa).
+  firstContactChannel MessageChannel?
   // Quando a conexão no LinkedIn foi detectada (convite aceito etc.).
   connectedAt       DateTime?
   // WhatsApp (via Deskcomm): conversa aberta lá e até onde já foi lida.
