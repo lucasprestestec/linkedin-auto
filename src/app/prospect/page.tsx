@@ -36,6 +36,12 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
           <IconShield size={14} /> {left > 0 ? `Hoje ainda dá pra convidar ${left} pessoas` : "Limite de convites de hoje atingido"}
           <span className="faint"> · máx. {settings.dailyInviteLimit}/dia</span>
         </p>
+        <p className="small muted" style={{ marginTop: 6 }}>
+          Já conhece a pessoa (indicação, evento, cliente)?{" "}
+          <Link href="/contacts/new" className="link-btn brand">
+            Adicionar contato
+          </Link>
+        </p>
       </header>
       <AddPeople
         campaigns={campaigns.map(({ id, name, description }) => ({ id, name, description }))}

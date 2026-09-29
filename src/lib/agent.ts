@@ -122,6 +122,7 @@ function nowLabel(now = new Date()) {
 }
 
 const STAGE: Record<LeadStatus, string> = {
+  NEW: "contato adicionado pelo corretor (vocês se conhecem por fora do LinkedIn); ainda não houve mensagem",
   INVITE_SENT: "convite enviado, ainda sem conexão",
   WAITING_REPLY: "conectados; mandamos mensagem e ainda não houve resposta",
   CONVERSATION_OPEN: "conversa em andamento (o lead já respondeu antes)",
@@ -439,6 +440,23 @@ export async function generateIntroEmail(instructions: string | null, lead: Lead
         `\nCanal desta mensagem: ${CHANNEL_NAME.EMAIL}. ${CHANNEL_STYLE.EMAIL}`,
     ),
     "Escreva o e-mail de apresentação (só o corpo).",
+    { model: opts.model, check: { previousOutgoing: [], instructions } },
+  );
+}
+
+// Contato adicionado à mão pelo corretor (indicação, evento, conhecido): a
+// secretária faz o primeiro contato no canal escolhido por ele.
+export async function generateFirstContact(instructions: string | null, lead: LeadContext, channel: MessageChannel, opts: { model?: string } = {}): Promise<string> {
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      lead,
+      "Essa pessoa foi adicionada pelo próprio corretor — vocês se conhecem ou ela veio por indicação/evento (veja a ficha pessoal, se houver). " +
+        "Escreva a PRIMEIRA mensagem: cumprimente pelo primeiro nome, faça a ponte com o que a ficha diz (como se conheceram, quem indicou) quando houver, " +
+        "diga em meia frase por que está escrevendo e termine com uma pergunta leve. Nada de pitch, preço ou anexo. Não diga que achou a pessoa no LinkedIn." +
+        `\nCanal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+    ),
+    "Escreva a primeira mensagem.",
     { model: opts.model, check: { previousOutgoing: [], instructions } },
   );
 }

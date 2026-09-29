@@ -89,9 +89,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const highIntent = lead.icpScore != null && lead.icpScore >= 70;
   // Canais do composer: LinkedIn sempre; e-mail se a caixa está configurada e a
   // ficha tem e-mail. Começa no canal em que a pessoa escreveu por último.
-  const replyChannels: ("LINKEDIN" | "EMAIL" | "WHATSAPP")[] = ["LINKEDIN"];
+  const replyChannels: ("LINKEDIN" | "EMAIL" | "WHATSAPP")[] = lead.linkedinProfileUrl ? ["LINKEDIN"] : [];
   if (lead.email && (await emailEnabled())) replyChannels.push("EMAIL");
   if (lead.phone && deskcommConfigOf(settings)) replyChannels.push("WHATSAPP");
+  // Sem nenhum canal (contato sem LinkedIn e sem e-mail/WhatsApp conectados): o
+  // envio explica o que falta.
+  if (replyChannels.length === 0) replyChannels.push("LINKEDIN");
   const lastLeadChannel = lead.messages.findLast((m) => m.sender === "LEAD")?.channel ?? "LINKEDIN";
 
   // ---- Atividades: linha do tempo montada com o que já está no banco ----
@@ -304,9 +307,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       </div>
       {facts}
       <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-        <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-          <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Perfil no LinkedIn
-        </a>
+        {lead.linkedinProfileUrl && (
+          <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+            <IconLinkedin size={15} style={{ color: "#0a66c2" }} /> Perfil no LinkedIn
+          </a>
+        )}
         {company && (
           <a
             href={buildLinkedinSearchUrl({ ...EMPTY_SEARCH, companies: [company] })}
@@ -369,9 +374,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               {lead.jobTitle && <p className="chat-role">{company ? `${role} · ${company}` : lead.jobTitle}</p>}
             </div>
             <DetailsToggle />
-            <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn" title="Ver no LinkedIn">
-              <IconLinkedin size={19} />
-            </a>
+            {lead.linkedinProfileUrl && (
+              <a href={lead.linkedinProfileUrl} target="_blank" rel="noreferrer" className="chat-more" aria-label="Ver no LinkedIn" title="Ver no LinkedIn">
+                <IconLinkedin size={19} />
+              </a>
+            )}
           </header>
 
           <LeadTabs

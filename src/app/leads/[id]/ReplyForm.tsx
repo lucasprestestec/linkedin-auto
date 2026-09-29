@@ -16,7 +16,7 @@ export function ReplyForm({
 }: {
   leadId: string;
   firstName: string;
-  profileUrl: string;
+  profileUrl: string | null;
   // Canais possíveis com essa pessoa; começa no último em que ela escreveu.
   channels?: Channel[];
   defaultChannel?: Channel;
@@ -93,7 +93,7 @@ export function ReplyForm({
         </div>
       )}
       <div className="composer-row">
-        {channel === "LINKEDIN" ? (
+        {channel === "LINKEDIN" && profileUrl ? (
           <a
           href={profileUrl}
           target="_blank"
