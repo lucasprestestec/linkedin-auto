@@ -27,15 +27,27 @@ export async function handleIncomingMessage(lead: Lead, identityId: string) {
     return;
   }
 
-  const history = await prisma.message.findMany({
-    where: { leadId: lead.id },
-    orderBy: { deliveredAt: "asc" },
-    select: { sender: true, content: true },
-  });
+  const [history, campaign] = await Promise.all([
+    prisma.message.findMany({
+      where: { leadId: lead.id },
+      orderBy: { deliveredAt: "asc" },
+      select: { sender: true, content: true, deliveredAt: true },
+    }),
+    lead.campaignId ? prisma.campaign.findUnique({ where: { id: lead.campaignId }, select: { name: true } }) : null,
+  ]);
 
   let decision;
   try {
-    decision = await decideResponse(history, await instructionsFor(lead, settings));
+    decision = await decideResponse({
+      instructions: await instructionsFor(lead, settings),
+      history,
+      lead: { ...lead, campaignName: campaign?.name ?? null },
+    });
+    // Fica nos logs da Vercel: por que o agente fez o que fez.
+    console.log(
+      `[agente] lead=${lead.id} modelo=${decision.model} ação=${decision.action} tentativas=${decision.attempts} ` +
+        `tokens=${decision.usage.inputTokens}/${decision.usage.outputTokens} análise=${JSON.stringify(decision.analysis)}`,
+    );
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha no agente de IA: ${err instanceof Error ? err.message : "erro desconhecido"}`);
     return;
@@ -59,7 +71,8 @@ export async function handleIncomingMessage(lead: Lead, identityId: string) {
     });
     await prisma.lead.update({
       where: { id: lead.id },
-      data: { status: decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null },
+      // Recusou: encerra (sem follow-up). Quer avançar: qualificado.
+      data: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null },
     });
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);

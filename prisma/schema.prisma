@@ -122,6 +122,9 @@ model Settings {
   dailyMessageLimit   Int     @default(25)
   linkedinIdentityId  String?
   agentInstructions   String? @db.Text
+  // Modelo do Nous usado nas conversas (escolhido no admin depois do banco de
+  // testes). Vazio = NOUS_MODEL do ambiente.
+  agentModel          String?
   targetAudience      String? @db.Text
   // Follow-up automático: até followUpMaxCount mensagens, uma a cada
   // followUpDelayHours sem resposta. Depois disso o lead vira LOST.
