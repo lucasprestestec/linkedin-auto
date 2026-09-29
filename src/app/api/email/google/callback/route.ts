@@ -9,7 +9,7 @@ const STATE_COOKIE = "google_oauth_state";
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const back = (result: string) => {
-    const res = NextResponse.redirect(new URL(`/settings?email=${result}#email`, url.origin));
+    const res = NextResponse.redirect(new URL(`/channels?email=${result}#email`, url.origin));
     res.cookies.delete({ name: STATE_COOKIE, path: "/api/email/google" });
     return res;
   };

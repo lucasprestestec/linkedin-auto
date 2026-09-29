@@ -360,7 +360,7 @@ const WRITE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 };
 
 function proactiveSystemPrompt(instructions: string | null, lead: LeadContext, task: string): string {
-  return `Você escreve, pelo corretor, mensagens do LinkedIn para possíveis clientes.
+  return `Você escreve, pelo corretor, mensagens (LinkedIn, e-mail ou WhatsApp) para possíveis clientes.
 
 ${contextBlock(instructions, lead, new Date())}
 
@@ -401,18 +401,126 @@ async function writeMessage(system: string, user: string, opts: { model?: string
   throw new Error(`a mensagem não passou na conferência (${issues.join("; ")})`);
 }
 
-// Primeira mensagem depois que o convite é aceito.
-export async function generateOpeningMessage(instructions: string | null, lead: LeadContext, opts: { model?: string } = {}): Promise<string> {
+// Primeira mensagem no LinkedIn depois que o convite é aceito. Se já houve
+// contato por outro canal (ex.: e-mail enquanto o convite estava pendente), o
+// histórico entra pra não repetir a apresentação.
+export async function generateOpeningMessage(
+  instructions: string | null,
+  lead: LeadContext,
+  opts: { model?: string; history?: HistoryItem[] } = {},
+): Promise<string> {
+  const history = opts.history ?? [];
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
       lead,
       "O lead acabou de aceitar o convite de conexão. Escreva a PRIMEIRA mensagem: agradeça a conexão em poucas palavras, faça uma ponte " +
-        "com o cargo/área dele quando houver e abra espaço pra conversa. Use só o primeiro nome. Nada de pitch longo.",
+        "com o cargo/área dele quando houver e abra espaço pra conversa. Use só o primeiro nome. Nada de pitch longo." +
+        (history.length
+          ? " Vocês já tiveram contato por outro canal (histórico abaixo): não se apresente de novo nem repita o que já foi dito; retome com naturalidade."
+          : "") +
+        `\nCanal desta mensagem: ${CHANNEL_NAME.LINKEDIN}. ${CHANNEL_STYLE.LINKEDIN}`,
     ),
-    "Escreva a mensagem de abertura.",
+    history.length ? `Contato até agora (mais antigo primeiro):\n${transcriptOf(history)}\n\nEscreva a mensagem de abertura no LinkedIn.` : "Escreva a mensagem de abertura.",
+    { model: opts.model, check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
+  );
+}
+
+// Convite do LinkedIn parado há dias e a pessoa tem e-mail na ficha: a
+// secretária se apresenta por e-mail (camada extra da prospecção).
+export async function generateIntroEmail(instructions: string | null, lead: LeadContext, daysPending: number, opts: { model?: string } = {}): Promise<string> {
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      lead,
+      `Você mandou um convite de conexão no LinkedIn para essa pessoa há ${daysPending} dias e ela ainda não aceitou (muita gente quase não entra lá). ` +
+        "Escreva um PRIMEIRO e-mail curto de apresentação: quem você é em meia frase, uma ponte concreta com o cargo/empresa dela e uma pergunta leve. " +
+        "Pode mencionar de passagem que tentou se conectar pelo LinkedIn. Nada de pitch, preço ou anexo." +
+        `\nCanal desta mensagem: ${CHANNEL_NAME.EMAIL}. ${CHANNEL_STYLE.EMAIL}`,
+    ),
+    "Escreva o e-mail de apresentação (só o corpo).",
     { model: opts.model, check: { previousOutgoing: [], instructions } },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Próximo passo: com mais de um canal possível, a secretária decide se insiste,
+// por onde, ou se para. Os sinais (convite, aberturas de e-mail, tentativas)
+// vêm prontos em texto.
+// ---------------------------------------------------------------------------
+
+export interface NextStepDecision {
+  action: "send" | "wait" | "stop";
+  channel: MessageChannel | null;
+  reason: string;
+  usage: Usage;
+}
+
+function nextStepTool(options: MessageChannel[]): OpenAI.Chat.Completions.ChatCompletionTool {
+  return {
+    type: "function",
+    function: {
+      name: "next_step",
+      description: "Decide o próximo passo com esta pessoa.",
+      parameters: {
+        type: "object",
+        properties: {
+          analysis: { type: "string", description: "Raciocínio curto (2-3 frases) sobre os sinais." },
+          action: { type: "string", enum: ["send", "wait", "stop"] },
+          channel: { type: "string", enum: options, description: "Obrigatório quando action=send." },
+          reason: { type: "string", description: "Uma frase curta, em português, pro corretor entender a decisão. Ex.: \"Abriu o e-mail 2x e não respondeu; vou retomar pelo LinkedIn.\"" },
+        },
+        required: ["analysis", "action", "reason"],
+      },
+    },
+  };
+}
+
+export async function decideNextStep(
+  input: { instructions: string | null; lead: LeadContext; history: HistoryItem[]; options: MessageChannel[]; signals: string[]; extraTouch: boolean },
+  opts: { model?: string } = {},
+): Promise<NextStepDecision> {
+  const client = nousClient();
+  const model = opts.model || (await conversationModel());
+  const system = `Você é a secretária do corretor e cuida da prospecção de novos clientes. A pessoa abaixo NÃO respondeu à nossa última mensagem.
+Decida o PRÓXIMO PASSO: enviar uma mensagem por um dos canais disponíveis, esperar mais um pouco, ou encerrar.
+
+${contextBlock(input.instructions, input.lead, new Date())}
+
+CANAIS DISPONÍVEIS AGORA: ${input.options.map((c) => CHANNEL_NAME[c]).join(", ")}
+
+SINAIS
+${input.signals.map((s) => `- ${s}`).join("\n")}
+
+COMO DECIDIR
+- O LinkedIn é o canal principal da prospecção; e-mail é uma camada a mais.
+- E-mail aberto é um indício de interesse (fraco: alguns apps abrem sozinhos). Abriu e não respondeu = vale uma nova tentativa, de preferência por OUTRO canal.
+- Nada de sinal depois de várias tentativas = encerre com elegância (stop) em vez de insistir.
+- Evite repetir o mesmo canal que já ficou sem resposta quando houver outro disponível e fizer sentido.
+- "wait" só quando o último contato foi recente demais ou algo indica que é melhor dar mais tempo.
+${input.extraTouch ? "- A sequência normal de retomadas ACABOU. Só envie (uma última vez) se os sinais justificarem de verdade; caso contrário, stop.\n" : ""}
+Use a ferramenta next_step. Nunca responda em texto livre.`;
+
+  const response = await completeWithTool(client, {
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `Histórico (mais antigo primeiro):\n${transcriptOf(input.history) || "(vazio)"}\n\nQual o próximo passo?` },
+    ],
+    tool: nextStepTool(input.options),
+  });
+  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== "function") throw new Error("O agente não decidiu o próximo passo.");
+  const out = JSON.parse(toolCall.function.arguments) as { action?: string; channel?: string; reason?: string };
+  const action = out.action === "wait" || out.action === "stop" ? out.action : "send";
+  const channel = input.options.includes(out.channel as MessageChannel) ? (out.channel as MessageChannel) : null;
+  // "send" sem canal válido: vai pelo primeiro disponível (o principal).
+  return {
+    action,
+    channel: action === "send" ? (channel ?? input.options[0]) : null,
+    reason: out.reason?.trim() || (action === "stop" ? "Sem sinais de interesse; encerrando." : "Decisão da secretária."),
+    usage: usageOf(response),
+  };
 }
 
 // Follow-up número `attempt` (1..maxCount) numa conversa sem resposta.

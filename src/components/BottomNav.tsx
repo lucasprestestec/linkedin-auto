@@ -11,7 +11,7 @@ export function BottomNav() {
 
   return (
     <nav className="nav" aria-label="Navegação principal">
-      {NAV_ITEMS.map(({ href, label, Icon, badge }) => {
+      {NAV_ITEMS.filter((item) => !("desktopOnly" in item && item.desktopOnly)).map(({ href, label, Icon, badge }) => {
         const active = isActive(pathname, href);
         const count = badge === "attention" ? needYouCount : 0;
         return (

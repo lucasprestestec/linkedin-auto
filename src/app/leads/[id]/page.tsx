@@ -244,6 +244,21 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </span>
         </dd>
       </div>
+      {lead.nextStep && (
+        <div>
+          <dt>Próximo passo (secretária)</dt>
+          <dd className="next-step">
+            <IconSparkles size={14} /> {lead.nextStep}
+            {lead.nextStepAt && (
+              <span className="tiny faint">
+                {" "}
+                · volta a olhar em{" "}
+                {lead.nextStepAt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+              </span>
+            )}
+          </dd>
+        </div>
+      )}
       {lead.icpScore != null && (
         <div>
           <dt>Encaixe com o cliente ideal</dt>

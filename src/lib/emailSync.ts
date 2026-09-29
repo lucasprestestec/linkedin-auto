@@ -34,7 +34,7 @@ export async function syncEmailInbox(): Promise<{ read: number; saved: number; l
     // Respondeu: conversa aberta e sem follow-up pendente.
     const updated = await prisma.lead.update({
       where: { id: lead.id },
-      data: { status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" ? lead.status : "CONVERSATION_OPEN", followUpsSent: 0 },
+      data: { status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" ? lead.status : "CONVERSATION_OPEN", followUpsSent: 0, nextStep: null, nextStepAt: null },
     });
     touched.set(lead.id, updated);
   }

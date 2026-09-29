@@ -1,9 +1,10 @@
-import type { Lead, Settings } from "@prisma/client";
+import type { Lead, MessageChannel, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
-import { extractConnections, sendMessage, type EdgesConnection } from "@/lib/edges";
-import { generateFollowUp, generateOpeningMessage } from "@/lib/agent";
-import { messagesSentToday } from "@/lib/limits";
+import { extractConnections, type EdgesConnection } from "@/lib/edges";
+import { decideNextStep, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
+import { emailsSentToday, messagesSentToday } from "@/lib/limits";
+import { emailEnabled } from "@/lib/email";
 import { isWithinWorkHours } from "@/lib/schedule";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
 import { handleIncomingMessage } from "@/lib/respond";
@@ -28,7 +29,9 @@ export interface ProactiveResult {
   acceptedInvites: number;
   repliesSent: number;
   openingsSent: number;
+  introEmailsSent: number;
   followUpsSent: number;
+  waiting: number;
   markedLost: number;
   skipped?: string;
 }
@@ -44,7 +47,8 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
   const checkedAt = settings.connectionsCheckedAt?.getTime() ?? 0;
   if (Date.now() - checkedAt < CONNECTIONS_CHECK_INTERVAL_MS) return 0;
 
-  const pending = await prisma.lead.findMany({ where: { status: "INVITE_SENT" } });
+  // Convite pendente = ainda não conectado (pode estar conversando por e-mail).
+  const pending = await prisma.lead.findMany({ where: { linkedinConnected: false, status: { not: "LOST" } } });
   if (pending.length === 0) return 0;
 
   // Marca a checagem antes de chamar: se a chamada falhar, não tenta de novo
@@ -68,7 +72,9 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
     await prisma.lead.update({
       where: { id: lead.id },
       data: {
-        status: "WAITING_REPLY",
+        linkedinConnected: true,
+        // Quem já conversa por e-mail continua no status que está.
+        status: lead.status === "INVITE_SENT" ? "WAITING_REPLY" : lead.status,
         // O ID do perfil é o mesmo que vem como remetente no histórico de
         // mensagens: guardando aqui, a primeira resposta já é reconhecida pelo ID.
         linkedinProfileId: lead.linkedinProfileId ?? (connection.linkedin_profile_id != null ? String(connection.linkedin_profile_id) : null),
@@ -82,20 +88,6 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
   return accepted;
 }
 
-async function sendAgentMessage(lead: Lead, identityId: string, content: string) {
-  const result = await sendMessage(identityId, lead.linkedinProfileUrl, content);
-  await prisma.message.create({
-    data: {
-      leadId: lead.id,
-      sender: "AGENT",
-      content,
-      linkedinMessageId: result.linkedin_message_id,
-      deliveredAt: new Date(result.delivered_at),
-    },
-  });
-}
-
-
 function errorMessage(err: unknown) {
   return err instanceof Error ? err.message : "erro desconhecido";
 }
@@ -104,25 +96,66 @@ function errorMessage(err: unknown) {
 // recebe abertura nem follow-up (respostas a quem escrever continuam normais).
 const IN_ACTIVE_CAMPAIGN = { OR: [{ campaignId: null }, { campaign: { status: "ACTIVE" as const } }] };
 
-// Conectado e sem nenhuma mensagem: o agente abre a conversa.
-async function sendOpenings(identityId: string, settings: Settings, budget: number): Promise<number> {
-  if (budget <= 0) return 0;
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Quando a secretária decide esperar, ela volta a olhar esse lead depois disso.
+const WAIT_MS = DAY_MS;
+
+// Quantos envios ainda cabem nesta rodada, por canal. Cada canal tem o próprio
+// limite diário; o total por rodada espalha os envios ao longo do dia.
+interface Budget {
+  total: number;
+  LINKEDIN: number;
+  EMAIL: number;
+}
+
+function spend(budget: Budget, channel: MessageChannel) {
+  budget.total--;
+  if (channel === "LINKEDIN" || channel === "EMAIL") budget[channel]--;
+}
+
+const HISTORY_SELECT = { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true, lastOpenedAt: true } as const;
+
+// Conectado no LinkedIn e ainda sem mensagem por lá: o agente abre a conversa.
+// Se já houve e-mail (convite estava parado), a abertura leva isso em conta.
+async function sendOpenings(identityId: string, settings: Settings, budget: Budget): Promise<number> {
+  if (budget.total <= 0 || budget.LINKEDIN <= 0) return 0;
   const leads = await prisma.lead.findMany({
-    // Sem conversa no LinkedIn (thread) e sem mensagem no banco. Checar a thread
-    // evita mandar "obrigado por conectar" no meio de uma conversa que existe
-    // mas cuja sincronização falhou.
-    where: { status: { in: PROACTIVE_STATUSES }, linkedinThreadId: null, messages: { none: {} }, ...IN_ACTIVE_CAMPAIGN },
+    // Sem conversa no LinkedIn (thread) e sem mensagem de LinkedIn no banco.
+    // Checar a thread evita mandar "obrigado por conectar" no meio de uma
+    // conversa que existe mas cuja sincronização falhou.
+    where: {
+      status: { in: PROACTIVE_STATUSES },
+      linkedinConnected: true,
+      linkedinThreadId: null,
+      messages: { none: { channel: "LINKEDIN" } },
+      ...IN_ACTIVE_CAMPAIGN,
+    },
     orderBy: { updatedAt: "asc" },
+    include: { messages: { orderBy: { deliveredAt: "asc" }, select: HISTORY_SELECT } },
   });
   const rules = parseExclusionList(settings.exclusionList);
-  const eligible = leads.filter((l) => !isExcluded({ ...l, headline: l.jobTitle }, rules)).slice(0, budget);
+  // Quem já respondeu por e-mail está numa conversa: não recebe "abertura".
+  const eligible = leads
+    .filter((l) => !isExcluded({ ...l, headline: l.jobTitle }, rules))
+    .filter((l) => l.messages.at(-1)?.sender !== "LEAD")
+    .slice(0, Math.min(budget.total, budget.LINKEDIN));
 
   let sent = 0;
   for (const lead of eligible) {
     try {
-      const content = await generateOpeningMessage(await instructionsFor(lead, settings), lead);
-      await sendAgentMessage(lead, identityId, content);
-      await prisma.lead.update({ where: { id: lead.id }, data: { status: "WAITING_REPLY", followUpsSent: 0 } });
+      const content = await generateOpeningMessage(await instructionsFor(lead, settings), lead, { history: lead.messages });
+      await sendOnChannel(lead, "LINKEDIN", content, { identityId });
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+        // Já conversando por e-mail: continua "conversando".
+        status: lead.status === "CONVERSATION_OPEN" ? "CONVERSATION_OPEN" : "WAITING_REPLY",
+        followUpsSent: 0,
+        nextStep: "Aceitou o convite; abri a conversa no LinkedIn.",
+        nextStepAt: null,
+      },
+      });
+      spend(budget, "LINKEDIN");
       sent++;
     } catch (err) {
       // Tira o lead do ciclo automático em vez de tentar de novo a cada rodada.
@@ -132,17 +165,94 @@ async function sendOpenings(identityId: string, settings: Settings, budget: numb
   return sent;
 }
 
-// Última mensagem é nossa e já passou do intervalo: manda follow-up ou, se a
-// sequência acabou, marca como sem resposta.
+// Convite parado há X dias e a pessoa tem e-mail na ficha: a secretária se
+// apresenta por e-mail. O convite continua valendo; se for aceito, a conversa
+// segue no LinkedIn sabendo do e-mail.
+async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: Budget): Promise<number> {
+  const days = settings.emailInviteFallbackDays;
+  if (!emailReady || days == null || budget.total <= 0 || budget.EMAIL <= 0) return 0;
+  const cutoff = new Date(Date.now() - days * DAY_MS);
+  const leads = await prisma.lead.findMany({
+    where: {
+      status: "INVITE_SENT",
+      email: { not: null },
+      messages: { none: {} },
+      OR: [{ invitedAt: { lte: cutoff } }, { invitedAt: null, createdAt: { lte: cutoff } }],
+      AND: [IN_ACTIVE_CAMPAIGN],
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const rules = parseExclusionList(settings.exclusionList);
+  const eligible = leads.filter((l) => !isExcluded({ ...l, headline: l.jobTitle }, rules)).slice(0, Math.min(budget.total, budget.EMAIL));
+
+  let sent = 0;
+  for (const lead of eligible) {
+    const pending = Math.max(days, Math.round((Date.now() - (lead.invitedAt ?? lead.createdAt).getTime()) / DAY_MS));
+    try {
+      const content = await generateIntroEmail(await instructionsFor(lead, settings), lead, pending);
+      await sendOnChannel(lead, "EMAIL", content, { subject: "Conexão no LinkedIn" });
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { followUpsSent: 0, nextStep: `Convite parado há ${pending} dias; me apresentei por e-mail.`, nextStepAt: null },
+      });
+      spend(budget, "EMAIL");
+      sent++;
+    } catch (err) {
+      await markNeedsHuman(lead.id, `Falha ao enviar o e-mail de apresentação: ${errorMessage(err)}`);
+    }
+  }
+  return sent;
+}
+
+type HistoryRow = { sender: string; content: string; deliveredAt: Date; channel: MessageChannel; openToken: string | null; openCount: number; lastOpenedAt: Date | null };
+
+function daysAgo(date: Date, now: number) {
+  const d = Math.floor((now - date.getTime()) / DAY_MS);
+  return d <= 0 ? "hoje" : d === 1 ? "há 1 dia" : `há ${d} dias`;
+}
+
+// Sinais em texto pro agente decidir o próximo passo.
+function signalsFor(lead: Lead, history: HistoryRow[], rule: { maxCount: number }, now: number): string[] {
+  const out: string[] = [];
+  out.push(
+    !lead.linkedinConnected
+      ? `Convite do LinkedIn ainda pendente (enviado ${daysAgo(lead.invitedAt ?? lead.createdAt, now)}): por lá não dá pra mandar mensagem.`
+      : "Vocês estão conectados no LinkedIn.",
+  );
+  out.push(history.some((m) => m.sender === "LEAD") ? "A pessoa já respondeu antes nesta conversa." : "A pessoa nunca respondeu.");
+  for (const channel of ["LINKEDIN", "EMAIL"] as const) {
+    const ours = history.filter((m) => m.sender !== "LEAD" && m.channel === channel);
+    if (!ours.length) continue;
+    const last = ours.at(-1)!;
+    let line = `${channel === "LINKEDIN" ? "LinkedIn" : "E-mail"}: ${ours.length} mensagem(ns) nossa(s), a última ${daysAgo(last.deliveredAt, now)}.`;
+    if (channel === "EMAIL") {
+      const tracked = ours.filter((m) => m.openToken);
+      const opens = tracked.reduce((n, m) => n + m.openCount, 0);
+      const lastOpen = tracked.map((m) => m.lastOpenedAt).filter((d): d is Date => Boolean(d)).sort((a, b) => b.getTime() - a.getTime())[0];
+      if (tracked.length) line += opens ? ` Aberturas: ${opens} (última ${daysAgo(lastOpen, now)}).` : " Nenhuma abertura registrada.";
+    }
+    out.push(line);
+  }
+  out.push(`Retomadas já feitas desde a última resposta: ${lead.followUpsSent} de ${rule.maxCount}.`);
+  return out;
+}
+
+// Última mensagem é nossa e já passou do intervalo: a secretária decide o
+// próximo passo (canal, esperar ou encerrar). Com um canal só, segue direto.
 async function sendFollowUps(
-  identityId: string,
+  identityId: string | null,
   settings: Settings,
-  budget: number,
-): Promise<{ sent: number; lost: number }> {
+  emailReady: boolean,
+  budget: Budget,
+): Promise<{ sent: number; lost: number; waiting: number }> {
   const now = Date.now();
   const leads = (
     await prisma.lead.findMany({
-      where: { status: { in: PROACTIVE_STATUSES }, ...IN_ACTIVE_CAMPAIGN },
+      where: {
+        // INVITE_SENT entra só se já recebeu e-mail (apresentação): segue por lá.
+        OR: [{ status: { in: PROACTIVE_STATUSES } }, { status: "INVITE_SENT", messages: { some: {} } }],
+        AND: [IN_ACTIVE_CAMPAIGN, { OR: [{ nextStepAt: null }, { nextStepAt: { lte: new Date(now) } }] }],
+      },
       include: {
         messages: { orderBy: { deliveredAt: "desc" }, take: 1 },
         campaign: { select: { followUpMaxCount: true, followUpDelayHours: true } },
@@ -162,60 +272,110 @@ async function sendFollowUps(
 
   let sent = 0;
   let lost = 0;
+  let waiting = 0;
   for (const lead of due) {
-    if (lead.followUpsSent >= lead.rule.maxCount) {
-      await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST" } });
+    const history = await prisma.message.findMany({ where: { leadId: lead.id }, orderBy: { deliveredAt: "asc" }, select: HISTORY_SELECT });
+    const lastOurs = history.filter((m) => m.sender !== "LEAD").at(-1);
+    // Abriu um e-mail depois do nosso último contato: sinal pra uma tentativa a mais.
+    const openedSinceLastTouch = history.some((m) => m.sender !== "LEAD" && m.lastOpenedAt && lastOurs && m.lastOpenedAt >= lastOurs.deliveredAt);
+    const ended = lead.followUpsSent >= lead.rule.maxCount;
+    const extraTouch = ended && openedSinceLastTouch && lead.followUpsSent < lead.rule.maxCount + 1;
+
+    if (ended && !extraTouch) {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { status: "LOST", nextStep: `Sem resposta depois de ${lead.followUpsSent} retomada(s); encerrei.`, nextStepAt: null },
+      });
       lost++;
       continue;
     }
-    if (sent >= budget) continue;
+    if (budget.total <= 0) continue;
+
+    const options: MessageChannel[] = [];
+    if (identityId && lead.linkedinConnected && budget.LINKEDIN > 0) options.push("LINKEDIN");
+    if (emailReady && lead.email && budget.EMAIL > 0) options.push("EMAIL");
+    // Nenhum canal disponível agora (limite do dia, LinkedIn desconectado...): tenta na próxima rodada.
+    if (options.length === 0) continue;
 
     try {
-      const history = await prisma.message.findMany({
-        where: { leadId: lead.id },
-        orderBy: { deliveredAt: "asc" },
-        select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true },
-      });
-      // Retoma no canal em que a conversa parou (e-mail continua por e-mail).
-      const channel = lead.messages[0].channel === "EMAIL" ? "EMAIL" : "LINKEDIN";
+      const instructions = await instructionsFor(lead, settings);
+      let channel: MessageChannel;
+      let reason: string;
+      if (options.length === 1 && !extraTouch) {
+        channel = options[0];
+        reason = `Sem resposta; retomei pelo ${channel === "EMAIL" ? "e-mail" : "LinkedIn"} (${lead.followUpsSent + 1} de ${lead.rule.maxCount}).`;
+      } else {
+        const decision = await decideNextStep({
+          instructions,
+          lead,
+          history,
+          options,
+          signals: signalsFor(lead, history, lead.rule, now),
+          extraTouch,
+        });
+        console.log(`[próximo passo] lead=${lead.id} ação=${decision.action} canal=${decision.channel ?? "-"} motivo=${JSON.stringify(decision.reason)}`);
+        if (decision.action === "stop") {
+          await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST", nextStep: decision.reason, nextStepAt: null } });
+          lost++;
+          continue;
+        }
+        if (decision.action === "wait") {
+          await prisma.lead.update({ where: { id: lead.id }, data: { nextStep: decision.reason, nextStepAt: new Date(now + WAIT_MS) } });
+          waiting++;
+          continue;
+        }
+        channel = decision.channel!;
+        reason = decision.reason;
+      }
+
       const attempt = lead.followUpsSent + 1;
       const previous = new Set(history.filter((m) => m.sender !== "LEAD").map((m) => normalizeText(m.content)));
-
-      const instructions = await instructionsFor(lead, settings);
-      let content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount, channel);
+      // Na tentativa extra, o texto é o da última da sequência (leve, sem insistir).
+      const maxForText = Math.max(lead.rule.maxCount, attempt);
+      let content = await generateFollowUp(instructions, lead, history, attempt, maxForText, channel);
       if (previous.has(normalizeText(content))) {
         // Repetiu uma mensagem anterior: uma segunda tentativa; se repetir de novo, não envia.
-        content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount, channel);
+        content = await generateFollowUp(instructions, lead, history, attempt, maxForText, channel);
         if (previous.has(normalizeText(content))) throw new Error("o agente repetiu uma mensagem anterior");
       }
 
       await sendOnChannel(lead, channel, content, { identityId });
-      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: attempt } });
+      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: attempt, nextStep: reason, nextStepAt: null } });
+      spend(budget, channel);
       sent++;
     } catch (err) {
       await markNeedsHuman(lead.id, `Falha ao enviar follow-up: ${errorMessage(err)}`);
     }
   }
-  return { sent, lost };
+  return { sent, lost, waiting };
 }
 
 // Lead escreveu fora do horário: a resposta não saiu na hora (ver cron). Aqui,
 // já dentro da janela, a IA responde quem está esperando — a última mensagem
 // da conversa é do lead e ninguém respondeu ainda.
-async function answerPendingReplies(identityId: string): Promise<number> {
+async function answerPendingReplies(identityId: string | null): Promise<number> {
   const leads = await prisma.lead.findMany({
     where: { status: { in: ["CONVERSATION_OPEN", "QUALIFIED"] } },
     include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
   });
-  const pending = leads.filter((l) => l.messages[0]?.sender === "LEAD").slice(0, MAX_PROACTIVE_PER_RUN);
+  const pending = leads
+    .filter((l) => l.messages[0]?.sender === "LEAD")
+    // Sem LinkedIn conectado, só dá pra responder quem escreveu por e-mail.
+    .filter((l) => identityId || l.messages[0].channel === "EMAIL")
+    .slice(0, MAX_PROACTIVE_PER_RUN);
   for (const lead of pending) {
     await handleIncomingMessage(lead, identityId);
   }
   return pending.length;
 }
 
-export async function runProactive(identityId: string): Promise<ProactiveResult> {
-  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, followUpsSent: 0, markedLost: 0 };
+// A secretária pode usar o e-mail por conta própria: caixa conectada e canal ligado.
+export async function emailChannelReady(settings: Settings): Promise<boolean> {
+  return settings.emailChannelEnabled && (await emailEnabled());
+}
+
+export async function runProactive(identityId: string | null): Promise<ProactiveResult> {
+  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // Mesmas travas do handleIncomingMessage: pausado, nada acontece sozinho.
@@ -223,28 +383,32 @@ export async function runProactive(identityId: string): Promise<ProactiveResult>
   // Fora do horário de trabalho nada sai; o que ficou devido sai na próxima janela.
   if (!isWithinWorkHours(settings)) return { ...result, skipped: "fora do horário de trabalho" };
 
-  result.engagement = await runEngagement(identityId, settings);
-
-  try {
-    result.acceptedInvites = await detectAcceptedInvites(identityId, settings);
-  } catch (err) {
-    console.error("Falha ao checar convites aceitos", err);
+  if (identityId) {
+    result.engagement = await runEngagement(identityId, settings);
+    try {
+      result.acceptedInvites = await detectAcceptedInvites(identityId, settings);
+    } catch (err) {
+      console.error("Falha ao checar convites aceitos", err);
+    }
   }
 
   // Respostas que ficaram pra depois (lead escreveu fora do horário) vêm antes
   // de qualquer iniciativa nossa.
   result.repliesSent = await answerPendingReplies(identityId);
 
-  const remainingToday = settings.dailyMessageLimit - (await messagesSentToday());
-  let budget = Math.max(0, Math.min(MAX_PROACTIVE_PER_RUN, remainingToday));
+  const emailReady = await emailChannelReady(settings);
+  const linkedinLeft = identityId ? settings.dailyMessageLimit - (await messagesSentToday()) : 0;
+  const emailLeft = emailReady ? settings.dailyEmailLimit - (await emailsSentToday()) : 0;
+  const budget: Budget = { total: MAX_PROACTIVE_PER_RUN, LINKEDIN: Math.max(0, linkedinLeft), EMAIL: Math.max(0, emailLeft) };
 
-  result.openingsSent = await sendOpenings(identityId, settings, budget);
-  budget -= result.openingsSent;
+  if (identityId) result.openingsSent = await sendOpenings(identityId, settings, budget);
+  result.introEmailsSent = await sendIntroEmails(settings, emailReady, budget);
 
-  const followUps = await sendFollowUps(identityId, settings, budget);
+  const followUps = await sendFollowUps(identityId, settings, emailReady, budget);
   result.followUpsSent = followUps.sent;
+  result.waiting = followUps.waiting;
   result.markedLost = followUps.lost;
 
-  if (remainingToday <= 0) result.skipped = "limite diário de mensagens atingido";
+  if (identityId && linkedinLeft <= 0) result.skipped = "limite diário de mensagens do LinkedIn atingido";
   return result;
 }

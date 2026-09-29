@@ -1198,6 +1198,93 @@ html:root:not([data-lux="off"]) .handoff-card {
   color: #3fd07a;
 }
 
+/* Tela Canais */
+.channel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(216, 178, 122, 0.14);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
+
+.channel-foot {
+  padding: 8px 6px 0;
+}
+
+.channel-options .setting-row + .setting-row {
+  border-top: 1px solid var(--border);
+}
+
+.wa-mark {
+  background: rgba(37, 211, 102, 0.12);
+  color: #3fd07a;
+}
+
+.decide-card p {
+  line-height: 1.55;
+}
+
+.decide-card svg {
+  color: var(--gold);
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+/* Conta: resumo dos canais */
+.channels-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.channel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.channel-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.channel-chips .chip.on {
+  border-color: rgba(63, 208, 122, 0.4);
+  color: #3fd07a;
+}
+
+.channel-chips .chip.off {
+  border-color: rgba(239, 91, 60, 0.4);
+  color: var(--urgent-ink);
+}
+
+.next-step {
+  display: block;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.next-step svg {
+  color: var(--gold);
+  vertical-align: -2px;
+}
+
 .mail-mark {
   background: rgba(216, 178, 122, 0.12);
   color: var(--gold);

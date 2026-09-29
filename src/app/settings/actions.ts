@@ -42,6 +42,7 @@ export async function getOrCreateIdentityLoginLink(fresh = false): Promise<strin
   if (!link) throw new Error("A Edges não retornou o link de conexão.");
 
   revalidatePath("/settings");
+  revalidatePath("/channels");
   return link;
 }
 
@@ -49,6 +50,7 @@ export async function updateTargetAudience(_prevState: unknown, formData: FormDa
   const targetAudience = String(formData.get("targetAudience") ?? "").trim();
   await prisma.settings.update({ where: { id: "singleton" }, data: { targetAudience: targetAudience || null } });
   revalidatePath("/settings");
+  revalidatePath("/channels");
   return { saved: true };
 }
 
@@ -60,6 +62,7 @@ export async function updateExclusionList(_prevState: unknown, formData: FormDat
     .join("\n");
   await prisma.settings.update({ where: { id: "singleton" }, data: { exclusionList: exclusionList || null } });
   revalidatePath("/settings");
+  revalidatePath("/channels");
   return { saved: true };
 }
 
@@ -119,4 +122,5 @@ export async function disconnectLinkedin() {
 export async function disconnectEmail() {
   await disconnectGoogle();
   revalidatePath("/settings");
+  revalidatePath("/channels");
 }
