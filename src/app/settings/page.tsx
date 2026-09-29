@@ -1,9 +1,8 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getIdentity } from "@/lib/edges";
+import { emailConnection } from "@/lib/email";
+import { linkedinStatus } from "../channels/LinkedinCard";
 import { logout } from "../actions";
-import { ConnectButton } from "./ConnectButton";
-import { RefreshStatusButton } from "./RefreshStatusButton";
-import { DisconnectButton } from "./DisconnectButton";
 import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
 import { IdealClientForm } from "./IdealClientForm";
@@ -11,23 +10,11 @@ import { OwnerNameForm } from "./OwnerNameForm";
 import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
-import { EmailCard } from "./EmailCard";
-import { passwordEmailAddress } from "@/lib/email";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
-import { IconBan, IconBell, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconTarget } from "@/components/Icons";
+import { IconBan, IconBell, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
-
-async function getConnectionStatus(identityId: string | null) {
-  if (!identityId) return { connected: false };
-  try {
-    const identity = await getIdentity(identityId);
-    return { connected: identity.integrations.includes("linkedin"), name: identity.name };
-  } catch {
-    return { connected: false, error: true };
-  }
-}
 
 // Uma linha que mostra o valor atual e abre pra editar — a página inteira cabe
 // numa olhada e ninguém precisa rolar por formulários que não vai mexer.
@@ -75,11 +62,10 @@ function exclusionSummary(raw: string | null) {
   return parts.length ? parts.join(", ") : "Ninguém por enquanto";
 }
 
-export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
-  const emailResult = (await searchParams).email;
+export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const status = await getConnectionStatus(settings.linkedinIdentityId);
-  const connected = status.connected && !settings.linkedinNeedsReconnect;
+  const [status, email] = await Promise.all([linkedinStatus(settings), emailConnection()]);
+  const linkedinOk = status.connected;
 
   return (
     <main className="page account">
@@ -88,56 +74,29 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <h1 className="display page-title">
           Sua <span className="name-grad">conta.</span>
         </h1>
-        <p className="hero-sub">Seu LinkedIn e como a automação deve abordar as pessoas. Toque num item pra mudar.</p>
+        <p className="hero-sub">Seus canais e como a secretária deve abordar as pessoas. Toque num item pra mudar.</p>
       </header>
 
       <div className="account-col">
         <section className="group rise">
-          <h2 className="group-title">LinkedIn</h2>
-          <section className="card card-pad connection rise" aria-label="Conta do LinkedIn">
-            <div className="row" style={{ gap: 14 }}>
-              <span className="li-mark">
-                <IconLinkedin size={26} />
+          <h2 className="group-title">Canais</h2>
+          <Link href="/channels" className="card channels-summary">
+            <span className="stack" style={{ gap: 8, flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: 700 }}>LinkedIn, e-mail e WhatsApp</span>
+              <span className="channel-chips">
+                <span className={linkedinOk ? "chip on" : "chip off"}>
+                  <IconLinkedin size={13} /> {linkedinOk ? "Conectado" : settings.linkedinNeedsReconnect ? "Reconectar" : "Não conectado"}
+                </span>
+                <span className={email ? "chip on" : "chip"}>
+                  <IconMail size={13} /> {email ? "Conectado" : "Opcional"}
+                </span>
+                <span className="chip">
+                  <IconChat size={13} /> Em breve
+                </span>
               </span>
-              <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
-                <span className="title-md">Conta do LinkedIn</span>
-                {connected ? (
-                  <span className="row small" style={{ gap: 8, color: "var(--success-ink)", fontWeight: 700 }}>
-                    <span className="pulse" />
-                    Conectado{status.name ? ` · ${status.name}` : ""}
-                  </span>
-                ) : (
-                  <span className="row small" style={{ gap: 8, color: "var(--urgent-ink)", fontWeight: 700 }}>
-                    <span className="pulse" />
-                    {settings.linkedinNeedsReconnect ? "Sessão expirou" : "Não conectado"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {!connected && (
-              <>
-                <p className="small muted">
-                  {settings.linkedinNeedsReconnect
-                    ? `${settings.linkedinReconnectReason ?? "A sessão do LinkedIn caiu"}. Reconecte para a automação voltar a funcionar.`
-                    : "Conecte sua conta pessoal do LinkedIn para o sistema começar a convidar e responder por você."}
-                </p>
-                <ConnectButton />
-                <RefreshStatusButton />
-              </>
-            )}
-            {settings.linkedinIdentityId && <DisconnectButton />}
-          </section>
-        </section>
-
-        <section className="group rise">
-          <h2 className="group-title">E-mail</h2>
-          <EmailCard
-            googleAddress={settings.googleEmail}
-            expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
-            fallbackAddress={passwordEmailAddress()}
-            result={typeof emailResult === "string" ? emailResult : null}
-          />
+            </span>
+            <IconChevronRight size={18} className="chev" />
+          </Link>
         </section>
 
         <section className="group rise">

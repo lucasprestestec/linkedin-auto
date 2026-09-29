@@ -159,7 +159,7 @@ export async function syncConversation(conv: EdgesConversation, identityId: stri
     const revived = lead.status === "INVITE_SENT" || lead.status === "WAITING_REPLY" || lead.status === "LOST";
     lead = await prisma.lead.update({
       where: { id: lead.id },
-      data: { followUpsSent: 0, ...(revived ? { status: "CONVERSATION_OPEN" as const } : {}) },
+      data: { followUpsSent: 0, nextStep: null, nextStepAt: null, ...(revived ? { status: "CONVERSATION_OPEN" as const } : {}) },
     });
   }
   const latest = messages[messages.length - 1];

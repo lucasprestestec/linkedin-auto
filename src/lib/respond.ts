@@ -70,7 +70,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     await prisma.lead.update({
       where: { id: lead.id },
       // Recusou: encerra (sem follow-up). Quer avançar: qualificado.
-      data: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null },
+      data: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null, nextStep: null, nextStepAt: null },
     });
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);

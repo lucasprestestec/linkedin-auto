@@ -11,3 +11,10 @@ export async function messagesSentToday(): Promise<number> {
     where: { sender: { not: "LEAD" }, channel: "LINKEDIN", createdAt: { gte: startOfDay } },
   });
 }
+
+// E-mails que a conta mandou hoje — base do limite diário do canal de e-mail.
+export async function emailsSentToday(): Promise<number> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  return prisma.message.count({ where: { sender: { not: "LEAD" }, channel: "EMAIL", createdAt: { gte: startOfDay } } });
+}

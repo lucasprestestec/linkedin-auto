@@ -36,6 +36,9 @@ model Lead {
   jobTitle          String?
   status            LeadStatus @default(INVITE_SENT)
   linkedinThreadId  String?   @unique
+  // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
+  // a pessoa pode estar conversando por e-mail com o convite ainda pendente.
+  linkedinConnected Boolean   @default(false)
   needsHumanReason  String?
   // Quando o convite foi enviado (callback da edges.run). É o que conta pro limite
   // diário de convites — o status muda assim que o convite é aceito.
@@ -60,6 +63,10 @@ model Lead {
   campaignId        String?
   // Conversa arquivada no LinkedIn (lead perdido) — evita arquivar de novo.
   archivedAt        DateTime?
+  // Próximo passo decidido pela secretária (texto pro corretor acompanhar) e
+  // quando ela volta a olhar esse lead (ex.: decidiu esperar).
+  nextStep          String?
+  nextStepAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -174,6 +181,12 @@ model Settings {
   archiveLostEnabled     Boolean @default(false)
   receivedInvitesCheckedAt DateTime?
   withdrawCheckedAt        DateTime?
+  // Canal de e-mail: a secretária pode usar (liga/desliga), limite diário e
+  // depois de quantos dias de convite não aceito ela se apresenta por e-mail
+  // (null = nunca).
+  emailChannelEnabled Boolean @default(true)
+  dailyEmailLimit     Int     @default(20)
+  emailInviteFallbackDays Int? @default(5)
   // E-mail conectado com "Entrar com Google": endereço, refresh token
   // (criptografado com SESSION_SECRET) e até onde a caixa já foi lida.
   googleEmail         String?

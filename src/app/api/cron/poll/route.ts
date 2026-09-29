@@ -39,9 +39,8 @@ export async function GET(request: Request) {
     email.error = err instanceof Error ? err.message : "erro desconhecido";
   }
 
-  // Sem LinkedIn conectado não há o que sincronizar nem enviar por lá.
-  if (!identityId) return NextResponse.json({ ok: true, email, skipped: "Nenhuma conta do LinkedIn conectada" });
-  const conversations = await extractConversations(identityId);
+  // Canais independentes: sem LinkedIn conectado, o e-mail segue sozinho.
+  const conversations = identityId ? await extractConversations(identityId) : [];
   let updatedLeads = 0;
   let newIncomingMessages = 0;
   let fallbacks = 0;
@@ -50,7 +49,7 @@ export async function GET(request: Request) {
   // Uma conversa com problema não pode derrubar a sincronização das outras.
   for (const conv of conversations) {
     try {
-      const result = await syncConversation(conv, identityId);
+      const result = await syncConversation(conv, identityId!);
       updatedLeads++;
       newIncomingMessages += result.saved.filter((m) => m.fromLead).length;
       if (result.usedFallback) fallbacks++;
@@ -77,5 +76,5 @@ export async function GET(request: Request) {
     proactive = { error: err instanceof Error ? err.message : "erro desconhecido" };
   }
 
-  return NextResponse.json({ email, updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
+  return NextResponse.json({ email, linkedin: identityId ? "conectado" : "não conectado", updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
 }

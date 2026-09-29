@@ -48,6 +48,7 @@ export async function syncLeadFromConversation(conv: EdgesConversation): Promise
         // Existe conversa, então o convite foi aceito. Só vira "Conversando"
         // quando o lead escrever (ver sync.ts) — até lá, aguardando resposta.
         status: byProfile.status === "INVITE_SENT" ? "WAITING_REPLY" : byProfile.status,
+        linkedinConnected: true,
       },
     });
   }
@@ -58,6 +59,7 @@ export async function syncLeadFromConversation(conv: EdgesConversation): Promise
       linkedinProfileUrl: normalizeLinkedinUrl(conv.linkedin_profile_url) ?? conv.linkedin_profile_url,
       linkedinThreadId: conv.linkedin_thread_id,
       status: "WAITING_REPLY",
+      linkedinConnected: true,
     },
   });
 }
