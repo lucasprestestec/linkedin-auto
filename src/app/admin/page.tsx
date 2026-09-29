@@ -11,6 +11,10 @@ import { EngagementForm } from "./EngagementForm";
 import { AccountTypeNotice } from "./AccountTypeNotice";
 import { adminLogout } from "./actions";
 import { AgentEval } from "./eval/AgentEval";
+import { EmailStatus } from "./EmailStatus";
+import { emailConnection } from "@/lib/email";
+import { googleConfigured, googleRedirectUri } from "@/lib/gmail";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -32,6 +36,9 @@ export default async function AdminPage() {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const email = await emailConnection();
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
   return (
     <main className="page">
@@ -87,6 +94,16 @@ export default async function AdminPage() {
                 archiveLostEnabled: settings.archiveLostEnabled,
               }}
               withdrawAfterDays={settings.withdrawAfterDays}
+            />
+          </section>
+          <section className="group">
+            <h2 className="group-title">E-mail da secretária</h2>
+            <EmailStatus
+              googleConfigured={googleConfigured()}
+              redirectUri={googleRedirectUri(origin)}
+              connectedAddress={email?.address ?? null}
+              provider={email?.provider ?? null}
+              appUrlSet={Boolean(process.env.APP_URL)}
             />
           </section>
           <section className="group">

@@ -9,6 +9,8 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/webhooks/") ||
+    // Imagem de abertura dos e-mails: carregada pelo app de e-mail do cliente.
+    pathname.startsWith("/api/o/") ||
     pathname === "/login" ||
     pathname.startsWith("/_next")
   ) {

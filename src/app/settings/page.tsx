@@ -11,6 +11,8 @@ import { OwnerNameForm } from "./OwnerNameForm";
 import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
+import { EmailCard } from "./EmailCard";
+import { passwordEmailAddress } from "@/lib/email";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
 import { IconBan, IconBell, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconTarget } from "@/components/Icons";
@@ -73,7 +75,8 @@ function exclusionSummary(raw: string | null) {
   return parts.length ? parts.join(", ") : "Ninguém por enquanto";
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
+  const emailResult = (await searchParams).email;
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const status = await getConnectionStatus(settings.linkedinIdentityId);
   const connected = status.connected && !settings.linkedinNeedsReconnect;
@@ -125,6 +128,16 @@ export default async function SettingsPage() {
             )}
             {settings.linkedinIdentityId && <DisconnectButton />}
           </section>
+        </section>
+
+        <section className="group rise">
+          <h2 className="group-title">E-mail</h2>
+          <EmailCard
+            googleAddress={settings.googleEmail}
+            expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
+            fallbackAddress={passwordEmailAddress()}
+            result={typeof emailResult === "string" ? emailResult : null}
+          />
         </section>
 
         <section className="group rise">

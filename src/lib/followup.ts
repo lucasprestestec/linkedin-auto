@@ -12,6 +12,7 @@ import { instructionsFor } from "@/lib/campaigns";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { PROACTIVE_STATUSES } from "@/lib/status";
 import { followUpRuleFor } from "@/lib/followupPolicy";
+import { sendOnChannel } from "@/lib/channels";
 
 // Parte proativa do cron: o agente fala primeiro e retoma conversas paradas.
 // Tudo aqui usa só ações Engagement da edges.run (lista de conexões e envio
@@ -173,20 +174,22 @@ async function sendFollowUps(
       const history = await prisma.message.findMany({
         where: { leadId: lead.id },
         orderBy: { deliveredAt: "asc" },
-        select: { sender: true, content: true },
+        select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true },
       });
+      // Retoma no canal em que a conversa parou (e-mail continua por e-mail).
+      const channel = lead.messages[0].channel === "EMAIL" ? "EMAIL" : "LINKEDIN";
       const attempt = lead.followUpsSent + 1;
       const previous = new Set(history.filter((m) => m.sender !== "LEAD").map((m) => normalizeText(m.content)));
 
       const instructions = await instructionsFor(lead, settings);
-      let content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount);
+      let content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount, channel);
       if (previous.has(normalizeText(content))) {
         // Repetiu uma mensagem anterior: uma segunda tentativa; se repetir de novo, não envia.
-        content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount);
+        content = await generateFollowUp(instructions, lead, history, attempt, lead.rule.maxCount, channel);
         if (previous.has(normalizeText(content))) throw new Error("o agente repetiu uma mensagem anterior");
       }
 
-      await sendAgentMessage(lead, identityId, content);
+      await sendOnChannel(lead, channel, content, { identityId });
       await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: attempt } });
       sent++;
     } catch (err) {

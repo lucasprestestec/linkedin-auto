@@ -1,16 +1,30 @@
 import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
-import { sendMessage } from "@/lib/edges";
 import { decideResponse } from "@/lib/agent";
 import { messagesSentToday } from "@/lib/limits";
 import { instructionsFor } from "@/lib/campaigns";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
+import { sendOnChannel } from "@/lib/channels";
 import type { Lead } from "@prisma/client";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
-// Decide: responder automaticamente, ou marcar NEEDS_HUMAN com o motivo certo.
-export async function handleIncomingMessage(lead: Lead, identityId: string) {
+// Decide: responder automaticamente (no MESMO canal em que ele escreveu), ou
+// marcar NEEDS_HUMAN com o motivo certo.
+export async function handleIncomingMessage(lead: Lead, identityId: string | null) {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+
+  const [history, campaign] = await Promise.all([
+    prisma.message.findMany({
+      where: { leadId: lead.id },
+      orderBy: { deliveredAt: "asc" },
+      select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true },
+    }),
+    lead.campaignId ? prisma.campaign.findUnique({ where: { id: lead.campaignId }, select: { name: true } }) : null,
+  ]);
+  const channel = [...history].reverse().find((m) => m.sender === "LEAD")?.channel ?? "LINKEDIN";
+
+  // Mensagem do LinkedIn sem conta conectada: não há por onde responder agora.
+  if (channel === "LINKEDIN" && !identityId) return;
 
   if (settings.automationPaused) {
     await markNeedsHuman(lead.id, "Automação pausada — responda manualmente");
@@ -22,30 +36,23 @@ export async function handleIncomingMessage(lead: Lead, identityId: string) {
     return;
   }
 
-  if ((await messagesSentToday()) >= settings.dailyMessageLimit) {
+  // O limite diário protege a conta do LinkedIn; e-mail não conta.
+  if (channel === "LINKEDIN" && (await messagesSentToday()) >= settings.dailyMessageLimit) {
     await markNeedsHuman(lead.id, "Limite diário de mensagens atingido");
     return;
   }
-
-  const [history, campaign] = await Promise.all([
-    prisma.message.findMany({
-      where: { leadId: lead.id },
-      orderBy: { deliveredAt: "asc" },
-      select: { sender: true, content: true, deliveredAt: true },
-    }),
-    lead.campaignId ? prisma.campaign.findUnique({ where: { id: lead.campaignId }, select: { name: true } }) : null,
-  ]);
 
   let decision;
   try {
     decision = await decideResponse({
       instructions: await instructionsFor(lead, settings),
       history,
+      channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },
     });
     // Fica nos logs da Vercel: por que o agente fez o que fez.
     console.log(
-      `[agente] lead=${lead.id} modelo=${decision.model} ação=${decision.action} tentativas=${decision.attempts} ` +
+      `[agente] lead=${lead.id} canal=${channel} modelo=${decision.model} ação=${decision.action} tentativas=${decision.attempts} ` +
         `tokens=${decision.usage.inputTokens}/${decision.usage.outputTokens} análise=${JSON.stringify(decision.analysis)}`,
     );
   } catch (err) {
@@ -59,16 +66,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string) {
   }
 
   try {
-    const result = await sendMessage(identityId, lead.linkedinProfileUrl, decision.message);
-    await prisma.message.create({
-      data: {
-        leadId: lead.id,
-        sender: "AGENT",
-        content: decision.message,
-        linkedinMessageId: result.linkedin_message_id,
-        deliveredAt: new Date(result.delivered_at),
-      },
-    });
+    await sendOnChannel(lead, channel, decision.message, { identityId });
     await prisma.lead.update({
       where: { id: lead.id },
       // Recusou: encerra (sem follow-up). Quer avançar: qualificado.
@@ -78,4 +76,3 @@ export async function handleIncomingMessage(lead: Lead, identityId: string) {
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);
   }
 }
-

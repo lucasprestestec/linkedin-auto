@@ -12,6 +12,7 @@ import {
   IconCheckCheck,
   IconFlame,
   IconLinkedin,
+  IconMail,
   IconSearch,
   IconSparkles,
   IconUser,
@@ -21,12 +22,14 @@ import { LeadTabs } from "./LeadTabs";
 import { LeadTags } from "./LeadTags";
 import { LeadCampaign } from "./LeadCampaign";
 import { LeadNotes } from "./LeadNotes";
+import { LeadProfile } from "./LeadProfile";
 import { LeadActions } from "./LeadActions";
 import { HandoffCard } from "./HandoffCard";
 import { LeadFollowUp } from "./LeadFollowUp";
 import { describeRule, followUpRuleFor } from "@/lib/followupPolicy";
 import { DetailsToggle, LeadWorkspace } from "./LeadWorkspace";
 import { ConversationList } from "@/components/ConversationList";
+import { emailEnabled } from "@/lib/email";
 import { getConversationItems } from "@/lib/conversations";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +85,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const knownTags = [...new Set(tagRows.flatMap((r) => r.tags))].sort();
   const author = settings.ownerName?.trim() || "você";
   const highIntent = lead.icpScore != null && lead.icpScore >= 70;
+  // Canais do composer: LinkedIn sempre; e-mail se a caixa está configurada e a
+  // ficha tem e-mail. Começa no canal em que a pessoa escreveu por último.
+  const replyChannels: ("LINKEDIN" | "EMAIL")[] = lead.email && (await emailEnabled()) ? ["LINKEDIN", "EMAIL"] : ["LINKEDIN"];
+  const lastLeadChannel = lead.messages.findLast((m) => m.sender === "LEAD")?.channel;
+  const replyDefault = lastLeadChannel === "EMAIL" ? "EMAIL" : "LINKEDIN";
 
   // ---- Atividades: linha do tempo montada com o que já está no banco ----
   const firstOut = lead.messages.find((m) => m.sender !== "LEAD");
@@ -182,6 +190,18 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 </span>
               )}
               <div className="msg-body">
+                {message.channel === "EMAIL" && (
+                  <div className="msg-channel">
+                    <IconMail size={12} /> E-mail{message.subject ? ` · ${message.subject}` : ""}
+                    {!fromLead && message.openToken && (
+                      <span className={message.openCount > 0 ? "open-badge opened" : "open-badge"}>
+                        {message.openCount > 0
+                          ? `Aberto${message.openCount > 1 ? ` ${message.openCount}x` : ""} · ${dayLabel(message.lastOpenedAt!)} ${clockTime(message.lastOpenedAt!)}`
+                          : "Não aberto"}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="bubble">{message.content}</div>
                 <div className="msg-meta">
                   {message.sender === "AGENT" && (
@@ -302,6 +322,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       {companyRow}
       <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
       {sideCards}
+      <LeadProfile leadId={lead.id} firstName={firstName} email={lead.email} phone={lead.phone} personal={lead.personal} variant="tab" />
       <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
       {moreInfo}
     </div>
@@ -333,7 +354,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <LeadTabs
             chat={conversation}
             about={aboutTab}
-            composer={<ReplyForm key="composer" leadId={lead.id} firstName={firstName} profileUrl={lead.linkedinProfileUrl} />}
+            composer={<ReplyForm
+                key="composer"
+                leadId={lead.id}
+                firstName={firstName}
+                profileUrl={lead.linkedinProfileUrl}
+                channels={replyChannels}
+                defaultChannel={replyDefault}
+              />}
           />
         </div>
 
@@ -344,6 +372,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
           </section>
           {sideCards}
+          <LeadProfile leadId={lead.id} firstName={firstName} email={lead.email} phone={lead.phone} personal={lead.personal} />
           <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
           {moreInfo}
         </aside>
