@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractConversations } from "@/lib/edges";
-import { getActiveIdentityId } from "@/lib/identity";
+import { activeIdentityIdOrNull } from "@/lib/identity";
 import { handleIncomingMessage } from "@/lib/respond";
 import { isValidBearer } from "@/lib/auth";
 import { syncConversation } from "@/lib/sync";
@@ -22,7 +22,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const identityId = await getActiveIdentityId();
+  // Sem LinkedIn conectado não há o que sincronizar nem enviar.
+  const identityId = await activeIdentityIdOrNull();
+  if (!identityId) return NextResponse.json({ ok: true, skipped: "Nenhuma conta do LinkedIn conectada" });
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const conversations = await extractConversations(identityId);
   let updatedLeads = 0;
