@@ -39,6 +39,8 @@ model Lead {
   // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
   // a pessoa pode estar conversando por e-mail com o convite ainda pendente.
   linkedinConnected Boolean   @default(false)
+  // Quando a conexão no LinkedIn foi detectada (convite aceito etc.).
+  connectedAt       DateTime?
   needsHumanReason  String?
   // Quando o convite foi enviado (callback da edges.run). É o que conta pro limite
   // diário de convites — o status muda assim que o convite é aceito.
@@ -185,6 +187,10 @@ model Settings {
   // depois de quantos dias de convite não aceito ela se apresenta por e-mail
   // (null = nunca).
   emailChannelEnabled Boolean @default(true)
+  // Resumo do dia no fim do expediente (push + e-mail pra própria caixa) e o
+  // dia (AAAA-MM-DD, fuso de SP) em que já foi enviado.
+  dailySummaryEnabled Boolean @default(true)
+  dailySummarySentOn  String?
   dailyEmailLimit     Int     @default(20)
   emailInviteFallbackDays Int? @default(5)
   // E-mail conectado com "Entrar com Google": endereço, refresh token

@@ -70,6 +70,7 @@ async function acceptInvites(identityId: string, settings: Settings): Promise<nu
         linkedinProfileId: inv.linkedin_profile_id != null ? String(inv.linkedin_profile_id) : null,
         status: "WAITING_REPLY",
         linkedinConnected: true,
+        connectedAt: new Date(),
         tags: ["convite recebido"],
         // A mensagem que a pessoa mandou junto com o convite dá contexto ao corretor.
         notes: inv.message?.trim() ? `Mensagem do convite: "${inv.message.trim()}"` : null,

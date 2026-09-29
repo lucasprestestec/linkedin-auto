@@ -125,3 +125,13 @@ export function dayKeyOf(date: Date): string {
 export function weekdayShort(date: Date): string {
   return date.toLocaleDateString("pt-BR", { weekday: "short", timeZone: TIME_ZONE }).replace(".", "");
 }
+
+// Motivo legível: erros técnicos (ex.: do banco) vêm com várias linhas de
+// detalhe — fica só a primeira frase, com tamanho de notificação. O detalhe
+// completo vai pro log.
+export function readableReason(reason: string): string {
+  const lines = reason.split("\n").map((l) => l.trim()).filter(Boolean);
+  let first = lines[0] ?? "Precisa da sua atenção";
+  if (first.endsWith(":")) first = `${first} erro técnico ao enviar (tente de novo ou responda você)`;
+  return first.length > 180 ? `${first.slice(0, 177)}…` : first;
+}

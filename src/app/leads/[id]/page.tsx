@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { LeadStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { clockTime, dayLabel, relativeTime, sameDay, shortDate, splitHeadline } from "@/lib/format";
+import { clockTime, dayLabel, readableReason, relativeTime, sameDay, shortDate, splitHeadline } from "@/lib/format";
 import { STATUS_LABEL, STATUS_TONE } from "@/lib/status";
 import { EMPTY_SEARCH, buildLinkedinSearchUrl } from "@/lib/linkedin";
 import { Avatar } from "@/components/Avatar";
@@ -101,7 +101,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     firstOut && { when: firstOut.deliveredAt, text: firstOut.sender === "AGENT" ? "A IA abriu a conversa" : "Você abriu a conversa" },
     firstIn && { when: firstIn.deliveredAt, text: `${firstName} respondeu pela primeira vez` },
     lead.followUpsSent > 0 && lastMsg && { when: lastMsg.deliveredAt, text: `${lead.followUpsSent} follow-up${lead.followUpsSent > 1 ? "s" : ""} sem resposta` },
-    lead.status === "NEEDS_HUMAN" && { when: lead.updatedAt, text: `A IA passou pra você: ${lead.needsHumanReason ?? "precisa de resposta"}` },
+    lead.status === "NEEDS_HUMAN" && { when: lead.updatedAt, text: `A IA passou pra você: ${readableReason(lead.needsHumanReason ?? "precisa de resposta")}` },
     lead.status === "QUALIFIED" && { when: lead.updatedAt, text: "Marcado como qualificado" },
     lead.archivedAt && { when: lead.archivedAt, text: "Conversa arquivada no LinkedIn" },
   ]
@@ -224,7 +224,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       })}
 
       {lead.status === "NEEDS_HUMAN" && (
-        <HandoffCard leadId={lead.id} firstName={firstName} reason={lead.needsHumanReason ?? "A conversa precisa de você"} when={relativeTime(lead.updatedAt)} />
+        <HandoffCard leadId={lead.id} firstName={firstName} reason={readableReason(lead.needsHumanReason ?? "A conversa precisa de você")} when={relativeTime(lead.updatedAt)} />
       )}
       <div id="thread-end" />
     </div>

@@ -8,6 +8,7 @@ import { runProactive } from "@/lib/followup";
 import { isWithinWorkHours } from "@/lib/schedule";
 import { prisma } from "@/lib/prisma";
 import { syncEmailInbox } from "@/lib/emailSync";
+import { maybeSendDailySummary } from "@/lib/dailySummary";
 
 // Geração de texto + envio por lead somam alguns segundos; a parte proativa é
 // limitada por rodada (ver lib/followup.ts), mas o padrão da função é curto.
@@ -76,5 +77,14 @@ export async function GET(request: Request) {
     proactive = { error: err instanceof Error ? err.message : "erro desconhecido" };
   }
 
-  return NextResponse.json({ email, linkedin: identityId ? "conectado" : "não conectado", updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
+  // Fim do expediente: resumo do dia (uma vez por dia).
+  let summary;
+  try {
+    summary = await maybeSendDailySummary(settings);
+  } catch (err) {
+    console.error("Falha no resumo do dia", err);
+    summary = { error: err instanceof Error ? err.message : "erro desconhecido" };
+  }
+
+  return NextResponse.json({ summary, email, linkedin: identityId ? "conectado" : "não conectado", updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
 }

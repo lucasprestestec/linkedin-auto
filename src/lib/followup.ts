@@ -73,6 +73,7 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
       where: { id: lead.id },
       data: {
         linkedinConnected: true,
+        connectedAt: new Date(),
         // Quem já conversa por e-mail continua no status que está.
         status: lead.status === "INVITE_SENT" ? "WAITING_REPLY" : lead.status,
         // O ID do perfil é o mesmo que vem como remetente no histórico de

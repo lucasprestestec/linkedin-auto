@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { relativeTime } from "@/lib/format";
+import { readableReason, relativeTime } from "@/lib/format";
 
 // Dados do "chrome" do painel (barra lateral, sino, menu): nome do corretor,
 // quem precisa dele e quantas conversas esperam resposta.
@@ -35,7 +35,7 @@ export async function getShellData(): Promise<ShellData> {
     needYou: urgent.slice(0, 6).map((l) => ({
       id: l.id,
       name: [l.firstName, l.lastName].filter(Boolean).join(" ") || "Lead",
-      reason: l.needsHumanReason ?? "Precisa da sua resposta",
+      reason: readableReason(l.needsHumanReason ?? "Precisa da sua resposta"),
       when: relativeTime(l.updatedAt),
     })),
   };
