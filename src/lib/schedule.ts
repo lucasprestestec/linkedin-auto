@@ -12,6 +12,16 @@ export function localHourAndWeekday(now = new Date()): { hour: number; weekday: 
   return { hour, weekday };
 }
 
+// Meia-noite de hoje em São Paulo (UTC-3, sem horário de verão desde 2019).
+export function startOfLocalDay(now = new Date()): Date {
+  const key = now.toLocaleDateString("en-CA", { timeZone: TIME_ZONE });
+  return new Date(`${key}T00:00:00-03:00`);
+}
+
+export function localDayKey(now = new Date()): string {
+  return now.toLocaleDateString("en-CA", { timeZone: TIME_ZONE });
+}
+
 export function isWithinWorkHours(
   settings: Pick<Settings, "workStartHour" | "workEndHour" | "workWeekdaysOnly">,
   now = new Date(),

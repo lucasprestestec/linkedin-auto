@@ -10,9 +10,10 @@ import { OwnerNameForm } from "./OwnerNameForm";
 import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
+import { DailySummaryToggle } from "./DailySummaryToggle";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
-import { IconBan, IconBell, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
+import { IconBan, IconBell, IconCalendar, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -90,8 +91,8 @@ export default async function SettingsPage() {
                 <span className={email ? "chip on" : "chip"}>
                   <IconMail size={13} /> {email ? "Conectado" : "Opcional"}
                 </span>
-                <span className="chip">
-                  <IconChat size={13} /> Em breve
+                <span className={settings.deskcommUrl ? "chip on" : "chip"}>
+                  <IconChat size={13} /> {settings.deskcommUrl ? "Conectado" : "Opcional"}
                 </span>
               </span>
             </span>
@@ -123,6 +124,14 @@ export default async function SettingsPage() {
             </SettingItem>
             <SettingItem icon={<IconBan size={19} />} tone="urgent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
               <ExclusionListForm value={settings.exclusionList ?? ""} />
+            </SettingItem>
+            <SettingItem
+              icon={<IconCalendar size={19} />}
+              tone="open"
+              title="Resumo do dia"
+              summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
+            >
+              <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
             </SettingItem>
             {/* Sem as chaves de push no servidor, o card só mostraria um aviso técnico. */}
             {pushPublicKey() && (

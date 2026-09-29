@@ -1557,3 +1557,119 @@ html:root:not([data-lux="off"]) .login-title span {
   background: var(--urgent-soft);
   border-color: rgba(239, 91, 60, 0.3);
 }
+
+/* Início: números de hoje e linha do tempo da secretária */
+.today-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.today-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.today-stats dd {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1.1;
+}
+
+.today-stats dt {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.day-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-timeline li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 2px;
+  min-width: 0;
+}
+
+.day-timeline li + li {
+  border-top: 1px solid var(--border);
+}
+
+.tl-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(216, 178, 122, 0.12);
+  color: var(--gold);
+}
+
+.tl-reply .tl-icon,
+.tl-accepted .tl-icon {
+  background: rgba(63, 208, 122, 0.12);
+  color: #3fd07a;
+}
+
+.tl-open .tl-icon {
+  background: rgba(120, 160, 255, 0.12);
+  color: #8fb0ff;
+}
+
+.tl-handoff .tl-icon {
+  background: rgba(239, 91, 60, 0.14);
+  color: var(--urgent-ink);
+}
+
+.tl-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-2);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tl-text b {
+  color: var(--text);
+}
+
+.tl-time {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.tl-more {
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.today-note {
+  font-size: 11px;
+  color: var(--text-3);
+}

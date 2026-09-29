@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { IconAlert, IconArrowRight, IconLinkedin, IconMail, IconPaperclip, IconSparkles } from "@/components/Icons";
+import { IconAlert, IconArrowRight, IconChat, IconLinkedin, IconMail, IconPaperclip, IconSparkles } from "@/components/Icons";
 import { sendReply, suggestLeadReply } from "./actions";
 
-type Channel = "LINKEDIN" | "EMAIL";
-const LABEL: Record<Channel, string> = { LINKEDIN: "LinkedIn", EMAIL: "E-mail" };
+type Channel = "LINKEDIN" | "EMAIL" | "WHATSAPP";
+const LABEL: Record<Channel, string> = { LINKEDIN: "LinkedIn", EMAIL: "E-mail", WHATSAPP: "WhatsApp" };
 
 export function ReplyForm({
   leadId,
@@ -87,7 +87,7 @@ export function ReplyForm({
               className={channel === c ? "active" : undefined}
               onClick={() => setChannel(c)}
             >
-              {c === "EMAIL" ? <IconMail size={14} /> : <IconLinkedin size={14} />} {LABEL[c]}
+              {c === "EMAIL" ? <IconMail size={14} /> : c === "WHATSAPP" ? <IconChat size={14} /> : <IconLinkedin size={14} />} {LABEL[c]}
             </button>
           ))}
         </div>
@@ -110,7 +110,13 @@ export function ReplyForm({
             ref={textareaRef}
             id="reply-box"
             name="content"
-            placeholder={channel === "EMAIL" ? `Escreva um e-mail para ${firstName}...` : `Digite uma mensagem para ${firstName}...`}
+            placeholder={
+              channel === "EMAIL"
+                ? `Escreva um e-mail para ${firstName}...`
+                : channel === "WHATSAPP"
+                  ? `WhatsApp para ${firstName}...`
+                  : `Digite uma mensagem para ${firstName}...`
+            }
             aria-label="Mensagem"
             required
             rows={1}

@@ -39,6 +39,11 @@ model Lead {
   // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
   // a pessoa pode estar conversando por e-mail com o convite ainda pendente.
   linkedinConnected Boolean   @default(false)
+  // Quando a conexão no LinkedIn foi detectada (convite aceito etc.).
+  connectedAt       DateTime?
+  // WhatsApp (via Deskcomm): conversa aberta lá e até onde já foi lida.
+  whatsappConversationId String? @unique
+  whatsappLastAt         DateTime?
   needsHumanReason  String?
   // Quando o convite foi enviado (callback da edges.run). É o que conta pro limite
   // diário de convites — o status muda assim que o convite é aceito.
@@ -134,6 +139,8 @@ model Message {
   subject   String?
   // Gmail: conversa (thread) em que a mensagem está, pra responder nela.
   emailThreadId String?
+  // WhatsApp (Deskcomm): id da mensagem lá — evita gravar duas vezes.
+  whatsappMessageId String? @unique
   // Rastreio de abertura dos e-mails enviados (imagem invisível). Sinal fraco:
   // alguns apps abrem sozinhos (Apple Mail), outros bloqueiam imagens (Outlook).
   openToken    String?   @unique
@@ -185,6 +192,18 @@ model Settings {
   // depois de quantos dias de convite não aceito ela se apresenta por e-mail
   // (null = nunca).
   emailChannelEnabled Boolean @default(true)
+  // WhatsApp pelo Deskcomm (MCP): endereço, token (criptografado) e o canal
+  // (número) de onde as conversas novas saem. A secretária só usa o WhatsApp
+  // com quem já deu sinal de interesse.
+  deskcommUrl         String?
+  deskcommToken       String? @db.Text
+  deskcommChannelId   String?
+  whatsappChannelEnabled Boolean @default(true)
+  dailyWhatsappLimit  Int     @default(15)
+  // Resumo do dia no fim do expediente (push + e-mail pra própria caixa) e o
+  // dia (AAAA-MM-DD, fuso de SP) em que já foi enviado.
+  dailySummaryEnabled Boolean @default(true)
+  dailySummarySentOn  String?
   dailyEmailLimit     Int     @default(20)
   emailInviteFallbackDays Int? @default(5)
   // E-mail conectado com "Entrar com Google": endereço, refresh token

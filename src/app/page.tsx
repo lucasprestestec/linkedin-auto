@@ -7,7 +7,9 @@ import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
 import { Avatar } from "@/components/Avatar";
 import { Sparkline } from "@/components/Sparkline";
-import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconMessages, IconUserPlus } from "@/components/Icons";
+import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconEye, IconFlame, IconMessages, IconSparkles, IconUserPlus } from "@/components/Icons";
+import { dailyReport, type TimelineKind } from "@/lib/dailyReport";
+import { clockTime } from "@/lib/format";
 import { AutomationBar } from "./AutomationBar";
 import { HomeConversations } from "./HomeConversations";
 
@@ -36,7 +38,7 @@ async function getData() {
   const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] } } };
   const inbound = { some: { sender: "LEAD" as const } };
 
-  const [settings, conversations, recentLeads, messagesToday, remaining, contacted, repliedAfterContact, active, qualified, recentMsgs, recentQualified] =
+  const [settings, conversations, recentLeads, messagesToday, remaining, contacted, repliedAfterContact, active, qualified, recentMsgs, recentQualified, report] =
     await Promise.all([
       prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
       getConversationItems(),
@@ -59,6 +61,7 @@ async function getData() {
       prisma.lead.count({ where: { status: "QUALIFIED" } }),
       prisma.message.findMany({ where: { deliveredAt: { gte: since } }, select: { sender: true, deliveredAt: true } }),
       prisma.lead.findMany({ where: { status: "QUALIFIED", updatedAt: { gte: since } }, select: { updatedAt: true } }),
+      dailyReport(),
     ]);
 
   // Séries diárias (mais antigo → hoje) pros minigráficos.
@@ -85,6 +88,7 @@ async function getData() {
   const levas = [...byDay.values()].sort((a, b) => b.key.localeCompare(a.key)).slice(0, LEVAS);
 
   return {
+    report,
     settings,
     conversations,
     levas,
@@ -106,6 +110,16 @@ async function getData() {
   };
 }
 
+const TIMELINE_ICON: Record<TimelineKind, React.ReactNode> = {
+  invite: <IconUserPlus size={15} />,
+  accepted: <IconCheck size={15} strokeWidth={2.6} />,
+  sent: <IconSparkles size={15} />,
+  reply: <IconMessages size={15} />,
+  open: <IconEye size={15} />,
+  handoff: <IconAlert size={15} />,
+  qualified: <IconFlame size={15} />,
+};
+
 function listNames(names: string[]) {
   if (names.length <= 1) return names.join("");
   if (names.length <= 3) return `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
@@ -113,7 +127,8 @@ function listNames(names: string[]) {
 }
 
 export default async function HomePage() {
-  const { settings, conversations, levas, remaining, messagesToday, invitesToday, kpis, spark } = await getData();
+  const { report, settings, conversations, levas, remaining, messagesToday, invitesToday, kpis, spark } = await getData();
+  const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
 
@@ -200,6 +215,34 @@ export default async function HomePage() {
           )}
 
           <HomeConversations items={conversations} />
+
+          <section className="panel" aria-labelledby="timeline-title">
+            <div className="panel-head">
+              <h2 id="timeline-title">O que a secretária fez hoje</h2>
+              <span className="panel-note">{report.timeline.length ? `${report.timeline.length} acontecimento${report.timeline.length > 1 ? "s" : ""}` : ""}</span>
+            </div>
+            {report.timeline.length === 0 ? (
+              <p className="panel-empty">
+                Nada por enquanto. Assim que ela convidar, escrever ou alguém responder, aparece aqui — e no fim do expediente você recebe o resumo do
+                dia.
+              </p>
+            ) : (
+              <ol className="day-timeline">
+                {report.timeline.slice(0, 12).map((t, i) => (
+                  <li key={`${t.kind}-${t.leadId}-${i}`} className={`tl-${t.kind}`}>
+                    <span className="tl-icon" aria-hidden>
+                      {TIMELINE_ICON[t.kind]}
+                    </span>
+                    <Link href={t.kind === "invite" && t.name.endsWith("pessoas") ? "/campaigns" : `/leads/${t.leadId}`} className="tl-text">
+                      <b>{t.name}</b> {t.text}
+                    </Link>
+                    <time className="tl-time">{clockTime(t.at)}</time>
+                  </li>
+                ))}
+                {report.timeline.length > 12 && <li className="tl-more">e mais {report.timeline.length - 12} hoje</li>}
+              </ol>
+            )}
+          </section>
 
           <section className="panel" aria-labelledby="results-title">
             <div className="panel-head">
@@ -290,6 +333,29 @@ export default async function HomePage() {
             <div className="panel-head">
               <h2 id="today-title">Hoje</h2>
             </div>
+            <dl className="today-stats">
+              <div>
+                <dd>{report.invites}</dd>
+                <dt>convites</dt>
+              </div>
+              <div>
+                <dd>{sentToday}</dd>
+                <dt>mensagens</dt>
+                {report.sent.EMAIL + report.sent.WHATSAPP > 0 && (
+                  <span className="today-note">
+                    {[report.sent.EMAIL && `${report.sent.EMAIL} e-mail`, report.sent.WHATSAPP && `${report.sent.WHATSAPP} WhatsApp`].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </div>
+              <div>
+                <dd>{report.replies.length}</dd>
+                <dt>respostas</dt>
+              </div>
+              <div>
+                <dd>{report.opens.length}</dd>
+                <dt>e-mails abertos</dt>
+              </div>
+            </dl>
             <div className="today-list">
               <Link href="/conversations?status=urgent" className="today-item">
                 <span className="today-icon">
@@ -307,10 +373,8 @@ export default async function HomePage() {
                   <IconUserPlus size={18} />
                 </span>
                 <span className="today-text">
-                  <b>
-                    {invitesToday} convite{invitesToday !== 1 ? "s" : ""} enviado{invitesToday !== 1 ? "s" : ""}
-                  </b>
-                  <small>{remaining > 0 ? `Ainda cabem ${remaining} · nova leva` : "Limite de hoje atingido"}</small>
+                  <b>{remaining > 0 ? `Cabem mais ${remaining} convite${remaining !== 1 ? "s" : ""} hoje` : "Limite de convites de hoje atingido"}</b>
+                  <small>{remaining > 0 ? "Toque pra adicionar uma nova leva" : `${invitesToday} enviados hoje`}</small>
                 </span>
                 <IconArrowRight size={16} className="today-go" />
               </Link>

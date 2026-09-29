@@ -1,6 +1,6 @@
 import type { LeadStatus, MessageSender } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { relativeTime, splitHeadline } from "@/lib/format";
+import { readableReason, relativeTime, splitHeadline } from "@/lib/format";
 
 // Uma linha da lista de conversas (Início, Conversas e ao lado do chat).
 export interface ConvItem {
@@ -43,7 +43,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
         role,
         company,
         status: l.status,
-        needsHumanReason: l.needsHumanReason,
+        needsHumanReason: l.needsHumanReason && readableReason(l.needsHumanReason),
         lastMessage: last ? { content: last.content, sender: last.sender } : null,
         unanswered: last?.sender === "LEAD",
         replied: l._count.messages > 0,

@@ -49,6 +49,7 @@ export async function syncLeadFromConversation(conv: EdgesConversation): Promise
         // quando o lead escrever (ver sync.ts) — até lá, aguardando resposta.
         status: byProfile.status === "INVITE_SENT" ? "WAITING_REPLY" : byProfile.status,
         linkedinConnected: true,
+        connectedAt: byProfile.connectedAt ?? new Date(),
       },
     });
   }
@@ -60,6 +61,7 @@ export async function syncLeadFromConversation(conv: EdgesConversation): Promise
       linkedinThreadId: conv.linkedin_thread_id,
       status: "WAITING_REPLY",
       linkedinConnected: true,
+      connectedAt: new Date(),
     },
   });
 }

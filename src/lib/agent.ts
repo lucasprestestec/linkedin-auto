@@ -497,6 +497,7 @@ COMO DECIDIR
 - E-mail aberto é um indício de interesse (fraco: alguns apps abrem sozinhos). Abriu e não respondeu = vale uma nova tentativa, de preferência por OUTRO canal.
 - Nada de sinal depois de várias tentativas = encerre com elegância (stop) em vez de insistir.
 - Evite repetir o mesmo canal que já ficou sem resposta quando houver outro disponível e fizer sentido.
+- WhatsApp só aparece nos canais quando a pessoa já deu sinal de interesse. É o canal mais pessoal: use quando o sinal for claro (respondeu antes, abriu e-mail) e o LinkedIn/e-mail não andaram; mensagem curta e leve.
 - "wait" só quando o último contato foi recente demais ou algo indica que é melhor dar mais tempo.
 ${input.extraTouch ? "- A sequência normal de retomadas ACABOU. Só envie (uma última vez) se os sinais justificarem de verdade; caso contrário, stop.\n" : ""}
 Use a ferramenta next_step. Nunca responda em texto livre.`;

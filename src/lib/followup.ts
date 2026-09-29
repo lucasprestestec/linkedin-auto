@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
 import { extractConnections, type EdgesConnection } from "@/lib/edges";
 import { decideNextStep, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
-import { emailsSentToday, messagesSentToday } from "@/lib/limits";
+import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { deskcommConfigOf } from "@/lib/deskcomm";
 import { emailEnabled } from "@/lib/email";
 import { isWithinWorkHours } from "@/lib/schedule";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
@@ -13,7 +14,7 @@ import { instructionsFor } from "@/lib/campaigns";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { PROACTIVE_STATUSES } from "@/lib/status";
 import { followUpRuleFor } from "@/lib/followupPolicy";
-import { sendOnChannel } from "@/lib/channels";
+import { CHANNEL_LABEL, sendOnChannel } from "@/lib/channels";
 
 // Parte proativa do cron: o agente fala primeiro e retoma conversas paradas.
 // Tudo aqui usa só ações Engagement da edges.run (lista de conexões e envio
@@ -73,6 +74,7 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
       where: { id: lead.id },
       data: {
         linkedinConnected: true,
+        connectedAt: new Date(),
         // Quem já conversa por e-mail continua no status que está.
         status: lead.status === "INVITE_SENT" ? "WAITING_REPLY" : lead.status,
         // O ID do perfil é o mesmo que vem como remetente no histórico de
@@ -106,11 +108,19 @@ interface Budget {
   total: number;
   LINKEDIN: number;
   EMAIL: number;
+  WHATSAPP: number;
 }
 
 function spend(budget: Budget, channel: MessageChannel) {
   budget.total--;
-  if (channel === "LINKEDIN" || channel === "EMAIL") budget[channel]--;
+  budget[channel]--;
+}
+
+// WhatsApp só com quem já deu sinal de interesse: respondeu em algum canal,
+// abriu um e-mail nosso ou já conversa por lá. Mensagem fria no WhatsApp
+// incomoda e arrisca bloquear o número.
+function showedInterest(lead: Lead, history: HistoryRow[]): boolean {
+  return Boolean(lead.whatsappConversationId) || history.some((m) => m.sender === "LEAD" || (m.sender !== "LEAD" && m.openCount > 0));
 }
 
 const HISTORY_SELECT = { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true, lastOpenedAt: true } as const;
@@ -220,11 +230,11 @@ function signalsFor(lead: Lead, history: HistoryRow[], rule: { maxCount: number 
       : "Vocês estão conectados no LinkedIn.",
   );
   out.push(history.some((m) => m.sender === "LEAD") ? "A pessoa já respondeu antes nesta conversa." : "A pessoa nunca respondeu.");
-  for (const channel of ["LINKEDIN", "EMAIL"] as const) {
+  for (const channel of ["LINKEDIN", "EMAIL", "WHATSAPP"] as const) {
     const ours = history.filter((m) => m.sender !== "LEAD" && m.channel === channel);
     if (!ours.length) continue;
     const last = ours.at(-1)!;
-    let line = `${channel === "LINKEDIN" ? "LinkedIn" : "E-mail"}: ${ours.length} mensagem(ns) nossa(s), a última ${daysAgo(last.deliveredAt, now)}.`;
+    let line = `${CHANNEL_LABEL[channel]}: ${ours.length} mensagem(ns) nossa(s), a última ${daysAgo(last.deliveredAt, now)}.`;
     if (channel === "EMAIL") {
       const tracked = ours.filter((m) => m.openToken);
       const opens = tracked.reduce((n, m) => n + m.openCount, 0);
@@ -233,6 +243,7 @@ function signalsFor(lead: Lead, history: HistoryRow[], rule: { maxCount: number 
     }
     out.push(line);
   }
+  if (lead.phone && !history.some((m) => m.channel === "WHATSAPP")) out.push("Tem WhatsApp na ficha, mas ainda não conversaram por lá.");
   out.push(`Retomadas já feitas desde a última resposta: ${lead.followUpsSent} de ${rule.maxCount}.`);
   return out;
 }
@@ -243,6 +254,7 @@ async function sendFollowUps(
   identityId: string | null,
   settings: Settings,
   emailReady: boolean,
+  whatsappReady: boolean,
   budget: Budget,
 ): Promise<{ sent: number; lost: number; waiting: number }> {
   const now = Date.now();
@@ -294,6 +306,7 @@ async function sendFollowUps(
     const options: MessageChannel[] = [];
     if (identityId && lead.linkedinConnected && budget.LINKEDIN > 0) options.push("LINKEDIN");
     if (emailReady && lead.email && budget.EMAIL > 0) options.push("EMAIL");
+    if (whatsappReady && lead.phone && budget.WHATSAPP > 0 && showedInterest(lead, history)) options.push("WHATSAPP");
     // Nenhum canal disponível agora (limite do dia, LinkedIn desconectado...): tenta na próxima rodada.
     if (options.length === 0) continue;
 
@@ -303,7 +316,7 @@ async function sendFollowUps(
       let reason: string;
       if (options.length === 1 && !extraTouch) {
         channel = options[0];
-        reason = `Sem resposta; retomei pelo ${channel === "EMAIL" ? "e-mail" : "LinkedIn"} (${lead.followUpsSent + 1} de ${lead.rule.maxCount}).`;
+        reason = `Sem resposta; retomei pelo ${channel === "LINKEDIN" ? "LinkedIn" : channel === "EMAIL" ? "e-mail" : "WhatsApp"} (${lead.followUpsSent + 1} de ${lead.rule.maxCount}).`;
       } else {
         const decision = await decideNextStep({
           instructions,
@@ -313,7 +326,7 @@ async function sendFollowUps(
           signals: signalsFor(lead, history, lead.rule, now),
           extraTouch,
         });
-        console.log(`[próximo passo] lead=${lead.id} ação=${decision.action} canal=${decision.channel ?? "-"} motivo=${JSON.stringify(decision.reason)}`);
+        console.log(`[próximo passo] lead=${lead.id} opções=${options.join(",")} ação=${decision.action} canal=${decision.channel ?? "-"} motivo=${JSON.stringify(decision.reason)}`);
         if (decision.action === "stop") {
           await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST", nextStep: decision.reason, nextStepAt: null } });
           lost++;
@@ -361,7 +374,7 @@ async function answerPendingReplies(identityId: string | null): Promise<number> 
   const pending = leads
     .filter((l) => l.messages[0]?.sender === "LEAD")
     // Sem LinkedIn conectado, só dá pra responder quem escreveu por e-mail.
-    .filter((l) => identityId || l.messages[0].channel === "EMAIL")
+    .filter((l) => identityId || l.messages[0].channel !== "LINKEDIN")
     .slice(0, MAX_PROACTIVE_PER_RUN);
   for (const lead of pending) {
     await handleIncomingMessage(lead, identityId);
@@ -370,6 +383,11 @@ async function answerPendingReplies(identityId: string | null): Promise<number> 
 }
 
 // A secretária pode usar o e-mail por conta própria: caixa conectada e canal ligado.
+// WhatsApp: Deskcomm conectado e canal ligado.
+export function whatsappChannelReady(settings: Settings): boolean {
+  return settings.whatsappChannelEnabled && deskcommConfigOf(settings) !== null;
+}
+
 export async function emailChannelReady(settings: Settings): Promise<boolean> {
   return settings.emailChannelEnabled && (await emailEnabled());
 }
@@ -399,12 +417,19 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   const emailReady = await emailChannelReady(settings);
   const linkedinLeft = identityId ? settings.dailyMessageLimit - (await messagesSentToday()) : 0;
   const emailLeft = emailReady ? settings.dailyEmailLimit - (await emailsSentToday()) : 0;
-  const budget: Budget = { total: MAX_PROACTIVE_PER_RUN, LINKEDIN: Math.max(0, linkedinLeft), EMAIL: Math.max(0, emailLeft) };
+  const whatsappReady = whatsappChannelReady(settings);
+  const whatsappLeft = whatsappReady ? settings.dailyWhatsappLimit - (await whatsappSentToday()) : 0;
+  const budget: Budget = {
+    total: MAX_PROACTIVE_PER_RUN,
+    LINKEDIN: Math.max(0, linkedinLeft),
+    EMAIL: Math.max(0, emailLeft),
+    WHATSAPP: Math.max(0, whatsappLeft),
+  };
 
   if (identityId) result.openingsSent = await sendOpenings(identityId, settings, budget);
   result.introEmailsSent = await sendIntroEmails(settings, emailReady, budget);
 
-  const followUps = await sendFollowUps(identityId, settings, emailReady, budget);
+  const followUps = await sendFollowUps(identityId, settings, emailReady, whatsappReady, budget);
   result.followUpsSent = followUps.sent;
   result.waiting = followUps.waiting;
   result.markedLost = followUps.lost;

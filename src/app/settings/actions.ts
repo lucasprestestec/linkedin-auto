@@ -124,3 +124,8 @@ export async function disconnectEmail() {
   revalidatePath("/settings");
   revalidatePath("/channels");
 }
+
+export async function updateDailySummary(enabled: boolean) {
+  await prisma.settings.update({ where: { id: "singleton" }, data: { dailySummaryEnabled: enabled } });
+  revalidatePath("/settings");
+}
