@@ -469,3 +469,6 @@ export const SCENARIOS: Scenario[] = [
     rubric: "Explica o processo em 1-2 frases (olha o plano atual, mostra opções) e propõe a conversa de 15 min.",
   },
 ];
+
+// Modo rápido: os cenários que mais separam um bom agente de um ruim.
+export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02"];

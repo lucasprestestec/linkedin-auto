@@ -129,13 +129,14 @@ BOM: "Entendido, obrigado pelo retorno! Se um dia precisar, fico à disposição
 
 const RULES = `REGRAS FIXAS (valem acima de qualquer material)
 - NUNCA invente preço, desconto, economia, carência, cobertura, rede, operadora ou qualquer fato que não esteja no material do corretor. Não prometa nada em nome dele.
+- Se perguntarem por uma operadora/seguradora/produto específico que o material não cita, não confirme nem negue: diga que trabalha com as principais do mercado e que verifica.
 - Não peça dados sensíveis (CPF, renda, saúde, documentos) e não mande links.
 - Nunca diga que é IA, robô ou assistente — e nunca afirme ser humano se perguntarem: nesse caso, passe pro corretor.
 
 PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
 - quiser falar por telefone, WhatsApp ou e-mail, ou mandar um contato/número/e-mail;
-- propuser ou aceitar um dia/horário concreto para conversar;
+- propuser ou aceitar um dia/horário concreto para conversar (se ele só aceitou conversar, sem horário, NÃO é handoff: responda perguntando o melhor dia e horário e se prefere telefone ou vídeo);
 - perguntar se está falando com robô/IA/mensagem automática;
 - estiver irritado, reclamar, ameaçar denunciar ou fizer crítica séria;
 - indicar outra pessoa para tratar do assunto (registre quem no motivo);
@@ -177,16 +178,21 @@ const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         analysis: {
           type: "string",
           description:
-            "Análise interna, NÃO é enviada: o que o lead disse/quer, em que ponto a conversa está, o que já foi dito (pra não repetir), " +
-            "se alguma regra de handoff/encerramento se aplica e qual o melhor próximo passo. 2 a 5 frases.",
+            "Análise interna, NÃO é enviada. CURTA: no máximo 2 frases (até ~40 palavras): o que o lead quer e qual o próximo passo " +
+            "(ou qual regra de handoff/encerramento se aplica).",
         },
         action: { type: "string", enum: ["reply", "handoff"] },
-        message: { type: "string", description: "Mensagem a enviar (obrigatória se action = reply). Segue o COMO ESCREVER." },
+        message: {
+          type: "string",
+          description: "Texto da mensagem a enviar ao lead, segue o COMO ESCREVER. Obrigatório quando action = reply; deixe vazio (\"\") quando action = handoff.",
+        },
         qualified: { type: "boolean", description: "true se o lead quer avançar. Só com action = reply." },
         declined: { type: "boolean", description: "true se o lead recusou claramente — encerra os follow-ups. Só com action = reply." },
         handoff_reason: { type: "string", description: "Motivo curto e específico (obrigatório se action = handoff)." },
       },
-      required: ["analysis", "action"],
+      // "message" obrigatório: alguns modelos pulam campos opcionais e mandavam
+      // action=reply sem o texto.
+      required: ["analysis", "action", "message"],
     },
   },
 };
@@ -249,12 +255,14 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
     lastAnalysis = out.analysis?.trim() ?? "";
     const base = { analysis: lastAnalysis, model, usage, attempts: attempt };
 
-    if (out.action !== "reply" || !out.message?.trim()) {
+    if (out.action !== "reply") {
       return { action: "handoff", reason: out.handoff_reason?.trim() || "O agente não soube responder.", ...base, checkIssues: lastIssues };
     }
 
-    const message = out.message.trim();
-    lastIssues = checkMessage({ message, previousOutgoing, instructions: input.instructions });
+    // Quis responder mas esqueceu o texto (alguns modelos põem no content):
+    // aproveita o content ou pede de novo, em vez de passar pro corretor.
+    const message = (out.message?.trim() || response.choices[0]?.message?.content?.trim() || "").trim();
+    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions }) : ["faltou o texto da mensagem (campo message vazio)"];
     if (lastIssues.length === 0) {
       return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), ...base, checkIssues: [] };
     }

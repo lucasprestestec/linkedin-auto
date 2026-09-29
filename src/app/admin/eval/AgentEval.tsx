@@ -1,18 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SCENARIOS } from "@/lib/agentEval/scenarios";
+import { QUICK_IDS, SCENARIOS } from "@/lib/agentEval/scenarios";
 import type { EvalResult, ModelInfo } from "@/lib/agentEval/run";
-import { loadEvalSetup, runEvalScenario, setAgentModel } from "./actions";
+import { loadEvalSetup, setAgentModel } from "./actions";
 import { IconAlert, IconCheck, IconDownload, IconRefresh, IconSearch, IconX } from "@/components/Icons";
 
 const STORE_KEY = "admin:agent-eval";
-const CONCURRENCY = 4;
+const CONCURRENCY = 8;
 
-// Sugestões pré-marcadas (se existirem no catálogo): o modelo atual e alguns
-// fortes/baratos de famílias diferentes.
-const SUGGESTED = [/claude.*sonnet/i, /claude.*haiku/i, /kimi.*k3|kimi/i, /gemini.*flash/i];
-const JUDGE_PREF = [/claude.*opus/i, /claude.*sonnet/i, /gpt-5/i];
+// Sugestões pré-marcadas (se existirem no catálogo): o modelo atual e opções
+// baratas de famílias diferentes, pra achar o melhor custo-benefício.
+const SUGGESTED = [/qwen.*flash/i, /glm.*flash/i, /gemini.*flash/i, /deepseek-v4-pro/i];
+
+// Ids com sufixo (":batch", ":US"...) são variantes de roteamento do Nous;
+// ":batch" não aceita conversa. Ficam fora das sugestões e da lista.
+const isVariant = (id: string) => id.includes(":");
+
+async function callScenario(scenarioId: string, model: string, judgeModel: string | null): Promise<EvalResult> {
+  const res = await fetch("/api/admin/eval", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scenarioId, model, judgeModel }),
+  });
+  if (!res.ok) return { scenarioId, model, ok: false, error: `HTTP ${res.status}` };
+  return res.json();
+}
 
 type Summary = {
   model: string;
@@ -49,6 +62,8 @@ export function AgentEval() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
   const [judgeModel, setJudgeModel] = useState<string>("");
+  const [quick, setQuick] = useState(true);
+  const [skipped, setSkipped] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState("");
   const [results, setResults] = useState<Record<string, EvalResult>>({});
   const [running, setRunning] = useState(false);
@@ -67,10 +82,9 @@ export function AgentEval() {
       setModels(r.models);
       setCurrent(r.current);
       setSetupError(r.error ?? null);
-      const ids = r.models.map((m) => m.id);
+      const ids = r.models.map((m) => m.id).filter((id) => !isVariant(id));
       const pre = [r.current, ...SUGGESTED.map((re) => pickLatest(ids, re))].filter((x): x is string => Boolean(x));
       setSelected([...new Set(pre)].slice(0, 5));
-      setJudgeModel(JUDGE_PREF.map((re) => pickLatest(ids, re)).find(Boolean) ?? r.current);
       setLoading(false);
     });
   }, []);
@@ -109,39 +123,56 @@ export function AgentEval() {
     });
   }, [results, priceOf]);
 
-  const visibleModels = models.filter((m) => !filter || m.id.toLowerCase().includes(filter.toLowerCase()));
-  const calls = selected.length * SCENARIOS.length * (judgeModel ? 2 : 1);
+  const scenarios = quick ? SCENARIOS.filter((s) => QUICK_IDS.includes(s.id)) : SCENARIOS;
+  // Variantes com ":" só aparecem se a busca pedir explicitamente (ex.: ":US").
+  const visibleModels = models.filter((m) => (filter.includes(":") || !isVariant(m.id)) && (!filter || m.id.toLowerCase().includes(filter.toLowerCase())));
+  const calls = selected.length * scenarios.length * (judgeModel ? 2 : 1);
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  function store(r: EvalResult) {
+    setResults((prev) => {
+      const updated = { ...prev, [key(r.model, r.scenarioId)]: r };
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify({ results: updated }));
+      } catch {}
+      return updated;
+    });
+  }
+
   async function run() {
-    const tasks = selected.flatMap((m) => SCENARIOS.map((s) => ({ model: m, scenarioId: s.id })));
     stopRef.current = false;
     setRunning(true);
-    setProgress({ done: 0, total: tasks.length });
+    setSkipped({});
     // Limpa resultados antigos dos modelos que vão rodar de novo.
     setResults((prev) => Object.fromEntries(Object.entries(prev).filter(([, r]) => !selected.includes(r.model))));
+
+    // 1º cenário de cada modelo antes de tudo: modelo que não responde (id
+    // errado, sem ferramentas) sai da rodada em vez de falhar N vezes.
+    const [first, ...rest] = scenarios;
+    setProgress({ done: 0, total: selected.length * scenarios.length });
+    const probes = await Promise.all(selected.map((m) => callScenario(first.id, m, judgeModel || null)));
+    probes.forEach(store);
+    const alive = selected.filter((m, i) => probes[i].ok);
+    setSkipped(Object.fromEntries(probes.filter((p) => !p.ok).map((p) => [p.model, p.error ?? "falhou"])));
+
+    const tasks = alive.flatMap((m) => rest.map((s) => ({ model: m, scenarioId: s.id })));
+    setProgress({ done: alive.length, total: alive.length + tasks.length });
     let next = 0;
-    let done = 0;
+    let done = alive.length;
     const worker = async () => {
       while (next < tasks.length && !stopRef.current) {
         const t = tasks[next++];
         let r: EvalResult;
         try {
-          r = await runEvalScenario(t.scenarioId, t.model, judgeModel || null);
+          r = await callScenario(t.scenarioId, t.model, judgeModel || null);
         } catch (err) {
           r = { scenarioId: t.scenarioId, model: t.model, ok: false, error: err instanceof Error ? err.message : "falhou" };
         }
-        setResults((prev) => {
-          const updated = { ...prev, [key(t.model, t.scenarioId)]: r };
-          try {
-            localStorage.setItem(STORE_KEY, JSON.stringify({ results: updated }));
-          } catch {}
-          return updated;
-        });
-        setProgress({ done: ++done, total: tasks.length });
+        store(r);
+        setProgress({ done: ++done, total: alive.length + tasks.length });
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
@@ -220,8 +251,17 @@ export function AgentEval() {
               )}
             </div>
 
+            <div className="seg-choice" role="radiogroup" aria-label="Quantos cenários">
+              <button type="button" role="radio" aria-checked={quick} onClick={() => setQuick(true)}>
+                Rápido · {QUICK_IDS.length} cenários
+              </button>
+              <button type="button" role="radio" aria-checked={!quick} onClick={() => setQuick(false)}>
+                Completo · {SCENARIOS.length} cenários
+              </button>
+            </div>
+
             <label className="field" style={{ gap: 6 }}>
-              <span className="label">Avaliador (dá as notas de naturalidade e competência)</span>
+              <span className="label">Avaliador (opcional — dá notas de naturalidade; dobra o tempo e o custo)</span>
               <select className="input" value={judgeModel} onChange={(e) => setJudgeModel(e.target.value)}>
                 <option value="">Sem avaliador (só as checagens automáticas — mais barato)</option>
                 {models.map((m) => (
@@ -239,11 +279,16 @@ export function AgentEval() {
                 </button>
               ) : (
                 <button type="button" className="btn btn-primary" onClick={run} disabled={selected.length === 0}>
-                  <IconRefresh size={16} /> Rodar {SCENARIOS.length} cenários em {selected.length} modelo{selected.length !== 1 ? "s" : ""}
+                  <IconRefresh size={16} /> Rodar {scenarios.length} cenários em {selected.length} modelo{selected.length !== 1 ? "s" : ""}
                 </button>
               )}
               <span className="tiny faint">{calls} chamadas ao Nous. Usa os créditos da sua conta.</span>
             </div>
+            {Object.entries(skipped).map(([m, err]) => (
+              <p key={m} className="small" style={{ color: "var(--warning-ink)" }}>
+                <IconAlert size={14} /> {m} ficou de fora: não respondeu ao primeiro teste ({err}).
+              </p>
+            ))}
             {progress.total > 0 && (
               <div className="eval-progress" aria-label="Progresso">
                 <i style={{ width: `${(progress.done / progress.total) * 100}%` }} />
