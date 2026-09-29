@@ -7,7 +7,7 @@ export const NAV_ITEMS = [
   { href: "/prospect", label: "Prospectar", Icon: IconUserSearch },
   { href: "/campaigns", label: "Campanhas", Icon: IconMegaphone },
   { href: "/conversations", label: "Conversas", Icon: IconMessages, badge: "attention" as const },
-  { href: "/approvals", label: "AprovaÃ§Ãµes", Icon: IconCheck, badge: "drafts" as const },
+  { href: "/approvals", label: "Aprovações", Icon: IconCheck, badge: "drafts" as const },
   { href: "/channels", label: "Canais", Icon: IconLayers, desktopOnly: true },
   { href: "/settings", label: "Conta", Icon: IconUser },
 ];

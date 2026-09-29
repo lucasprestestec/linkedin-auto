@@ -16,7 +16,7 @@ export interface ShellData {
   automationPaused: boolean;
   needYou: ShellNotification[];
   needYouCount: number;
-  // Mensagens da secretÃ¡ria esperando a sua aprovaÃ§Ã£o.
+  // Mensagens da secretária esperando a sua aprovação.
   draftCount: number;
 }
 

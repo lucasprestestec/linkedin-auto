@@ -97,6 +97,8 @@ export interface LeadContext {
   // Canais que já temos dele (só se sabe se está preenchido; o número em si não entra no prompt).
   phone?: string | null;
   email?: string | null;
+  // Quando a secretária já mandou o link da agenda (não manda de novo).
+  bookingLinkSentAt?: Date | null;
 }
 
 type HistoryItem = Pick<DbMessage, "sender" | "content"> & {
@@ -131,6 +133,7 @@ const STAGE: Record<LeadStatus, string> = {
   CONVERSATION_OPEN: "conversa em andamento (o lead já respondeu antes)",
   NEEDS_HUMAN: "o corretor tinha assumido esta conversa",
   QUALIFIED: "lead já demonstrou interesse forte",
+  MEETING_SCHEDULED: "reunião já marcada com o corretor",
   LOST: "conversa tinha sido encerrada sem avanço",
 };
 
@@ -144,6 +147,7 @@ function leadBlock(lead: LeadContext): string {
   if (lead.phone !== undefined || lead.email !== undefined) {
     lines.push(`Contatos na ficha: WhatsApp ${lead.phone ? "sim" : "não"}; e-mail ${lead.email ? "sim" : "não"}`);
   }
+  if (lead.bookingLinkSentAt) lines.push("Link da agenda já enviado a este lead: sim");
   if (lead.tags?.length) lines.push(`Etiquetas do corretor: ${lead.tags.join(", ")}`);
   if (lead.personal?.trim()) lines.push(`Ficha pessoal (o que o corretor sabe dessa pessoa): ${lead.personal.trim().slice(0, 1200)}`);
   return lines.join("\n");
@@ -212,6 +216,15 @@ ENCERRAR SEM INSISTIR (declined = true): o lead disse claramente que não tem in
 
 QUALIFICADO (qualified = true): o lead quer avançar (quer conversar, entender condições, contratar).`;
 
+// Só entra no prompt quando o corretor configurou o link da agenda (Ajustes).
+const BOOKING_RULES = `AGENDA DO CORRETOR (você pode marcar a reunião)
+- O corretor tem uma agenda online. Quando o lead topar conversar, pedir uma conversa, quiser avançar ou sugerir um dia/horário, responda curto e marque offer_booking = true: o sistema anexa o link da agenda no fim da sua mensagem.
+- NUNCA escreva o link, nem invente, sugira ou confirme horários: quem confirma é a própria agenda. Diga algo como "te passo o link da minha agenda pra você escolher o melhor horário".
+- Se o lead sugerir um horário, NÃO diga que "funciona", "está ótimo" ou "está reservado": você não sabe se está livre. Diga que a agenda mostra o que está disponível e que ele pode escolher lá o horário que preferir.
+- Com a agenda disponível, o lead propor um dia/horário concreto NÃO é handoff: aponte a agenda (offer_booking = true).
+- Só ofereça a agenda quando houver interesse real. Se o lead ainda está entendendo, continue a conversa primeiro.
+- Se o lead já recebeu o link (veja "Link da agenda já enviado" em QUEM É O LEAD), não mande de novo (offer_booking = false). Se ele disser que não conseguiu agendar, que os horários não servem ou pedir outra forma, aí passe pro corretor.`;
+
 function contextBlock(instructions: string | null, lead: LeadContext, now: Date) {
   return `MATERIAL DO CORRETOR (o que você pode afirmar sobre ofertas e sobre ele)
 ${instructions?.trim() || DEFAULT_INSTRUCTIONS}
@@ -227,7 +240,7 @@ ${leadBlock(lead)}`;
 // ---------------------------------------------------------------------------
 
 export type AgentDecision = (
-  | { action: "reply"; message: string; qualified: boolean; declined: boolean }
+  | { action: "reply"; message: string; qualified: boolean; declined: boolean; offerBooking: boolean }
   | { action: "handoff"; reason: string }
 ) & { analysis: string; model: string; usage: Usage; attempts: number; checkIssues: string[] };
 
@@ -253,6 +266,10 @@ const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         qualified: { type: "boolean", description: "true se o lead quer avançar. Só com action = reply." },
         declined: { type: "boolean", description: "true se o lead recusou claramente — encerra os follow-ups. Só com action = reply." },
         handoff_reason: { type: "string", description: "Motivo curto e específico (obrigatório se action = handoff)." },
+        offer_booking: {
+          type: "boolean",
+          description: "true para o sistema anexar o link da agenda do corretor à mensagem. Só quando a seção AGENDA DO CORRETOR existir e o lead já estiver pronto para marcar. Só com action = reply.",
+        },
       },
       // "message" obrigatório: alguns modelos pulam campos opcionais e mandavam
       // action=reply sem o texto.
@@ -268,6 +285,8 @@ export interface ConversationInput {
   // Canal em que a resposta vai sair (o mesmo em que o lead escreveu).
   channel?: MessageChannel;
   now?: Date;
+  // O corretor configurou o link da agenda: a secretária pode oferecê-lo.
+  bookingAvailable?: boolean;
 }
 
 export async function decideResponse(input: ConversationInput, opts: { model?: string } = {}): Promise<AgentDecision> {
@@ -284,7 +303,7 @@ CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}
 
 ${STYLE}
 
-${RULES}
+${RULES}${input.bookingAvailable ? `\n\n${BOOKING_RULES}` : ""}
 
 Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão. Nunca responda em texto livre.`;
 
@@ -314,6 +333,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
       message?: string;
       qualified?: boolean;
       declined?: boolean;
+      offer_booking?: boolean;
       handoff_reason?: string;
     };
     lastAnalysis = out.analysis?.trim() ?? "";
@@ -326,9 +346,9 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
     // Quis responder mas esqueceu o texto (alguns modelos põem no content):
     // aproveita o content ou pede de novo, em vez de passar pro corretor.
     const message = (out.message?.trim() || response.choices[0]?.message?.content?.trim() || "").trim();
-    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions }) : ["faltou o texto da mensagem (campo message vazio)"];
+    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions, bookingAvailable: input.bookingAvailable }) : ["faltou o texto da mensagem (campo message vazio)"];
     if (lastIssues.length === 0) {
-      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), ...base, checkIssues: [] };
+      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), offerBooking: Boolean(out.offer_booking) && Boolean(input.bookingAvailable), ...base, checkIssues: [] };
     }
 
     messages.push(
@@ -575,6 +595,26 @@ export async function generateFollowUp(
       { ...lead, followUpsSent: attempt - 1 },
       `O lead não respondeu à última mensagem. Escreva o follow-up ${attempt} de ${maxCount}. ${angle} ` +
         "Não repita frases, aberturas ou perguntas do histórico. Não mencione que é um follow-up nem conte tentativas.\n" +
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+    ),
+    `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,
+    { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
+  );
+}
+
+// Lembrete único depois de mandar o link da agenda e o lead não marcar.
+export async function generateBookingNudge(
+  instructions: string | null,
+  lead: LeadContext,
+  history: HistoryItem[],
+  channel: MessageChannel = "LINKEDIN",
+): Promise<string> {
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      lead,
+      "Você mandou o link da agenda do corretor e a pessoa ainda não marcou horário. Escreva UMA mensagem leve perguntando se conseguiu ver um horário " +
+        "ou se prefere sugerir um dia. NÃO escreva o link de novo, não cobre, não invente horários. Não mencione que é um lembrete.\n" +
         `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
     ),
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,

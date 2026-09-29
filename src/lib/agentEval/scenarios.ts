@@ -16,6 +16,9 @@ export interface Scenario {
   // Deve (true) ou não deve (false) marcar recusa. undefined = tanto faz.
   declined?: boolean;
   qualified?: boolean;
+  // O corretor tem link de agenda configurado neste cenário / a secretária deve (ou não) oferecê-lo.
+  booking?: boolean;
+  offerBooking?: boolean;
   rubric: string;
 }
 
@@ -510,6 +513,59 @@ export const SCENARIOS: Scenario[] = [
     history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Me chama no zap agora, 51 97777-6666, prefiro resolver por lá" }],
     expect: "handoff",
     rubric: "Handoff: o lead pede contato imediato no WhatsApp, que é do corretor. Motivo cita o pedido e o número.",
+  },
+  // --- agenda (o corretor configurou o link de agendamento)
+  {
+    id: "g01",
+    title: "Topa conversar",
+    category: "avanço",
+    lead: L("Marcos", "Teixeira", "Diretor Financeiro · Teixeira Construções"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Faz sentido. Vamos conversar, quando você tem tempo?" }],
+    expect: "reply",
+    qualified: true,
+    booking: true,
+    offerBooking: true,
+    rubric:
+      "Oferece a agenda com uma frase curta (ex.: 'te passo o link pra você escolher o melhor horário'). NÃO escreve link nem sugere horários específicos. " +
+      "Não pergunta dia/horário (a agenda resolve).",
+  },
+  {
+    id: "g02",
+    title: "Sugere um horário",
+    category: "avanço",
+    lead: L("Luiza", "Prado", "Sócia · Prado Advocacia"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Tenho interesse. Pode ser quinta às 15h?" }],
+    expect: "reply",
+    qualified: true,
+    booking: true,
+    offerBooking: true,
+    rubric: "NÃO é handoff: com agenda disponível, aponta a agenda para confirmar o horário. Não confirma 'quinta às 15h' por conta própria e não escreve o link.",
+  },
+  {
+    id: "g03",
+    title: "Não achou horário na agenda",
+    category: "handoff",
+    lead: L("Sérgio", "Barros", "CEO · Barros Indústria", { bookingLinkSentAt: new Date(), status: "QUALIFIED" }),
+    history: [
+      { sender: "AGENT", content: OPEN },
+      { sender: "LEAD", content: "Vamos sim, pode me mandar a agenda." },
+      { sender: "AGENT", content: "Combinado! Te passo o link da minha agenda pra você escolher o melhor horário.\n\nhttps://agenda.exemplo.com/lucas" },
+      { sender: "LEAD", content: "Olhei aqui e nenhum horário serve. Tem algo depois das 18h?" },
+    ],
+    expect: "handoff",
+    booking: true,
+    rubric: "Handoff: o link já foi enviado e os horários não servem. Motivo cita o pedido de horário depois das 18h. Não manda o link de novo.",
+  },
+  {
+    id: "g04",
+    title: "Ainda só entendendo",
+    category: "avanço",
+    lead: L("Patrícia", "Gomes", "Gerente Administrativa · Gomes Alimentos"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Que tipo de plano vocês trabalham? Ainda não entendi bem." }],
+    expect: "reply",
+    booking: true,
+    offerBooking: false,
+    rubric: "Explica em 1-2 frases o que o corretor faz e faz uma pergunta. NÃO oferece a agenda ainda: o lead só está entendendo.",
   },
 ];
 

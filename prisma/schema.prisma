@@ -13,6 +13,7 @@ enum LeadStatus {
   CONVERSATION_OPEN // o lead já respondeu pelo menos uma vez — conversa de verdade
   NEEDS_HUMAN      // agente pediu handoff
   QUALIFIED        // pronto para fechar
+  MEETING_SCHEDULED // reunião marcada: a secretária não escreve mais, só o corretor
   LOST             // sem resposta / recusou
 }
 
@@ -77,6 +78,11 @@ model Lead {
   // quando ela volta a olhar esse lead (ex.: decidiu esperar).
   nextStep          String?
   nextStepAt        DateTime?
+  // Reunião: quando foi marcada (data da reunião) e o link de agenda que a secretária mandou.
+  meetingAt         DateTime?
+  bookingLinkSentAt DateTime?
+  // A secretária já perguntou "conseguiu ver um horário?" (uma vez só).
+  bookingNudgedAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -203,8 +209,11 @@ model Message {
 model Settings {
   id                  String  @id @default("singleton")
   automationPaused    Boolean @default(true)
-  // Modo piloto: a secretÃ¡ria escreve, mas nada sai sem o seu OK (aba AprovaÃ§Ãµes).
+  // Modo piloto: a secretária escreve, mas nada sai sem o seu OK (aba Aprovações).
   approvalMode        Boolean @default(true)
+  // Link de agenda do corretor (Calendly, Cal.com, Google...): a secretária o manda
+  // quando o lead topa conversar. Vazio = ela não agenda, passa pro corretor.
+  bookingUrl          String?
   // Como o corretor quer ser chamado no painel ("Boa noite, Lucas.").
   ownerName           String?
   dailyInviteLimit    Int     @default(18)

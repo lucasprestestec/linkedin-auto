@@ -7,6 +7,7 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
   WAITING_REPLY: "Aguardando resposta",
   INVITE_SENT: "Convite enviado",
   QUALIFIED: "Qualificado",
+  MEETING_SCHEDULED: "Reunião marcada",
   LOST: "Sem resposta",
 };
 
@@ -19,6 +20,7 @@ export const STATUS_TONE: Record<LeadStatus, StatusTone> = {
   CONVERSATION_OPEN: "open",
   WAITING_REPLY: "waiting",
   QUALIFIED: "qualified",
+  MEETING_SCHEDULED: "qualified",
   INVITE_SENT: "invite",
   LOST: "lost",
 };
@@ -31,6 +33,7 @@ export interface LeadSection {
 
 export const LEAD_SECTIONS: LeadSection[] = [
   { key: "urgent", label: "Precisa de você", statuses: ["NEEDS_HUMAN"] },
+  { key: "meeting", label: "Reunião marcada", statuses: ["MEETING_SCHEDULED"] },
   { key: "open", label: "Conversando", statuses: ["CONVERSATION_OPEN", "QUALIFIED"] },
   { key: "waiting", label: "Aguardando resposta", statuses: ["WAITING_REPLY"] },
   { key: "invited", label: "Convites e novos contatos", statuses: ["INVITE_SENT", "NEW"] },

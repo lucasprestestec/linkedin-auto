@@ -114,10 +114,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     .filter((e): e is { when: Date; text: string } => Boolean(e))
     .sort((a, b) => b.when.getTime() - a.when.getTime());
 
+  // "Reunião marcada · 02/10 15:30" quando a data é conhecida.
+  const statusLabel =
+    lead.status === "MEETING_SCHEDULED" && lead.meetingAt
+      ? `${STATUS_LABEL[lead.status]} · ${lead.meetingAt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}`
+      : STATUS_LABEL[lead.status];
+
   const profileBadges = (
     <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
       <span className={`soft-badge pill-${tone}`}>
-        <i className="dot" /> {lead.status === "QUALIFIED" ? "Lead qualificado" : STATUS_LABEL[lead.status]}
+        <i className="dot" /> {lead.status === "QUALIFIED" ? "Lead qualificado" : statusLabel}
       </span>
       {highIntent ? (
         <span className="soft-badge pill-urgent">
@@ -251,7 +257,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <dt>Status</dt>
         <dd>
           <span className={`status-pill pill-${tone}`} style={{ height: 28 }}>
-            {STATUS_LABEL[lead.status]}
+            {statusLabel}
           </span>
         </dd>
       </div>

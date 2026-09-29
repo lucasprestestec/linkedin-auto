@@ -8,6 +8,9 @@ export interface CheckInput {
   previousOutgoing: string[];
   // Material do corretor: um valor em R$ só é aceito se estiver escrito ali.
   instructions: string | null;
+  // Com a agenda do corretor ativa, quem confirma horário é a agenda: a mensagem não
+  // pode citar dia da semana nem hora (o modelo chegou a escrever "quinta está disponível").
+  bookingAvailable?: boolean;
 }
 
 const MAX_CHARS = 600;
@@ -31,7 +34,7 @@ function sentences(s: string) {
     .filter((x) => x.length >= 30);
 }
 
-export function checkMessage({ message, previousOutgoing, instructions }: CheckInput): string[] {
+export function checkMessage({ message, previousOutgoing, instructions, bookingAvailable }: CheckInput): string[] {
   const issues: string[] = [];
   const text = message.trim();
   if (!text) return ["mensagem vazia"];
@@ -57,6 +60,10 @@ export function checkMessage({ message, previousOutgoing, instructions }: CheckI
       issues.push(`cita valor em dinheiro que não está no material (${m.trim()})`);
       break;
     }
+  }
+
+  if (bookingAvailable && /\b(segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo)(-feira)?\b|\b\d{1,2}\s?(h|hs|horas)\b|\b\d{1,2}:\d{2}\b|\bamanh[ãa]\b/i.test(text)) {
+    issues.push("cita dia da semana ou horário (a agenda é quem confirma; não sugira nem confirme horários)");
   }
 
   const questions = (text.match(/\?/g) ?? []).length;

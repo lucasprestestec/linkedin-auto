@@ -2,7 +2,7 @@ import type { Lead, MessageChannel, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
 import { extractConnections, type EdgesConnection } from "@/lib/edges";
-import { decideNextStep, generateFirstContact, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
+import { decideNextStep, generateBookingNudge, generateFirstContact, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { emailEnabled } from "@/lib/email";
@@ -36,6 +36,7 @@ export interface ProactiveResult {
   followUpsSent: number;
   waiting: number;
   markedLost: number;
+  bookingNudgesSent: number;
   skipped?: string;
 }
 
@@ -444,8 +445,59 @@ export async function emailChannelReady(settings: Settings): Promise<boolean> {
   return settings.emailChannelEnabled && (await emailEnabled());
 }
 
+// Mandou o link da agenda e o lead não marcou em 2 dias: uma pergunta leve, uma vez só.
+// Sai pelo canal da última mensagem (onde o link foi mandado). Depois disso a conversa
+// fica com o corretor, que vê "Qualificado" na lista.
+const BOOKING_NUDGE_DELAY_MS = 2 * DAY_MS;
+
+async function sendBookingNudges(
+  identityId: string | null,
+  settings: Settings,
+  ready: { LINKEDIN: boolean; EMAIL: boolean; WHATSAPP: boolean },
+  budget: Budget,
+): Promise<number> {
+  if (budget.total <= 0) return 0;
+  const leads = await prisma.lead.findMany({
+    where: {
+      status: "QUALIFIED",
+      meetingAt: null,
+      bookingNudgedAt: null,
+      bookingLinkSentAt: { lt: new Date(Date.now() - BOOKING_NUDGE_DELAY_MS) },
+      AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER],
+    },
+    orderBy: { bookingLinkSentAt: "asc" },
+  });
+  const rules = parseExclusionList(settings.exclusionList);
+  let sent = 0;
+  for (const lead of leads) {
+    if (budget.total <= 0) break;
+    if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
+    const history = await prisma.message.findMany({ where: { leadId: lead.id }, orderBy: { deliveredAt: "asc" }, select: HISTORY_SELECT });
+    const last = history.at(-1);
+    // O lead respondeu depois do link: a conversa andou, não cabe lembrete.
+    if (!last || last.sender === "LEAD") continue;
+    const channel = last.channel;
+    if (!ready[channel] || budget[channel] <= 0) continue;
+    try {
+      const content = await generateBookingNudge(await instructionsFor(lead, settings), lead, history, channel);
+      await deliver(lead, channel, content, {
+        identityId,
+        kind: "FOLLOW_UP",
+        reason: "Mandei o link da agenda há 2 dias e ele não marcou; pergunta leve, uma vez só.",
+        approval: settings.approvalMode,
+        effects: { bookingNudgedAt: new Date(), nextStep: "Perguntei se conseguiu ver um horário na agenda." },
+      });
+      spend(budget, channel);
+      sent++;
+    } catch (err) {
+      await markNeedsHuman(lead.id, `Falha ao lembrar da agenda: ${errorMessage(err)}`);
+    }
+  }
+  return sent;
+}
+
 export async function runProactive(identityId: string | null): Promise<ProactiveResult> {
-  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0 };
+  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0, bookingNudgesSent: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // Rascunho que ninguém decidiu a tempo perde a validade (a conversa andou).
@@ -510,6 +562,8 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   result.followUpsSent = followUps.sent;
   result.waiting = followUps.waiting;
   result.markedLost = followUps.lost;
+
+  result.bookingNudgesSent = await sendBookingNudges(identityId, settings, { LINKEDIN: Boolean(identityId), EMAIL: emailReady, WHATSAPP: whatsappReady }, budget);
 
   if (identityId && linkedinLeft <= 0) result.skipped = "limite diário de mensagens do LinkedIn atingido";
   return result;

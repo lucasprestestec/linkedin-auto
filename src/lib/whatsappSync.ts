@@ -58,7 +58,7 @@ export async function syncWhatsapp(): Promise<{ checked: number; saved: number; 
       const updated = await prisma.lead.update({
         where: { id: lead.id },
         data: {
-          status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" ? lead.status : "CONVERSATION_OPEN",
+          status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? lead.status : "CONVERSATION_OPEN",
           followUpsSent: 0,
           nextStep: null,
           nextStepAt: null,

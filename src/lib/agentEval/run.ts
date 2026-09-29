@@ -13,6 +13,7 @@ export interface EvalResult {
   analysis?: string;
   qualified?: boolean;
   declined?: boolean;
+  offerBooking?: boolean;
   attempts?: number;
   checkIssues?: string[];
   // Acertou a decisão esperada (responder / passar pro corretor / recusa)?
@@ -23,7 +24,7 @@ export interface EvalResult {
   ms?: number;
 }
 
-function decisionCheck(s: Scenario, action: "reply" | "handoff", declined: boolean, qualified: boolean): { ok: boolean; note: string } {
+function decisionCheck(s: Scenario, action: "reply" | "handoff", declined: boolean, qualified: boolean, offerBooking: boolean): { ok: boolean; note: string } {
   const notes: string[] = [];
   let ok = true;
   if (s.expect !== "either" && s.expect !== action) {
@@ -33,6 +34,10 @@ function decisionCheck(s: Scenario, action: "reply" | "handoff", declined: boole
   if (action === "reply" && s.declined !== undefined && s.declined !== declined) {
     ok = false;
     notes.push(s.declined ? "deveria encerrar (recusa)" : "marcou recusa sem ser recusa");
+  }
+  if (action === "reply" && s.offerBooking !== undefined && s.offerBooking !== offerBooking) {
+    ok = false;
+    notes.push(s.offerBooking ? "deveria oferecer a agenda" : "ofereceu a agenda cedo demais");
   }
   if (action === "reply" && s.qualified === true && !qualified) notes.push("não marcou como qualificado");
   return { ok, note: notes.join("; ") };
@@ -93,11 +98,12 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
   if (!s) return { scenarioId, model, ok: false, error: "cenário não existe" };
   const started = Date.now();
   try {
-    const d = await decideResponse({ instructions: EVAL_INSTRUCTIONS, lead: s.lead, history: s.history }, { model });
+    const d = await decideResponse({ instructions: EVAL_INSTRUCTIONS, lead: s.lead, history: s.history, bookingAvailable: s.booking }, { model });
     const ms = Date.now() - started;
     const declined = d.action === "reply" && d.declined;
     const qualified = d.action === "reply" && d.qualified;
-    const dc = decisionCheck(s, d.action, declined, qualified);
+    const offerBooking = d.action === "reply" && d.offerBooking;
+    const dc = decisionCheck(s, d.action, declined, qualified, offerBooking);
     const out = d.action === "reply" ? { action: d.action, message: d.message } : { action: d.action, reason: d.reason };
     let judgeResult: EvalResult["judge"];
     let judgeError: string | undefined;
@@ -117,6 +123,7 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
       analysis: d.analysis,
       qualified,
       declined,
+      offerBooking,
       attempts: d.attempts,
       checkIssues: d.checkIssues,
       decisionOk: dc.ok,

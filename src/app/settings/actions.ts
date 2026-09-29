@@ -95,6 +95,30 @@ export async function updateOwnerName(_prevState: unknown, formData: FormData) {
   return { saved: true };
 }
 
+// Link da agenda: só http(s), sem espaços. Vazio = a secretária não agenda.
+export async function updateBookingUrl(raw: string): Promise<{ url?: string; error?: string }> {
+  const value = raw.trim();
+  if (!value) {
+    await prisma.settings.update({ where: { id: "singleton" }, data: { bookingUrl: null } });
+    revalidatePath("/settings");
+    return { url: "" };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+  } catch {
+    return { error: "Esse link não parece válido. Cole o endereço completo da sua agenda." };
+  }
+  if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname.includes(".") || /\s/.test(value)) {
+    return { error: "Esse link não parece válido. Cole o endereço completo da sua agenda." };
+  }
+  const url = parsed.toString();
+  if (url.length > 300) return { error: "Link longo demais." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { bookingUrl: url } });
+  revalidatePath("/settings");
+  return { url };
+}
+
 // Follow-up padrão da conta: vale pra toda conversa sem regra própria (nem da
 // campanha, nem da conversa).
 export async function updateFollowUpDefault(count: number, days: number) {

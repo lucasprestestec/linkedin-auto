@@ -16,6 +16,12 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   // O lead escreveu: qualquer mensagem que esperava aprovação ficou velha.
   await supersedeDrafts(lead.id);
 
+  // Reunião já marcada: remarcar, cancelar ou qualquer assunto novo é com o corretor.
+  if (lead.status === "MEETING_SCHEDULED") {
+    await markNeedsHuman(lead.id, "Escreveu depois de a reunião ser marcada");
+    return;
+  }
+
   const [history, campaign] = await Promise.all([
     prisma.message.findMany({
       where: { leadId: lead.id },
@@ -45,6 +51,8 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     return;
   }
 
+  const bookingUrl = settings.bookingUrl?.trim() || null;
+
   let decision;
   try {
     decision = await decideResponse({
@@ -52,6 +60,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
       history,
       channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },
+      bookingAvailable: Boolean(bookingUrl),
     });
     // Fica nos logs da Vercel: por que o agente fez o que fez.
     console.log(
@@ -68,14 +77,25 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     return;
   }
 
+  // O modelo só marca "oferecer agenda"; o link em si é sempre o configurado, anexado aqui.
+  // Nunca duas vezes para o mesmo lead.
+  const offerBooking = decision.offerBooking && Boolean(bookingUrl) && !lead.bookingLinkSentAt && !decision.declined;
+  const message = offerBooking ? `${decision.message}\n\n${bookingUrl}` : decision.message;
+
   try {
-    await deliver(lead, channel, decision.message, {
+    await deliver(lead, channel, message, {
       identityId,
       kind: "REPLY",
-      reason: decision.analysis,
+      reason: offerBooking ? `${decision.analysis} (com o link da agenda)` : decision.analysis,
       approval: settings.approvalMode,
-      // Recusou: encerra (sem follow-up). Quer avançar: qualificado.
-      effects: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null, nextStep: null, nextStepAt: null },
+      // Recusou: encerra (sem follow-up). Quer avançar (ou recebeu a agenda): qualificado.
+      effects: {
+        status: decision.declined ? "LOST" : decision.qualified || offerBooking ? "QUALIFIED" : "CONVERSATION_OPEN",
+        needsHumanReason: null,
+        nextStep: offerBooking ? "Mandei o link da agenda; aguardando o lead marcar." : null,
+        nextStepAt: null,
+        ...(offerBooking ? { bookingLinkSentAt: new Date() } : {}),
+      },
     });
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);

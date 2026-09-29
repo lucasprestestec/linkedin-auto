@@ -11,9 +11,10 @@ import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
 import { DailySummaryToggle } from "./DailySummaryToggle";
+import { BookingForm } from "./BookingForm";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
-import { IconBan, IconBell, IconCalendar, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
+import { IconBan, IconBell, IconCalendar, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLink, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,14 @@ export default async function SettingsPage() {
             </SettingItem>
             <SettingItem icon={<IconBan size={19} />} tone="urgent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
               <ExclusionListForm value={settings.exclusionList ?? ""} />
+            </SettingItem>
+            <SettingItem
+              icon={<IconLink size={19} />}
+              tone="brand"
+              title="Agenda de reuniões"
+              summary={settings.bookingUrl ? settings.bookingUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") : "Sem link: a secretária passa a conversa pra você"}
+            >
+              <BookingForm value={settings.bookingUrl ?? ""} />
             </SettingItem>
             <SettingItem
               icon={<IconCalendar size={19} />}
