@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { sendMessage } from "@/lib/edges";
-import { getActiveIdentityId } from "@/lib/identity";
+import { activeIdentityIdOrNull } from "@/lib/identity";
+import { sendOnChannel } from "@/lib/channels";
+import type { MessageChannel } from "@prisma/client";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
 import { validFollowUp } from "@/lib/settings-ranges";
@@ -14,18 +15,12 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
 
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
 
+  // Canal escolhido no composer; se não vier (ou não for válido), LinkedIn.
+  const channel: MessageChannel = formData.get("channel") === "EMAIL" ? "EMAIL" : "LINKEDIN";
+
   try {
-    const identityId = await getActiveIdentityId();
-    const result = await sendMessage(identityId, lead.linkedinProfileUrl, content);
-    await prisma.message.create({
-      data: {
-        leadId: lead.id,
-        sender: "HUMAN",
-        content,
-        linkedinMessageId: result.linkedin_message_id,
-        deliveredAt: new Date(result.delivered_at),
-      },
-    });
+    const identityId = channel === "LINKEDIN" ? await activeIdentityIdOrNull() : null;
+    await sendOnChannel(lead, channel, content, { identityId, sender: "HUMAN" });
     // "Conversando" só se o lead já respondeu alguma vez; senão, seguimos
     // aguardando a primeira resposta dele.
     const leadHasReplied = await prisma.message.count({ where: { leadId: lead.id, sender: "LEAD" } });
@@ -97,7 +92,7 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
 async function leadWithHistory(leadId: string) {
   return prisma.lead.findUniqueOrThrow({
     where: { id: leadId },
-    include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true } } },
+    include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true, deliveredAt: true, channel: true } } },
   });
 }
 
@@ -111,11 +106,11 @@ export async function summarizeLead(leadId: string): Promise<{ text?: string; er
   }
 }
 
-export async function suggestLeadReply(leadId: string): Promise<{ text?: string; error?: string }> {
+export async function suggestLeadReply(leadId: string, channel: MessageChannel = "LINKEDIN"): Promise<{ text?: string; error?: string }> {
   try {
     const lead = await leadWithHistory(leadId);
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-    return { text: await suggestReply(await instructionsFor(lead, settings), lead, lead.messages) };
+    return { text: await suggestReply(await instructionsFor(lead, settings), lead, lead.messages, channel === "EMAIL" ? "EMAIL" : "LINKEDIN") };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
   }
@@ -127,6 +122,23 @@ export async function updateLeadFollowUp(leadId: string, value: { count: number;
   await prisma.lead.update({
     where: { id: leadId },
     data: { followUpMaxCount: value?.count ?? null, followUpDelayHours: value ? value.days * 24 : null },
+  });
+  revalidatePath(`/leads/${leadId}`);
+  return { saved: true };
+}
+
+// Ficha pessoal: canais (e-mail, WhatsApp) e o que o corretor sabe da pessoa.
+// A secretária usa isso pra escolher o canal e personalizar as mensagens.
+export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string }) {
+  const email = data.email.trim().toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." };
+  const digits = data.phone.replace(/\D/g, "");
+  if (digits && (digits.length < 10 || digits.length > 13)) return { error: "WhatsApp inválido. Use DDD + número (ex.: 51 99999-0000)." };
+  // Guarda só dígitos com DDI: 51999990000 → 5551999990000.
+  const phone = digits ? (digits.length <= 11 ? `55${digits}` : digits) : null;
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { email: email || null, phone, personal: data.personal.trim().slice(0, 2000) || null },
   });
   revalidatePath(`/leads/${leadId}`);
   return { saved: true };

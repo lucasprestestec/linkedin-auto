@@ -11,6 +11,8 @@ import { EngagementForm } from "./EngagementForm";
 import { AccountTypeNotice } from "./AccountTypeNotice";
 import { adminLogout } from "./actions";
 import { AgentEval } from "./eval/AgentEval";
+import { EmailStatus } from "./EmailStatus";
+import { emailAddress } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -88,6 +90,10 @@ export default async function AdminPage() {
               }}
               withdrawAfterDays={settings.withdrawAfterDays}
             />
+          </section>
+          <section className="group">
+            <h2 className="group-title">E-mail da secretária</h2>
+            <EmailStatus address={emailAddress()} />
           </section>
           <section className="group">
             <h2 className="group-title">Tipo de conta do LinkedIn</h2>

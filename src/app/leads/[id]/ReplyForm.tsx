@@ -1,11 +1,28 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { IconAlert, IconArrowRight, IconPaperclip, IconSparkles } from "@/components/Icons";
+import { IconAlert, IconArrowRight, IconLinkedin, IconMail, IconPaperclip, IconSparkles } from "@/components/Icons";
 import { sendReply, suggestLeadReply } from "./actions";
 
-export function ReplyForm({ leadId, firstName, profileUrl }: { leadId: string; firstName: string; profileUrl: string }) {
+type Channel = "LINKEDIN" | "EMAIL";
+const LABEL: Record<Channel, string> = { LINKEDIN: "LinkedIn", EMAIL: "E-mail" };
+
+export function ReplyForm({
+  leadId,
+  firstName,
+  profileUrl,
+  channels = ["LINKEDIN"],
+  defaultChannel = "LINKEDIN",
+}: {
+  leadId: string;
+  firstName: string;
+  profileUrl: string;
+  // Canais possíveis com essa pessoa; começa no último em que ela escreveu.
+  channels?: Channel[];
+  defaultChannel?: Channel;
+}) {
   const [value, setValue] = useState("");
+  const [channel, setChannel] = useState<Channel>(channels.includes(defaultChannel) ? defaultChannel : channels[0]);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [suggesting, startSuggest] = useTransition();
   const [state, formAction, pending] = useActionState(
@@ -40,7 +57,7 @@ export function ReplyForm({ leadId, firstName, profileUrl }: { leadId: string; f
   function suggest() {
     setSuggestError(null);
     startSuggest(async () => {
-      const result = await suggestLeadReply(leadId);
+      const result = await suggestLeadReply(leadId, channel);
       if (result.text) {
         setValue(result.text);
         textareaRef.current?.focus();
@@ -58,8 +75,26 @@ export function ReplyForm({ leadId, firstName, profileUrl }: { leadId: string; f
           <IconAlert size={15} /> {error}
         </p>
       )}
+      <input type="hidden" name="channel" value={channel} />
+      {channels.length > 1 && (
+        <div className="composer-channels" role="radiogroup" aria-label="Enviar por">
+          {channels.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={channel === c}
+              className={channel === c ? "active" : undefined}
+              onClick={() => setChannel(c)}
+            >
+              {c === "EMAIL" ? <IconMail size={14} /> : <IconLinkedin size={14} />} {LABEL[c]}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="composer-row">
-        <a
+        {channel === "LINKEDIN" ? (
+          <a
           href={profileUrl}
           target="_blank"
           rel="noreferrer"
@@ -67,14 +102,15 @@ export function ReplyForm({ leadId, firstName, profileUrl }: { leadId: string; f
           aria-label="Enviar anexo pelo LinkedIn"
           title="Anexos: envie direto pelo LinkedIn"
         >
-          <IconPaperclip size={21} />
-        </a>
+            <IconPaperclip size={21} />
+          </a>
+        ) : null}
         <div className="composer-box">
           <textarea
             ref={textareaRef}
             id="reply-box"
             name="content"
-            placeholder={`Digite uma mensagem para ${firstName}...`}
+            placeholder={channel === "EMAIL" ? `Escreva um e-mail para ${firstName}...` : `Digite uma mensagem para ${firstName}...`}
             aria-label="Mensagem"
             required
             rows={1}

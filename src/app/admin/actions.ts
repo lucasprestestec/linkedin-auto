@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_COOKIE, adminEnabled, checkAdminPassword, createAdminToken, requireAdmin } from "@/lib/admin";
+import { testEmailConnection } from "@/lib/email";
 
 export async function adminLogin(_prev: { error?: string } | undefined, formData: FormData) {
   if (!adminEnabled()) return { error: "Admin desativado." };
@@ -17,6 +18,11 @@ export async function adminLogin(_prev: { error?: string } | undefined, formData
   });
   revalidatePath("/admin");
   return { error: undefined };
+}
+
+export async function testEmail() {
+  await requireAdmin();
+  return testEmailConnection();
 }
 
 export async function adminLogout() {

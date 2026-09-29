@@ -7,6 +7,7 @@ import { syncConversation } from "@/lib/sync";
 import { runProactive } from "@/lib/followup";
 import { isWithinWorkHours } from "@/lib/schedule";
 import { prisma } from "@/lib/prisma";
+import { syncEmailInbox } from "@/lib/emailSync";
 
 // Geração de texto + envio por lead somam alguns segundos; a parte proativa é
 // limitada por rodada (ver lib/followup.ts), mas o padrão da função é curto.
@@ -22,10 +23,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Sem LinkedIn conectado não há o que sincronizar nem enviar.
-  const identityId = await activeIdentityIdOrNull();
-  if (!identityId) return NextResponse.json({ ok: true, skipped: "Nenhuma conta do LinkedIn conectada" });
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const canReplyNow = settings.automationPaused || isWithinWorkHours(settings);
+  const identityId = await activeIdentityIdOrNull();
+
+  // E-mail primeiro (independe do LinkedIn): grava o que chegou e responde pelo
+  // mesmo canal. Fora do horário a resposta espera, como no LinkedIn.
+  let email: { read: number; saved: number; error?: string } = { read: 0, saved: 0 };
+  try {
+    const r = await syncEmailInbox();
+    email = { read: r.read, saved: r.saved };
+    if (canReplyNow) for (const lead of r.leads) await handleIncomingMessage(lead, identityId);
+  } catch (err) {
+    console.error("Falha ao ler a caixa de e-mail", err);
+    email.error = err instanceof Error ? err.message : "erro desconhecido";
+  }
+
+  // Sem LinkedIn conectado não há o que sincronizar nem enviar por lá.
+  if (!identityId) return NextResponse.json({ ok: true, email, skipped: "Nenhuma conta do LinkedIn conectada" });
   const conversations = await extractConversations(identityId);
   let updatedLeads = 0;
   let newIncomingMessages = 0;
@@ -44,7 +59,7 @@ export async function GET(request: Request) {
       // lê o histórico completo, então vê todas as mensagens novas de uma vez.
       // Fora do horário de trabalho a resposta espera: runProactive responde
       // quando a janela abrir. Pausado responde na hora (marca pra você).
-      if (result.shouldRespond && (settings.automationPaused || isWithinWorkHours(settings))) {
+      if (result.shouldRespond && canReplyNow) {
         await handleIncomingMessage(result.lead, identityId);
       }
     } catch (err) {
@@ -62,5 +77,5 @@ export async function GET(request: Request) {
     proactive = { error: err instanceof Error ? err.message : "erro desconhecido" };
   }
 
-  return NextResponse.json({ updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
+  return NextResponse.json({ email, updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
 }

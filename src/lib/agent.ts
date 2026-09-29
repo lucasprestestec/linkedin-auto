@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LeadStatus, Message as DbMessage } from "@prisma/client";
+import type { LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkMessage } from "@/lib/agentCheck";
 
@@ -88,13 +88,26 @@ export interface LeadContext {
   // Opcionais: quanto mais contexto, melhor a conversa.
   status?: LeadStatus;
   icpScore?: number | null;
-  notes?: string | null;
+  // Ficha pessoal escrita pelo corretor (as "anotações" dele são privadas e
+  // NÃO entram aqui).
+  personal?: string | null;
   tags?: string[];
   followUpsSent?: number;
   campaignName?: string | null;
 }
 
-type HistoryItem = Pick<DbMessage, "sender" | "content"> & { deliveredAt?: Date };
+type HistoryItem = Pick<DbMessage, "sender" | "content"> & { deliveredAt?: Date; channel?: MessageChannel };
+
+const CHANNEL_NAME: Record<MessageChannel, string> = { LINKEDIN: "LinkedIn", EMAIL: "e-mail", WHATSAPP: "WhatsApp" };
+
+// Como escrever em cada canal (o resto do estilo vale pra todos).
+const CHANNEL_STYLE: Record<MessageChannel, string> = {
+  LINKEDIN: "Mensagem de LinkedIn: curta e direta, sem saudação formal nem assinatura.",
+  EMAIL:
+    "E-MAIL: comece com uma saudação curta pelo primeiro nome (ex.: \"Oi, Mariana,\"), 2 a 4 frases, e termine com uma despedida simples " +
+    "e o primeiro nome do corretor. Sem assunto no corpo, sem formatação, sem link.",
+  WHATSAPP: "WhatsApp: bem curto e informal, como mensagem entre pessoas. Sem assinatura.",
+};
 
 const TIME_ZONE = "America/Sao_Paulo";
 
@@ -119,7 +132,7 @@ function leadBlock(lead: LeadContext): string {
   if (lead.followUpsSent) lines.push(`Follow-ups já enviados sem resposta: ${lead.followUpsSent}`);
   if (lead.icpScore != null) lines.push(`Encaixe com o cliente ideal: ${lead.icpScore}/100`);
   if (lead.tags?.length) lines.push(`Etiquetas do corretor: ${lead.tags.join(", ")}`);
-  if (lead.notes?.trim()) lines.push(`Anotações do corretor (use como contexto, não cite): ${lead.notes.trim().slice(0, 600)}`);
+  if (lead.personal?.trim()) lines.push(`Ficha pessoal (o que o corretor sabe dessa pessoa): ${lead.personal.trim().slice(0, 1200)}`);
   return lines.join("\n");
 }
 
@@ -127,8 +140,9 @@ function transcriptOf(history: HistoryItem[]): string {
   return history
     .map((m) => {
       const who = m.sender === "LEAD" ? "LEAD" : m.sender === "AGENT" ? "VOCÊ (automático)" : "VOCÊ (corretor digitou)";
-      const when = m.deliveredAt ? ` [${m.deliveredAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TIME_ZONE })}]` : "";
-      return `${who}${when}: ${m.content}`;
+      const date = m.deliveredAt ? m.deliveredAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TIME_ZONE }) : "";
+      const tag = [date, m.channel && m.channel !== "LINKEDIN" ? CHANNEL_NAME[m.channel] : ""].filter(Boolean).join(", ");
+      return `${who}${tag ? ` [${tag}]` : ""}: ${m.content}`;
     })
     .join("\n");
 }
@@ -140,6 +154,7 @@ const STYLE = `COMO ESCREVER
 - Espelhe o tom do lead: se ele é breve, seja breve; se é formal, seja um pouco mais formal. Emoji só se ele usou (no máximo 1).
 - Não repita o nome do lead em toda mensagem, não repita frases que já mandou, não comece com "Ótima pergunta", "Perfeito!" ou elogios vazios.
 - Sem listas, negrito, links ou assinatura. Sem "[Nome]" ou campos a preencher.
+- FICHA PESSOAL: se houver, use no máximo UM detalhe por mensagem e só quando encaixar com naturalidade (ex.: na abertura, numa retomada, no aniversário). Nunca diga que tem ficha/anotações. Nada delicado (saúde, problemas pessoais, família em dificuldade) se o lead não trouxe o assunto.
 - O objetivo é entender a situação do lead e, no ritmo dele, chegar a um próximo passo concreto com o corretor (uma conversa rápida). Não empurre.
 
 EXEMPLOS DE TOM (situações genéricas — o conteúdo real vem do material do corretor)
@@ -230,6 +245,8 @@ export interface ConversationInput {
   instructions: string | null;
   lead: LeadContext;
   history: HistoryItem[];
+  // Canal em que a resposta vai sair (o mesmo em que o lead escreveu).
+  channel?: MessageChannel;
   now?: Date;
 }
 
@@ -238,9 +255,12 @@ export async function decideResponse(input: ConversationInput, opts: { model?: s
   const model = opts.model || (await conversationModel());
   const now = input.now ?? new Date();
 
-  const system = `Você conduz, pelo corretor, as conversas do LinkedIn com possíveis clientes.
+  const channel = input.channel ?? "LINKEDIN";
+  const system = `Você é a secretária do corretor: conduz, por ele, as conversas com possíveis clientes (LinkedIn, e-mail e WhatsApp).
 
 ${contextBlock(input.instructions, input.lead, now)}
+
+CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}
 
 ${STYLE}
 
@@ -394,6 +414,7 @@ export async function generateFollowUp(
   history: HistoryItem[],
   attempt: number,
   maxCount: number,
+  channel: MessageChannel = "LINKEDIN",
 ): Promise<string> {
   const isLast = attempt >= maxCount;
   const angle = isLast
@@ -407,7 +428,8 @@ export async function generateFollowUp(
       instructions,
       { ...lead, followUpsSent: attempt - 1 },
       `O lead não respondeu à última mensagem. Escreva o follow-up ${attempt} de ${maxCount}. ${angle} ` +
-        "Não repita frases, aberturas ou perguntas do histórico. Não mencione que é um follow-up nem conte tentativas.",
+        "Não repita frases, aberturas ou perguntas do histórico. Não mencione que é um follow-up nem conte tentativas.\n" +
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
     ),
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,
     { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
@@ -510,13 +532,19 @@ Use a ferramenta write_message (o campo message recebe o resumo).`,
   );
 }
 
-export async function suggestReply(instructions: string | null, lead: LeadContext, history: HistoryItem[]): Promise<string> {
+export async function suggestReply(
+  instructions: string | null,
+  lead: LeadContext,
+  history: HistoryItem[],
+  channel: MessageChannel = "LINKEDIN",
+): Promise<string> {
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
       lead,
       "Escreva a PRÓXIMA mensagem do corretor nesta conversa, respondendo ao que o lead disse por último. " +
-        "O corretor vai revisar antes de enviar, então aqui você pode sugerir mesmo quando seria caso de handoff. Não repita frases do histórico.",
+        "O corretor vai revisar antes de enviar, então aqui você pode sugerir mesmo quando seria caso de handoff. Não repita frases do histórico.\n" +
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
     ),
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
   );

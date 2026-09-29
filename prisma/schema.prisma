@@ -15,6 +15,12 @@ enum LeadStatus {
   LOST             // sem resposta / recusou
 }
 
+enum MessageChannel {
+  LINKEDIN
+  EMAIL
+  WHATSAPP
+}
+
 enum MessageSender {
   LEAD
   AGENT
@@ -39,7 +45,13 @@ model Lead {
   // Follow-up próprio desta conversa (null = usa o da campanha ou o da conta).
   followUpMaxCount   Int?
   followUpDelayHours Int?
-  // CRM: anotações livres do corretor e etiquetas.
+  // Canais além do LinkedIn (a secretária usa o que existir).
+  email             String?
+  phone             String?
+  // Ficha pessoal: o que o corretor sabe da pessoa (família, time, aniversário,
+  // como se conheceram...). A IA usa pra personalizar as mensagens.
+  personal          String?   @db.Text
+  // CRM: anotações livres do corretor (só ele vê) e etiquetas.
   notes             String?   @db.Text
   tags              String[]  @default([])
   // Nota 0-100 da IA: quanto o perfil combina com o cliente ideal (Settings.targetAudience).
@@ -107,8 +119,12 @@ model Message {
   lead      Lead          @relation(fields: [leadId], references: [id])
   leadId    String
   sender    MessageSender
+  channel   MessageChannel @default(LINKEDIN)
   content   String
   linkedinMessageId String? @unique
+  // E-mail: Message-ID (dedupe e resposta na mesma thread) e assunto.
+  emailMessageId String? @unique
+  subject   String?
   deliveredAt DateTime
   createdAt DateTime      @default(now())
 }
@@ -150,6 +166,9 @@ model Settings {
   archiveLostEnabled     Boolean @default(false)
   receivedInvitesCheckedAt DateTime?
   withdrawCheckedAt        DateTime?
+  // Caixa de e-mail (IMAP): último UID lido, pra não reprocessar.
+  emailLastUid        Int?
+  emailUidValidity    String?
   linkedinNeedsReconnect Boolean @default(false)
   linkedinReconnectReason String?
 }

@@ -1136,6 +1136,101 @@ html:root:not([data-lux="off"]) .handoff-card {
   color: var(--gold-ink);
 }
 
+/* Canal da resposta (LinkedIn / E-mail) acima do compositor */
+.composer-channels {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px 8px;
+}
+
+.composer-channels button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.composer-channels button.active {
+  border-color: var(--gold);
+  background: rgba(216, 178, 122, 0.12);
+  color: var(--gold);
+}
+
+/* Mensagem que veio/saiu por e-mail */
+.msg-channel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 4px 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.msg-out .msg-channel {
+  justify-content: flex-end;
+}
+
+/* Ficha pessoal */
+.profile-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.profile-line svg {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.profile-wa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(37, 211, 102, 0.16);
+  color: #3fd07a;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.profile-personal {
+  display: flex;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(216, 178, 122, 0.08);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+.profile-personal svg {
+  color: var(--gold);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
 @media (min-width: 1024px) {
   /* A barra de cima já tem "Nova campanha" */
   .page-head .new-camp-btn {
