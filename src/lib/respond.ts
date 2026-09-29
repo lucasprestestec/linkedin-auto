@@ -4,7 +4,7 @@ import { decideResponse } from "@/lib/agent";
 import { messagesSentToday } from "@/lib/limits";
 import { instructionsFor } from "@/lib/campaigns";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
-import { sendOnChannel } from "@/lib/channels";
+import { deliver, supersedeDrafts } from "@/lib/outbox";
 import type { Lead } from "@prisma/client";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
@@ -12,6 +12,9 @@ import type { Lead } from "@prisma/client";
 // marcar NEEDS_HUMAN com o motivo certo.
 export async function handleIncomingMessage(lead: Lead, identityId: string | null) {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+
+  // O lead escreveu: qualquer mensagem que esperava aprovação ficou velha.
+  await supersedeDrafts(lead.id);
 
   const [history, campaign] = await Promise.all([
     prisma.message.findMany({
@@ -66,11 +69,13 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   }
 
   try {
-    await sendOnChannel(lead, channel, decision.message, { identityId });
-    await prisma.lead.update({
-      where: { id: lead.id },
+    await deliver(lead, channel, decision.message, {
+      identityId,
+      kind: "REPLY",
+      reason: decision.analysis,
+      approval: settings.approvalMode,
       // Recusou: encerra (sem follow-up). Quer avançar: qualificado.
-      data: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null, nextStep: null, nextStepAt: null },
+      effects: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null, nextStep: null, nextStepAt: null },
     });
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);

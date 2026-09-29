@@ -80,6 +80,7 @@ model Lead {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
+  drafts            Draft[]
 }
 
 // Campanha (opcional) = um público com uma oferta própria (ex.: "Saúde
@@ -122,6 +123,49 @@ model WebSearchLog {
   @@index([createdAt])
 }
 
+// Mensagem que a secretária quer mandar e espera a sua aprovação (modo piloto,
+// Settings.approvalMode). Ao aprovar, ela é enviada e "effects" (o que mudaria
+// no lead se tivesse saído sozinha: status, follow-ups, próximo passo) é aplicado.
+enum DraftKind {
+  REPLY
+  OPENING
+  FIRST_CONTACT
+  INTRO_EMAIL
+  FOLLOW_UP
+}
+
+enum DraftStatus {
+  PENDING    // esperando o corretor
+  APPROVED   // aprovada; sai assim que a janela de horário permitir
+  SENT
+  DISCARDED  // corretor descartou, ou o lead respondeu antes
+  EXPIRED    // ninguém decidiu a tempo
+  FAILED     // aprovada, mas o envio deu erro
+}
+
+model Draft {
+  id          String         @id @default(cuid())
+  lead        Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String
+  kind        DraftKind
+  channel     MessageChannel
+  subject     String?
+  content     String         @db.Text
+  // Por que a secretária escolheu isso (uma linha, pro corretor decidir rápido).
+  reason      String?
+  // Atualizações do lead a aplicar quando a mensagem sair (JSON).
+  effects     Json
+  status      DraftStatus    @default(PENDING)
+  // O corretor mudou o texto antes de aprovar (mede a confiança na IA).
+  edited      Boolean        @default(false)
+  error       String?
+  createdAt   DateTime       @default(now())
+  decidedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([leadId, status])
+}
+
 // Inscrição de Web Push (um por navegador/aparelho do corretor).
 model PushSubscription {
   id        String   @id @default(cuid())
@@ -159,6 +203,8 @@ model Message {
 model Settings {
   id                  String  @id @default("singleton")
   automationPaused    Boolean @default(true)
+  // Modo piloto: a secretÃ¡ria escreve, mas nada sai sem o seu OK (aba AprovaÃ§Ãµes).
+  approvalMode        Boolean @default(true)
   // Como o corretor quer ser chamado no painel ("Boa noite, Lucas.").
   ownerName           String?
   dailyInviteLimit    Int     @default(18)

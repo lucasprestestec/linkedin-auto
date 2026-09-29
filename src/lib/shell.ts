@@ -16,22 +16,26 @@ export interface ShellData {
   automationPaused: boolean;
   needYou: ShellNotification[];
   needYouCount: number;
+  // Mensagens da secretÃ¡ria esperando a sua aprovaÃ§Ã£o.
+  draftCount: number;
 }
 
 export async function getShellData(): Promise<ShellData> {
-  const [settings, urgent] = await Promise.all([
+  const [settings, urgent, draftCount] = await Promise.all([
     prisma.settings.findUnique({ where: { id: "singleton" }, select: { ownerName: true, automationPaused: true } }),
     prisma.lead.findMany({
       where: { status: "NEEDS_HUMAN" },
       orderBy: { updatedAt: "desc" },
       select: { id: true, firstName: true, lastName: true, needsHumanReason: true, updatedAt: true },
     }),
+    prisma.draft.count({ where: { status: "PENDING" } }),
   ]);
 
   return {
     ownerName: settings?.ownerName?.trim() || null,
     automationPaused: settings?.automationPaused ?? true,
     needYouCount: urgent.length,
+    draftCount,
     needYou: urgent.slice(0, 6).map((l) => ({
       id: l.id,
       name: [l.firstName, l.lastName].filter(Boolean).join(" ") || "Lead",

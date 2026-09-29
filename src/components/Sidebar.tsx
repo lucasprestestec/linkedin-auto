@@ -13,7 +13,7 @@ import { logout } from "@/app/actions";
 // Barra lateral escura do computador (≥1024px).
 export function Sidebar() {
   const pathname = usePathname();
-  const { ownerName, needYouCount } = useShell();
+  const { ownerName, needYouCount, draftCount } = useShell();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const name = ownerName ?? "Seu perfil";
@@ -35,7 +35,7 @@ export function Sidebar() {
       <nav className="sidebar-nav">
         {NAV_ITEMS.map(({ href, label, Icon, badge }) => {
           const active = isActive(pathname, href);
-          const count = badge === "attention" ? needYouCount : 0;
+          const count = badge === "attention" ? needYouCount : badge === "drafts" ? draftCount : 0;
           return (
             <Link key={href} href={href} className="sidebar-item" aria-current={active ? "page" : undefined}>
               <Icon size={19} strokeWidth={active ? 2.2 : 1.9} />

@@ -14,7 +14,8 @@ import { instructionsFor } from "@/lib/campaigns";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { PROACTIVE_STATUSES } from "@/lib/status";
 import { followUpRuleFor } from "@/lib/followupPolicy";
-import { CHANNEL_LABEL, sendOnChannel } from "@/lib/channels";
+import { CHANNEL_LABEL } from "@/lib/channels";
+import { MAX_PENDING_DRAFTS, OPEN_DRAFT_FILTER, deliver, expireDrafts, flushApprovedDrafts, pendingDraftCount } from "@/lib/outbox";
 
 // Parte proativa do cron: o agente fala primeiro e retoma conversas paradas.
 // Tudo aqui usa só ações Engagement da edges.run (lista de conexões e envio
@@ -140,6 +141,7 @@ async function sendOpenings(identityId: string, settings: Settings, budget: Budg
       linkedinThreadId: null,
       messages: { none: { channel: "LINKEDIN" } },
       ...IN_ACTIVE_CAMPAIGN,
+      ...OPEN_DRAFT_FILTER,
     },
     orderBy: { updatedAt: "asc" },
     include: { messages: { orderBy: { deliveredAt: "asc" }, select: HISTORY_SELECT } },
@@ -155,16 +157,18 @@ async function sendOpenings(identityId: string, settings: Settings, budget: Budg
   for (const lead of eligible) {
     try {
       const content = await generateOpeningMessage(await instructionsFor(lead, settings), lead, { history: lead.messages });
-      await sendOnChannel(lead, "LINKEDIN", content, { identityId });
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: {
-        // Já conversando por e-mail: continua "conversando".
-        status: lead.status === "CONVERSATION_OPEN" ? "CONVERSATION_OPEN" : "WAITING_REPLY",
-        followUpsSent: 0,
-        nextStep: "Aceitou o convite; abri a conversa no LinkedIn.",
-        nextStepAt: null,
-      },
+      await deliver(lead, "LINKEDIN", content, {
+        identityId,
+        kind: "OPENING",
+        reason: "Aceitou o convite; abertura da conversa no LinkedIn.",
+        approval: settings.approvalMode,
+        effects: {
+          // Já conversando por e-mail: continua "conversando".
+          status: lead.status === "CONVERSATION_OPEN" ? "CONVERSATION_OPEN" : "WAITING_REPLY",
+          followUpsSent: 0,
+          nextStep: "Aceitou o convite; abri a conversa no LinkedIn.",
+          nextStepAt: null,
+        },
       });
       spend(budget, "LINKEDIN");
       sent++;
@@ -189,7 +193,7 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
       email: { not: null },
       messages: { none: {} },
       OR: [{ invitedAt: { lte: cutoff } }, { invitedAt: null, createdAt: { lte: cutoff } }],
-      AND: [IN_ACTIVE_CAMPAIGN],
+      AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER],
     },
     orderBy: { createdAt: "asc" },
   });
@@ -201,10 +205,12 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
     const pending = Math.max(days, Math.round((Date.now() - (lead.invitedAt ?? lead.createdAt).getTime()) / DAY_MS));
     try {
       const content = await generateIntroEmail(await instructionsFor(lead, settings), lead, pending);
-      await sendOnChannel(lead, "EMAIL", content, { subject: "Conexão no LinkedIn" });
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: { followUpsSent: 0, nextStep: `Convite parado há ${pending} dias; me apresentei por e-mail.`, nextStepAt: null },
+      await deliver(lead, "EMAIL", content, {
+        subject: "Conexão no LinkedIn",
+        kind: "INTRO_EMAIL",
+        reason: `Convite parado há ${pending} dias; apresentação por e-mail.`,
+        approval: settings.approvalMode,
+        effects: { followUpsSent: 0, nextStep: `Convite parado há ${pending} dias; me apresentei por e-mail.`, nextStepAt: null },
       });
       spend(budget, "EMAIL");
       sent++;
@@ -221,7 +227,7 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
 async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WHATSAPP: boolean }, budget: Budget): Promise<number> {
   if (budget.total <= 0) return 0;
   const leads = await prisma.lead.findMany({
-    where: { status: "NEW", firstContactChannel: { in: ["EMAIL", "WHATSAPP"] }, messages: { none: {} }, ...IN_ACTIVE_CAMPAIGN },
+    where: { status: "NEW", firstContactChannel: { in: ["EMAIL", "WHATSAPP"] }, messages: { none: {} }, ...IN_ACTIVE_CAMPAIGN, ...OPEN_DRAFT_FILTER },
     orderBy: { createdAt: "asc" },
   });
   const rules = parseExclusionList(settings.exclusionList);
@@ -233,10 +239,12 @@ async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WH
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
     try {
       const content = await generateFirstContact(await instructionsFor(lead, settings), lead, channel);
-      await sendOnChannel(lead, channel, content, channel === "EMAIL" ? { subject: `Tudo bem, ${lead.firstName ?? ""}?`.replace(" ?", "?") } : {});
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: {
+      await deliver(lead, channel, content, {
+        subject: channel === "EMAIL" ? `Tudo bem, ${lead.firstName ?? ""}?`.replace(" ?", "?") : undefined,
+        kind: "FIRST_CONTACT",
+        reason: `Primeiro contato por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"} (você pediu).`,
+        approval: settings.approvalMode,
+        effects: {
           status: "WAITING_REPLY",
           firstContactChannel: null,
           followUpsSent: 0,
@@ -302,7 +310,7 @@ async function sendFollowUps(
       where: {
         // INVITE_SENT entra só se já recebeu e-mail (apresentação): segue por lá.
         OR: [{ status: { in: PROACTIVE_STATUSES } }, { status: "INVITE_SENT", messages: { some: {} } }],
-        AND: [IN_ACTIVE_CAMPAIGN, { OR: [{ nextStepAt: null }, { nextStepAt: { lte: new Date(now) } }] }],
+        AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER, { OR: [{ nextStepAt: null }, { nextStepAt: { lte: new Date(now) } }] }],
       },
       include: {
         messages: { orderBy: { deliveredAt: "desc" }, take: 1 },
@@ -391,8 +399,13 @@ async function sendFollowUps(
         if (previous.has(normalizeText(content))) throw new Error("o agente repetiu uma mensagem anterior");
       }
 
-      await sendOnChannel(lead, channel, content, { identityId });
-      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: attempt, nextStep: reason, nextStepAt: null } });
+      await deliver(lead, channel, content, {
+        identityId,
+        kind: "FOLLOW_UP",
+        reason,
+        approval: settings.approvalMode,
+        effects: { followUpsSent: attempt, nextStep: reason, nextStepAt: null },
+      });
       spend(budget, channel);
       sent++;
     } catch (err) {
@@ -407,7 +420,7 @@ async function sendFollowUps(
 // da conversa é do lead e ninguém respondeu ainda.
 async function answerPendingReplies(identityId: string | null): Promise<number> {
   const leads = await prisma.lead.findMany({
-    where: { status: { in: ["CONVERSATION_OPEN", "QUALIFIED"] } },
+    where: { status: { in: ["CONVERSATION_OPEN", "QUALIFIED"] }, ...OPEN_DRAFT_FILTER },
     include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
   });
   const pending = leads
@@ -435,6 +448,9 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
+  // Rascunho que ninguém decidiu a tempo perde a validade (a conversa andou).
+  await expireDrafts().catch((err) => console.error("Falha ao expirar rascunhos", err));
+
   // Mesmas travas do handleIncomingMessage: pausado, nada acontece sozinho.
   if (settings.automationPaused) return { ...result, skipped: "automação pausada" };
   // Fora do horário de trabalho nada sai; o que ficou devido sai na próxima janela.
@@ -452,6 +468,12 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   // Respostas que ficaram pra depois (lead escreveu fora do horário) vêm antes
   // de qualquer iniciativa nossa.
   result.repliesSent = await answerPendingReplies(identityId);
+
+  // Aprovado fora do horário sai agora que a janela abriu.
+  await flushApprovedDrafts().catch((err) => console.error("Falha ao enviar mensagens aprovadas", err));
+
+  // Muita coisa esperando o seu OK: a secretária não gera mais nada até você limpar a fila.
+  if ((await pendingDraftCount()) >= MAX_PENDING_DRAFTS) return { ...result, skipped: "aprovações pendentes demais: abra Aprovações" };
 
   const emailReady = await emailChannelReady(settings);
   const linkedinLeft = identityId ? settings.dailyMessageLimit - (await messagesSentToday()) : 0;

@@ -128,6 +128,7 @@ function listNames(names: string[]) {
 
 export default async function HomePage() {
   const { report, settings, conversations, levas, remaining, messagesToday, invitesToday, kpis, spark } = await getData();
+  const draftCount = await prisma.draft.count({ where: { status: "PENDING" } });
   const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
@@ -187,6 +188,21 @@ export default async function HomePage() {
           <span style={{ flex: 1, minWidth: 0 }}>
             <strong>LinkedIn desconectado</strong>
             <p>{settings.linkedinReconnectReason ?? "A sessão expirou"}. Toque aqui pra reconectar.</p>
+          </span>
+          <IconChevronRight size={18} />
+        </Link>
+      )}
+
+      {draftCount > 0 && (
+        <Link href="/approvals" className="alert">
+          <span className="alert-icon">
+            <IconCheck size={20} />
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <strong>
+              {draftCount} mensagem{draftCount > 1 ? "ns" : ""} esperando sua aprovação
+            </strong>
+            <p>A secretária já escreveu. Toque aqui pra revisar e enviar.</p>
           </span>
           <IconChevronRight size={18} />
         </Link>
