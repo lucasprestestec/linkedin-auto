@@ -32,6 +32,35 @@ export function nousClient() {
   });
 }
 
+// Chamada com uma ferramenta só, forçando o uso dela. O formato mais preciso é
+// dizer QUAL ferramenta (nome); alguns provedores só aceitam "required" ou
+// "auto" (ex.: GLM, Muse Spark). Se o provedor recusar com 400, tenta o
+// próximo formato e lembra qual funcionou para aquele modelo.
+type ToolChoice = OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
+const toolChoiceMode = new Map<string, "named" | "required" | "auto">();
+
+export async function completeWithTool(
+  client: OpenAI,
+  params: { model: string; messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]; tool: OpenAI.Chat.Completions.ChatCompletionTool },
+): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  const name = params.tool.type === "function" ? params.tool.function.name : "";
+  const modes: ("named" | "required" | "auto")[] = ["named", "required", "auto"];
+  const start = modes.indexOf(toolChoiceMode.get(params.model) ?? "named");
+  let lastError: unknown;
+  for (const mode of modes.slice(start)) {
+    const tool_choice: ToolChoice = mode === "named" ? { type: "function", function: { name } } : mode;
+    try {
+      const response = await client.chat.completions.create({ model: params.model, messages: params.messages, tools: [params.tool], tool_choice });
+      toolChoiceMode.set(params.model, mode);
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (!(err instanceof OpenAI.APIError) || err.status !== 400) throw err;
+    }
+  }
+  throw lastError;
+}
+
 export interface Usage {
   inputTokens: number;
   outputTokens: number;
@@ -234,12 +263,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
 
   // Até 2 tentativas: se a mensagem não passar na conferência, pede pra reescrever.
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      tools: [RESPOND_TOOL],
-      tool_choice: { type: "function", function: { name: "respond_to_lead" } },
-    });
+    const response = await completeWithTool(client, { model, messages, tool: RESPOND_TOOL });
     usage = addUsage(usage, usageOf(response));
 
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
@@ -332,12 +356,7 @@ async function writeMessage(system: string, user: string, opts: { model?: string
 
   let issues: string[] = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      tools: [WRITE_TOOL],
-      tool_choice: { type: "function", function: { name: "write_message" } },
-    });
+    const response = await completeWithTool(client, { model, messages, tool: WRITE_TOOL });
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.type !== "function") throw new Error("O agente não retornou uma mensagem.");
     const message = (JSON.parse(toolCall.function.arguments) as { message?: string }).message?.trim();
@@ -446,7 +465,7 @@ export async function scoreProfiles(idealCustomer: string, profiles: ProfileToSc
 
   for (let i = 0; i < profiles.length; i += SCORE_BATCH) {
     const batch = profiles.slice(i, i + SCORE_BATCH);
-    const response = await client.chat.completions.create({
+    const response = await completeWithTool(client, {
       model,
       messages: [
         {
@@ -463,8 +482,7 @@ export async function scoreProfiles(idealCustomer: string, profiles: ProfileToSc
             batch.map((p) => `- id=${p.id} | ${p.name || "(sem nome)"} | ${p.headline || "(sem cargo)"}`).join("\n"),
         },
       ],
-      tools: [SCORE_TOOL],
-      tool_choice: { type: "function", function: { name: "score_profiles" } },
+      tool: SCORE_TOOL,
     });
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.type !== "function") throw new Error("O agente não retornou as notas.");

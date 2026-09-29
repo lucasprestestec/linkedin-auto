@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { decideResponse, nousClient, type Usage } from "@/lib/agent";
+import { completeWithTool, decideResponse, nousClient, type Usage } from "@/lib/agent";
 import { EVAL_INSTRUCTIONS, SCENARIOS, type Scenario } from "./scenarios";
 
 export interface EvalResult {
@@ -60,7 +60,7 @@ const JUDGE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 async function judge(s: Scenario, out: { action: string; message?: string; reason?: string }, judgeModel: string) {
   const client = nousClient();
   const transcript = s.history.map((m) => `${m.sender === "LEAD" ? "LEAD" : "CORRETOR"}: ${m.content}`).join("\n");
-  const response = await client.chat.completions.create({
+  const response = await completeWithTool(client, {
     model: judgeModel,
     messages: [
       {
@@ -79,8 +79,7 @@ async function judge(s: Scenario, out: { action: string; message?: string; reaso
           }`,
       },
     ],
-    tools: [JUDGE_TOOL],
-    tool_choice: { type: "function", function: { name: "grade" } },
+    tool: JUDGE_TOOL,
   });
   const call = response.choices[0]?.message?.tool_calls?.[0];
   if (!call || call.type !== "function") throw new Error("avaliador não respondeu");
