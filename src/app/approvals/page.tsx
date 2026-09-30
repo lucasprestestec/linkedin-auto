@@ -53,8 +53,8 @@ export default async function ApprovalsPage() {
           <h1 className="t-title">Aprovações</h1>
           <p className="t-sub">
             {settings.approvalMode
-              ? "A secretária escreve, você dá o OK. Nada sai sem a sua aprovação."
-              : "Aprovação desligada: a secretária envia sozinha."}
+              ? "O assistente escreve, você dá o OK. Nada sai sem a sua aprovação."
+              : "Aprovação desligada: o assistente envia sozinho."}
           </p>
         </div>
       </header>
@@ -65,7 +65,7 @@ export default async function ApprovalsPage() {
             <b>Aprovar antes de enviar</b>
             <small>
               {stats.decided === 0
-                ? "Quando você aprovar as primeiras mensagens, mostro quantas a secretária acertou sem você mexer."
+                ? "Quando você aprovar as primeiras mensagens, mostro quantas o assistente acertou sem você mexer."
                 : trusted
                   ? `Acertou ${stats.untouched} de ${stats.decided} sem você mexer. Já dá para desligar a aprovação com segurança.`
                   : `Aprovadas sem mudar nada: ${stats.untouched} de ${stats.decided}. Com ${TRUST_MIN_DECIDED} decisões e 90% de acerto, sugiro liberar o automático.`}

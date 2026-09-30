@@ -118,7 +118,7 @@ export function CampaignWizard({
           <>
             <div>
               <label className="label">
-                Oferta ou mensagem principal <Help>Escreva do seu jeito. A secretária usa isso para conversar com as pessoas desta campanha.</Help>
+                Oferta ou mensagem principal <Help>Escreva do seu jeito. O assistente usa isso para conversar com as pessoas desta campanha.</Help>
               </label>
               <textarea
                 className="field"

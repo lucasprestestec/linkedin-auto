@@ -5,7 +5,7 @@ import type { LeadStatus } from "@prisma/client";
 import { leadAction, markMeeting, type LeadActionKind } from "./actions";
 
 // Botão principal (marcar como oportunidade) e "Mais". Marcar tira a pessoa da
-// automação de abordagem; assumir faz a secretária parar de responder até você devolver.
+// automação de abordagem; assumir faz o assistente parar de responder até você devolver.
 export function LeadActions({ leadId, status, profileUrl }: { leadId: string; status: LeadStatus; profileUrl: string | null }) {
   const [open, setOpen] = useState(false);
   const [meetingOpen, setMeetingOpen] = useState(false);
@@ -54,7 +54,7 @@ export function LeadActions({ leadId, status, profileUrl }: { leadId: string; st
           <div className="menu" role="menu" style={{ right: "auto", left: 0 }}>
             {status === "NEEDS_HUMAN" ? (
               <button type="button" role="menuitem" onClick={() => run("handback")}>
-                Devolver para a secretária
+                Devolver para o assistente
               </button>
             ) : (
               status !== "INVITE_SENT" && (

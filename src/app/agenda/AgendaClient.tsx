@@ -104,7 +104,7 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
 
       {view !== "mes" && (
         <p className="cal-hint">
-          Os blocos <b className="cal-hint-free">verdes</b> são horários <b>livres</b>, onde a secretária pode marcar reunião. Os outros blocos são compromissos que já estão na agenda.
+          Os blocos <b className="cal-hint-free">verdes</b> são horários <b>livres</b>, onde o assistente pode marcar reunião. Os outros blocos são compromissos que já estão na agenda.
           {empty && " Nada marcado neste período: tudo o que está em verde está livre."}
         </p>
       )}
@@ -124,7 +124,7 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
         {payload.upcomingMeetings > 0
           ? `${payload.upcomingMeetings} reunião${payload.upcomingMeetings > 1 ? "ões" : ""} marcada${payload.upcomingMeetings > 1 ? "s" : ""} pela frente. `
           : ""}
-        A secretária oferece horários dentro do seu expediente ({built.workHours}), para reuniões de {built.minutes} minutos, com 4 horas de antecedência e só nos próximos 10 dias. <Link href="/settings">Ajustar</Link>
+        O assistente oferece horários dentro do seu expediente ({built.workHours}), para reuniões de {built.minutes} minutos, com 4 horas de antecedência e só nos próximos 10 dias. <Link href="/settings">Ajustar</Link>
       </p>
     </div>
   );
@@ -252,7 +252,7 @@ function TimeGrid({ built, selected, onSelect, nowMin, single }: { built: BuiltA
                 <>
                   <b>{e.title}</b>
                   <span>{e.time.replace("-", " às ")}</span>
-                  {e.lead && <em>Reunião marcada pela secretária com {e.lead.name}</em>}
+                  {e.lead && <em>Reunião marcada pelo assistente com {e.lead.name}</em>}
                 </>
               );
               return e.lead ? (
@@ -330,7 +330,7 @@ function EventRow({ e }: { e: AgendaEvent }) {
         {!e.busy && <span className="tiny faint"> (marcado como livre)</span>}
         {e.lead && (
           <span className="cal-ev-lead">
-            Marcada pela secretária · <Link href={`/leads/${e.lead.id}`}>{e.lead.name}</Link>
+            Marcada pelo assistente · <Link href={`/leads/${e.lead.id}`}>{e.lead.name}</Link>
           </span>
         )}
       </span>
@@ -373,7 +373,7 @@ function DayPanel({ day, minutes }: { day: AgendaDay; minutes: number }) {
         ) : day.isPast ? (
           <p className="cal-empty">Dia que já passou.</p>
         ) : !day.offerable ? (
-          <p className="cal-empty">A secretária só oferece horários dos próximos 10 dias.</p>
+          <p className="cal-empty">O assistente só oferece horários dos próximos 10 dias.</p>
         ) : day.freeLabels.length > 0 ? (
           <ul className="cal-free-list">
             {day.freeLabels.map((w) => (

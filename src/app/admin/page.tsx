@@ -93,7 +93,7 @@ export default async function AdminPage() {
       </section>
 
       <section className="sec">
-        <h2 className="t-label">E-mail da secretária</h2>
+        <h2 className="t-label">E-mail do assistente</h2>
         <EmailStatus
           googleConfigured={googleConfigured()}
           redirectUri={googleRedirectUri(origin)}

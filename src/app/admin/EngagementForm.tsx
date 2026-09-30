@@ -8,7 +8,7 @@ const OPTIONS: { flag: EngagementFlag; title: string; text: string }[] = [
   {
     flag: "acceptInvitesEnabled",
     title: "Aceitar convites recebidos",
-    text: "Quem te convidar vira contato e a secretária abre a conversa. Checado 1x por hora.",
+    text: "Quem te convidar vira contato e o assistente abre a conversa. Checado 1x por hora.",
   },
   {
     flag: "warmupEnabled",

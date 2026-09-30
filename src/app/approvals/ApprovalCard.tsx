@@ -19,7 +19,7 @@ export interface ApprovalItem {
   when: string;
 }
 
-// Uma mensagem que a secretária quer mandar. O texto é editável: mexer nele
+// Uma mensagem que o assistente quer mandar. O texto é editável: mexer nele
 // também conta como aprovação (e fica registrado que você ajustou).
 export function ApprovalCard({ item }: { item: ApprovalItem }) {
   const [text, setText] = useState(item.content);
@@ -71,7 +71,7 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
         disabled={pending}
         aria-label={`Mensagem para ${name}`}
       />
-      {item.reason && <p className="hint" style={{ margin: 0 }}>Por que a secretária escreveu isso: {item.reason}</p>}
+      {item.reason && <p className="hint" style={{ margin: 0 }}>Por que o assistente escreveu isso: {item.reason}</p>}
 
       {notice && (
         <p className={notice.tone === "error" ? "field-error" : "ok-text"} role="status">

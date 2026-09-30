@@ -628,7 +628,7 @@ Use a ferramenta next_step. Nunca responda em texto livre.`;
   return {
     action,
     channel: action === "send" ? (channel ?? input.options[0]) : null,
-    reason: out.reason?.trim() || (action === "stop" ? "Sem sinais de interesse; encerrando." : "Decisão da secretária."),
+    reason: out.reason?.trim() || (action === "stop" ? "Sem sinais de interesse; encerrando." : "Decisão do assistente."),
     usage: usageOf(response),
   };
 }

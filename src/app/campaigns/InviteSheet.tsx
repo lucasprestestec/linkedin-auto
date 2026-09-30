@@ -87,7 +87,7 @@ export function InviteSheet({
                   Na campanha <b>{done.campaignName}</b>.{" "}
                 </>
               ) : null}
-              Os convites saem ao longo do dia. Quem aceitar recebe a primeira mensagem da secretária e aparece em Conversas.
+              Os convites saem ao longo do dia. Quem aceitar recebe a primeira mensagem do assistente e aparece em Conversas.
             </p>
             {done.skippedForLimit > 0 && <p className="note note-warn">{done.skippedForLimit} ficaram de fora pelo limite de hoje.</p>}
             <div className="row wrap" style={{ gap: 8 }}>
@@ -110,7 +110,7 @@ export function InviteSheet({
               </button>
             </div>
 
-            <p className="muted">Em qual campanha? A secretária usa a oferta da campanha na conversa.</p>
+            <p className="muted">Em qual campanha? O assistente usa a oferta da campanha na conversa.</p>
             <div className="stack" style={{ gap: 8 }} role="radiogroup" aria-label="Campanha">
               <CampaignChoice checked={campaignId === ""} onSelect={() => setCampaignId("")} title="Sem campanha" sub="Usa a sua abordagem padrão" />
               {campaigns.map((c) => (

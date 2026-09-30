@@ -20,17 +20,17 @@ export function ContactForm({
 
   // Cada opção de primeiro contato só aparece habilitada com o dado e o canal prontos.
   const options: { id: FirstContact; label: string; hint: string; enabled: boolean; why?: string }[] = [
-    { id: "ME", label: "Eu mesmo começo", hint: "Nada é enviado agora. Quando você mandar a primeira mensagem, a secretária acompanha.", enabled: true },
+    { id: "ME", label: "Eu mesmo começo", hint: "Nada é enviado agora. Quando você mandar a primeira mensagem, o assistente acompanha.", enabled: true },
     {
       id: "WHATSAPP",
-      label: "A secretária manda um WhatsApp",
+      label: "O assistente manda um WhatsApp",
       hint: "Primeira mensagem curta, no próximo horário de trabalho, usando o que você escrever sobre a pessoa.",
       enabled: ready.WHATSAPP && Boolean(values.phone.trim()),
       why: !ready.WHATSAPP ? "Conecte o WhatsApp em Canais" : "Informe o WhatsApp",
     },
     {
       id: "EMAIL",
-      label: "A secretária se apresenta por e-mail",
+      label: "O assistente se apresenta por e-mail",
       hint: "E-mail de apresentação no próximo horário de trabalho, com rastreio de abertura.",
       enabled: ready.EMAIL && Boolean(values.email.trim()),
       why: !ready.EMAIL ? "Conecte o e-mail em Canais" : "Informe o e-mail",
@@ -38,7 +38,7 @@ export function ContactForm({
     {
       id: "LINKEDIN",
       label: "Convidar no LinkedIn",
-      hint: "Convite de conexão; quando aceitar, a secretária abre a conversa por lá.",
+      hint: "Convite de conexão; quando aceitar, o assistente abre a conversa por lá.",
       enabled: ready.LINKEDIN && Boolean(values.linkedin.trim()),
       why: !ready.LINKEDIN ? "Conecte o LinkedIn em Canais" : "Informe o link do perfil",
     },
@@ -110,7 +110,7 @@ export function ContactForm({
         </div>
         <div>
           <label className="label">
-            O que você sabe dessa pessoa <Help>A secretária usa isso para fazer a ponte na primeira mensagem e deixar a conversa pessoal.</Help>
+            O que você sabe dessa pessoa <Help>O assistente usa isso para fazer a ponte na primeira mensagem e deixar a conversa pessoal.</Help>
           </label>
           <textarea
             className="field"

@@ -10,7 +10,7 @@ function formatPhone(phone: string | null) {
   return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : phone;
 }
 
-// Contato e o que você sabe da pessoa. Diferente das anotações, a secretária LÊ
+// Contato e o que você sabe da pessoa. Diferente das anotações, o assistente LÊ
 // isto e usa nas mensagens.
 export function LeadProfile({
   leadId,
@@ -49,7 +49,7 @@ export function LeadProfile({
       <div className="sec-head">
         <h2 className="t-label">
           Contato
-          <Help>Com e-mail ou WhatsApp, a secretária também fala por esses canais. O que você escrever em &ldquo;o que você sabe&rdquo; ela usa para deixar as mensagens mais pessoais.</Help>
+          <Help>Com e-mail ou WhatsApp, o assistente também fala por esses canais. O que você escrever em &ldquo;o que você sabe&rdquo; ele usa para deixar as mensagens mais pessoais.</Help>
         </h2>
         {!editing && (
           <button type="button" className="btn-text" onClick={() => setEditing(true)}>

@@ -33,7 +33,7 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
         <div>
           <h1 className="t-title">Prospectar</h1>
           <p className="t-sub">
-            Busque, marque quem te interessa e convide. Quando aceitarem, a secretária começa a conversa.{" "}
+            Busque, marque quem te interessa e convide. Quando aceitarem, o assistente começa a conversa.{" "}
             <Help>O LinkedIn limita quantos convites uma conta pode mandar por dia. O sistema respeita esse limite para proteger sua conta.</Help>
           </p>
         </div>
