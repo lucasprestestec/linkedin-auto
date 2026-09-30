@@ -5,7 +5,7 @@ import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
 import { updateEmailChannel } from "./actions";
 
-// O que a secretária pode fazer sozinha por e-mail. Salva a cada mudança.
+// O que o assistente pode fazer sozinha por e-mail. Salva a cada mudança.
 export function EmailChannelOptions({ enabled, dailyLimit, fallbackDays }: { enabled: boolean; dailyLimit: number; fallbackDays: number | null }) {
   const [value, setValue] = useState({ enabled, dailyLimit, fallbackDays });
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export function EmailChannelOptions({ enabled, dailyLimit, fallbackDays }: { ena
         <span className="setting-text">
           <b>
             Usar o e-mail{" "}
-            <Help>Desligado, a secretária só responde quem escrever por e-mail. Ela não começa nem retoma conversa por lá.</Help>
+            <Help>Desligado, o assistente só responde quem escrever por e-mail. Ele não começa nem retoma conversa por lá.</Help>
           </b>
         </span>
         <button
@@ -49,7 +49,7 @@ export function EmailChannelOptions({ enabled, dailyLimit, fallbackDays }: { ena
             <span className="setting-text">
               <b>
                 Convite parado: apresentar-se por e-mail{" "}
-                <Help>Se o convite do LinkedIn não for aceito e a pessoa tiver e-mail na ficha, a secretária se apresenta por e-mail.</Help>
+                <Help>Se o convite do LinkedIn não for aceito e a pessoa tiver e-mail na ficha, o assistente se apresenta por e-mail.</Help>
               </b>
               {value.fallbackDays != null && <small>Depois de {value.fallbackDays} dias sem aceite</small>}
             </span>

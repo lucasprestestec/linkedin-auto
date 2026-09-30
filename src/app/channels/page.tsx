@@ -3,6 +3,7 @@ import { MobileHeader } from "@/components/MobileHeader";
 import { Help } from "@/components/Help";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { fixedDeskcommUrl } from "@/lib/deskcomm";
 import { WhatsappCard } from "./WhatsappCard";
 import { EmailCard } from "../settings/EmailCard";
 import { EmailChannelOptions } from "./EmailChannelOptions";
@@ -19,7 +20,7 @@ async function emailWeek() {
 }
 
 // Canais: cada um conecta, liga e desliga por conta própria. O LinkedIn é a
-// prospecção; e-mail e WhatsApp são camadas a mais que a secretária usa quando
+// prospecção; e-mail e WhatsApp são camadas a mais que o assistente usa quando
 // os sinais indicam que vale a pena.
 export default async function ChannelsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const emailResult = (await searchParams).email;
@@ -41,12 +42,12 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
           <h1 className="t-title">
             Canais{" "}
             <Help>
-              Quando alguém não responde, a secretária olha os sinais e escolhe: retomar por um canal, esperar mais um pouco ou encerrar. Se a pessoa abriu o
+              Quando alguém não responde, o assistente olha os sinais e escolhe: retomar por um canal, esperar mais um pouco ou encerrar. Se a pessoa abriu o
               e-mail e não respondeu, ela tenta de novo, de preferência por outro canal, sem dizer que sabe que foi aberto. Tudo respeita seu horário de
               trabalho e os limites de cada canal.
             </Help>
           </h1>
-          <p className="t-sub">Por onde a secretária fala com as pessoas. Conecte só o que fizer sentido.</p>
+          <p className="t-sub">Por onde o assistente fala com as pessoas. Conecte só o que fizer sentido.</p>
         </div>
       </header>
 
@@ -78,6 +79,7 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
         <WhatsappCard
           host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
           channelId={settings.deskcommChannelId}
+          fixedAddress={fixedDeskcommUrl() !== null}
           enabled={settings.whatsappChannelEnabled}
           dailyLimit={settings.dailyWhatsappLimit}
           sentToday={whatsappToday}

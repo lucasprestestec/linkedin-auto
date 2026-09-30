@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { deskcommConfigOf, inspectDeskcomm, normalizeDeskcommUrl, saveDeskcommConnection } from "@/lib/deskcomm";
+import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommUrl, saveDeskcommConnection } from "@/lib/deskcomm";
 
-// Regras do canal de e-mail (tela Canais). null em fallbackDays = a secretária
+// Regras do canal de e-mail (tela Canais). null em fallbackDays = o assistente
 // nunca se apresenta por e-mail quando o convite fica parado.
 export async function updateEmailChannel(input: { enabled: boolean; dailyLimit: number; fallbackDays: number | null }) {
   const dailyLimit = Math.round(input.dailyLimit);
@@ -30,7 +30,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // por uma conversa existente, ou informado à mão.
 export async function connectDeskcomm(input: { url: string; token: string; channelId?: string }) {
   const current = await currentConfig();
-  const url = input.url.trim() ? normalizeDeskcommUrl(input.url) : (current?.url ?? null);
+  // Com o endereço fixo do servidor (DESKCOMM_URL), o cliente informa só a chave.
+  const url = fixedDeskcommUrl() ?? (input.url.trim() ? normalizeDeskcommUrl(input.url) : (current?.url ?? null));
   if (!url) return { error: "Endereço inválido." };
   const token = input.token.trim() || current?.token;
   if (!token) return { error: "Cole a chave de acesso do WhatsApp." };
