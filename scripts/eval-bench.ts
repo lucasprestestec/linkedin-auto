@@ -1,7 +1,8 @@
 // Bateria do banco de testes do agente, por linha de comando.
-// Uso: npx tsx scripts/eval-bench.ts --models a,b --judge j --runs 3 --out resultado.json [--only id1,id2] [--via claude-code | --judge-via claude-code]
+// Uso: npx tsx scripts/eval-bench.ts --models a,b --judge j --runs 3 --out resultado.json [--only id1,id2] [--via claude-code | --via codex --effort medium | --judge-via claude-code]
 import { config } from "dotenv";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -71,6 +72,93 @@ function claudeCode(alias: string): Completer {
   };
 }
 
+// Codex (assinatura da OpenAI): usa o codex.exe do app desktop (o do npm pode ser velho e nÃ£o ter o modelo).
+// As instruÃ§Ãµes de programador do Codex sÃ£o trocadas pelo prompt do agente (model_instructions_file).
+// A saÃ­da estruturada da OpenAI exige todos os campos obrigatÃ³rios: os opcionais viram "campo ou null".
+const CODEX_BIN = process.env.CODEX_BIN || join(process.env.LOCALAPPDATA ?? "", "OpenAI", "Codex", "bin", "c6fe824d725f02d7", "codex.exe");
+
+function strictSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(strictSchema);
+  if (!node || typeof node !== "object") return node;
+  const o = { ...(node as Record<string, unknown>) };
+  if (o.properties && typeof o.properties === "object") {
+    const props = o.properties as Record<string, Record<string, unknown>>;
+    const req = new Set((o.required as string[] | undefined) ?? []);
+    const next: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(props)) {
+      const sv = strictSchema(v) as Record<string, unknown>;
+      next[k] = req.has(k) || typeof sv.type !== "string" ? sv : { ...sv, type: [sv.type, "null"] };
+    }
+    o.properties = next;
+    o.required = Object.keys(next);
+    o.additionalProperties = false;
+  }
+  if (o.items) o.items = strictSchema(o.items);
+  delete o.minimum;
+  delete o.maximum;
+  return o;
+}
+
+function codex(slug: string, effort: string): Completer {
+  return async ({ messages, tool }) => {
+    const id = randomUUID();
+    const sysFile = join(EMPTY_DIR, `${id}.md`).replace(/\\/g, "/");
+    const schemaFile = join(EMPTY_DIR, `${id}.json`);
+    const fn = tool.type === "function" ? tool.function : null;
+    writeFileSync(sysFile, String(messages[0].content));
+    writeFileSync(schemaFile, JSON.stringify(strictSchema(fn?.parameters ?? {})));
+    const body = messages
+      .slice(1)
+      .map((m) => {
+        if (m.role === "user") return String(m.content);
+        if (m.role === "assistant") return `[Sua resposta anterior]\n${(m as { tool_calls?: { function: { arguments: string } }[] }).tool_calls?.[0]?.function.arguments ?? ""}`;
+        if (m.role === "tool") return `[Retorno]\n${String(m.content)}`;
+        return "";
+      })
+      .join("\n\n");
+    const args = [
+      "exec", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "-s", "read-only",
+      "-m", slug, "-c", `model_reasoning_effort=${effort}`, "-c", `model_instructions_file="${sysFile}"`,
+      "--output-schema", schemaFile, "--json", "-",
+    ];
+    try {
+      let lastErr = "";
+      for (let i = 0; i < 3; i++) {
+        const out = await new Promise<string>((resolve, reject) => {
+          const p = spawn(CODEX_BIN, args, { cwd: EMPTY_DIR });
+          let so = "";
+          p.stdout.on("data", (d) => (so += d));
+          p.on("error", reject);
+          p.on("close", () => resolve(so));
+          p.stdin.end(body);
+        });
+        let text = "";
+        let usage: { input_tokens?: number; output_tokens?: number } = {};
+        for (const line of out.split("\n")) {
+          try {
+            const ev = JSON.parse(line) as { type?: string; item?: { type?: string; text?: string }; usage?: typeof usage; message?: string };
+            if (ev.type === "item.completed" && ev.item?.type === "agent_message") text = ev.item.text ?? "";
+            if (ev.type === "turn.completed") usage = ev.usage ?? {};
+            if (ev.type === "turn.failed" || ev.type === "error") lastErr = String(ev.message ?? line).slice(0, 200);
+          } catch {}
+        }
+        if (!text) continue;
+        // Campos "null" voltam a ser "ausentes", como na chamada normal.
+        const parsed = JSON.parse(text, (_k, v) => (v === null ? undefined : v));
+        return {
+          id: "cx", object: "chat.completion", created: 0, model: slug,
+          choices: [{ index: 0, finish_reason: "tool_calls", logprobs: null, message: { role: "assistant", refusal: null, content: null, tool_calls: [{ id: "call", type: "function", function: { name: fn?.name ?? "", arguments: JSON.stringify(parsed) } }] } }],
+          usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0, total_tokens: 0 },
+        } as never;
+      }
+      throw new Error(`codex sem resposta: ${lastErr}`);
+    } finally {
+      rmSync(sysFile, { force: true });
+      rmSync(schemaFile, { force: true });
+    }
+  };
+}
+
 async function main() {
   const { SCENARIOS } = await import("../src/lib/agentEval/scenarios");
   const { runScenario } = await import("../src/lib/agentEval/run");
@@ -78,7 +166,10 @@ async function main() {
   const models = arg("models").split(",").filter(Boolean);
   const judge = arg("judge") || null;
   // --via claude-code: os modelos (e o avaliador) viram apelidos do Claude Code (sonnet, opus), sem gastar a API.
-  const viaCC = arg("via") === "claude-code";
+  const via = arg("via");
+  const viaCC = via === "claude-code";
+  const viaCodex = via === "codex";
+  const effort = arg("effort", "medium");
   // --judge-via claude-code: os modelos rodam pela API (Nous), mas o avaliador roda no Claude Code (sem gastar API).
   const judgeViaCC = viaCC || arg("judge-via") === "claude-code";
   const runs = Number(arg("runs", "1"));
@@ -97,7 +188,7 @@ async function main() {
     Array.from({ length: concurrency }, async () => {
       while (next < jobs.length) {
         const job = jobs[next++];
-        const r = await runScenario(job.id, job.model, judge, { complete: viaCC ? claudeCode(job.model) : undefined, judgeComplete: judgeViaCC && judge ? claudeCode(judge) : undefined });
+        const r = await runScenario(job.id, job.model, judge, { complete: viaCC ? claudeCode(job.model) : viaCodex ? codex(job.model, effort) : undefined, judgeComplete: judgeViaCC && judge ? claudeCode(judge) : undefined });
         results.push({ ...r, run: job.run });
         done++;
         if (done % 20 === 0) console.log(`${done}/${jobs.length}`);
