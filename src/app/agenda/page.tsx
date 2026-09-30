@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { MobileHeader } from "@/components/MobileHeader";
 import { IconAlert, IconCalendar } from "@/components/Icons";
 import { googleConfigured } from "@/lib/gmail";
-import { loadAgenda, parseView } from "@/lib/agendaView";
-import { minutesOfDay } from "@/lib/slots";
-import { DayPanel, Legend, MonthGrid, Toolbar, WeekGrid } from "./AgendaCalendar";
+import { loadAgenda } from "@/lib/agendaView";
+import { parseView } from "@/lib/agendaBuild";
+import { AgendaClient } from "./AgendaClient";
 import "./agenda.css";
 
 // A agenda é lida do Google a cada abertura da tela: sempre o que está lá agora.
@@ -55,24 +54,8 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
           )}
         </section>
       ) : (
-        <div className="cal">
-          <Toolbar data={data} />
-          <Legend />
-          {data.view === "mes" ? (
-            <>
-              <MonthGrid data={data} />
-              {data.selected && <DayPanel day={data.selected} minutes={data.minutes} />}
-            </>
-          ) : (
-            <WeekGrid data={data} nowMin={minutesOfDay(new Date())} />
-          )}
-          <p className="small muted" style={{ margin: 0 }}>
-            {data.upcomingMeetings > 0
-              ? `${data.upcomingMeetings} reunião${data.upcomingMeetings > 1 ? "ões" : ""} marcada${data.upcomingMeetings > 1 ? "s" : ""} pela secretária ou por você pela frente. `
-              : ""}
-            Horários livres: expediente de {data.workHours}, reuniões de {data.minutes} minutos, com 4 horas de antecedência (só nos próximos 10 dias). <Link href="/settings">Ajustar</Link>
-          </p>
-        </div>
+        // `key` = a janela lida: ao buscar outra janela no servidor, o calendário recomeça dela.
+        <AgendaClient key={`${data.fromKey}|${data.view}|${data.focusKey}`} payload={data} />
       )}
     </main>
   );
