@@ -1,64 +1,18 @@
 import Link from "next/link";
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconAlert, IconCalendar, IconExternal } from "@/components/Icons";
+import { IconAlert, IconCalendar } from "@/components/Icons";
 import { googleConfigured } from "@/lib/gmail";
-import { loadAgenda, type AgendaDay } from "@/lib/agendaView";
+import { loadAgenda, parseView } from "@/lib/agendaView";
+import { minutesOfDay } from "@/lib/slots";
+import { DayPanel, Legend, MonthGrid, Toolbar, WeekGrid } from "./AgendaCalendar";
+import "./agenda.css";
 
 // A agenda é lida do Google a cada abertura da tela: sempre o que está lá agora.
 export const dynamic = "force-dynamic";
 
-function DayCard({ day, minutes }: { day: AgendaDay; minutes: number }) {
-  return (
-    <section className="panel" style={{ padding: 16, display: "grid", gap: 10 }} aria-label={day.label}>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <h2 style={{ margin: 0, fontSize: 17, textTransform: "capitalize" }}>
-          {day.label}
-          {day.isToday && <span className="count-pill" style={{ marginLeft: 8 }}>hoje</span>}
-        </h2>
-        <span className="small muted">{day.events.length ? `${day.events.length} compromisso${day.events.length > 1 ? "s" : ""}` : "sem compromissos"}</span>
-      </div>
-
-      {day.events.length > 0 && (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-          {day.events.map((e) => (
-            <li key={e.id} className="row" style={{ gap: 10, alignItems: "flex-start", flexWrap: "wrap", opacity: e.busy ? 1 : 0.6 }}>
-              <strong style={{ minWidth: 92, fontVariantNumeric: "tabular-nums" }}>{e.time}</strong>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                {e.title}
-                {!e.busy && <span className="tiny faint"> (marcado como livre)</span>}
-              </span>
-              {e.lead && (
-                <Link href={`/leads/${e.lead.id}`} className="soft-badge pill-qualified" title="Reunião marcada pela secretária">
-                  <i className="dot" /> Marcada pela secretária · {e.lead.name}
-                </Link>
-              )}
-              {e.meetLink && (
-                <a href={e.meetLink} target="_blank" rel="noreferrer" className="small">
-                  <IconExternal size={13} /> Meet
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <p className="small" style={{ margin: 0 }}>
-        {day.offDay ? (
-          <span className="muted">Fora do expediente.</span>
-        ) : day.free.length ? (
-          <>
-            <strong>Livre para reunião de {minutes} min:</strong> {day.free.join("  ·  ")}
-          </>
-        ) : (
-          <span className="muted">Nenhum horário livre {day.isToday ? "hoje" : "neste dia"}.</span>
-        )}
-      </p>
-    </section>
-  );
-}
-
-export default async function AgendaPage() {
-  const data = await loadAgenda(googleConfigured());
+export default async function AgendaPage({ searchParams }: PageProps<"/agenda">) {
+  const params = await searchParams;
+  const data = await loadAgenda(googleConfigured(), parseView(params.v), params.d);
 
   return (
     <main className="page">
@@ -101,24 +55,24 @@ export default async function AgendaPage() {
           )}
         </section>
       ) : (
-        <>
-          <section className="panel" style={{ padding: 16, display: "grid", gap: 6 }}>
-            <strong>
-              {data.secretaryMeetings === 0
-                ? "Nenhuma reunião marcada pela secretária nos próximos dias."
-                : `${data.secretaryMeetings} reunião${data.secretaryMeetings > 1 ? "ões" : ""} marcada${data.secretaryMeetings > 1 ? "s" : ""} pela secretária nos próximos dias.`}
-            </strong>
-            <span className="small muted">
-              Horários livres: expediente de {data.workHours}, reuniões de {data.minutes} minutos, com 4 horas de antecedência. Mostrando os próximos 10 dias.{" "}
-              <Link href="/settings">Ajustar</Link>
-            </span>
-          </section>
-          <div style={{ display: "grid", gap: 14 }}>
-            {data.days.map((d) => (
-              <DayCard key={d.key} day={d} minutes={data.minutes} />
-            ))}
-          </div>
-        </>
+        <div className="cal">
+          <Toolbar data={data} />
+          <Legend />
+          {data.view === "mes" ? (
+            <>
+              <MonthGrid data={data} />
+              {data.selected && <DayPanel day={data.selected} minutes={data.minutes} />}
+            </>
+          ) : (
+            <WeekGrid data={data} nowMin={minutesOfDay(new Date())} />
+          )}
+          <p className="small muted" style={{ margin: 0 }}>
+            {data.upcomingMeetings > 0
+              ? `${data.upcomingMeetings} reunião${data.upcomingMeetings > 1 ? "ões" : ""} marcada${data.upcomingMeetings > 1 ? "s" : ""} pela secretária ou por você pela frente. `
+              : ""}
+            Horários livres: expediente de {data.workHours}, reuniões de {data.minutes} minutos, com 4 horas de antecedência (só nos próximos 10 dias). <Link href="/settings">Ajustar</Link>
+          </p>
+        </div>
       )}
     </main>
   );
