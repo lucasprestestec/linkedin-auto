@@ -9,7 +9,10 @@ const DEFAULT_INSTRUCTIONS = `Você responde pelo corretor de seguros dono desta
 Nenhum material de vendas foi configurado ainda — fale de forma genérica e cordial, e SEMPRE prefira
 passar a conversa pro corretor a inventar qualquer informação sobre produtos, preços ou condições.`;
 
+// Tarefas simples (nota de perfil, resumo): modelo rápido e barato.
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+// Conversas com o lead (o ponto crítico): GPT-6.1 Sol, validado no banco de testes (88 cenários x 3).
+export const DEFAULT_CONVERSATION_MODEL = "openai/gpt-6.1-sol";
 
 // ---------------------------------------------------------------------------
 // Modelos: o das conversas pode ser trocado no admin (depois do banco de
@@ -18,7 +21,7 @@ export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 
 export async function conversationModel(): Promise<string> {
   const settings = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { agentModel: true } });
-  return settings?.agentModel?.trim() || process.env.NOUS_MODEL || DEFAULT_MODEL;
+  return settings?.agentModel?.trim() || process.env.NOUS_MODEL || DEFAULT_CONVERSATION_MODEL;
 }
 
 function fastModel(): string {
@@ -204,9 +207,9 @@ const RULES = `REGRAS FIXAS (valem acima de qualquer material)
 - Não peça dados sensíveis (CPF, renda, saúde, documentos) e não mande links.
 - Nunca diga que é IA, robô ou assistente — e nunca afirme ser humano se perguntarem: nesse caso, passe pro corretor.
 
-QUEM RESPONDEU PODE NÃƒO SER UMA PESSOA
-- Menu de atendimento ("digite 1 para..."), resposta automÃ¡tica de fÃ©rias/ausÃªncia, protocolo de atendimento, FAQ com link, pedido de CPF/CNPJ para seguir, "prove que vocÃª Ã© humano" ou assistente de IA de terceiros NÃƒO sÃ£o conversa. Nunca escolha opÃ§Ã£o, responda pergunta deles, faÃ§a pitch nem pergunte nada: use action = handoff e diga no motivo, em poucas palavras, o que Ã© (ex.: "Caiu num menu automÃ¡tico da empresa", "Resposta automÃ¡tica de fÃ©rias atÃ© 15/10").
-- Outro vendedor (ou robÃ´ de vendas) oferecendo produto a vocÃª: nÃ£o demonstre interesse e nÃ£o faÃ§a pergunta nova. Encerre em uma frase cordial (action = reply, declined = true) ou passe pro corretor.
+QUEM RESPONDEU PODE NÃO SER UMA PESSOA
+- Menu de atendimento ("digite 1 para..."), resposta automática de férias/ausência, protocolo de atendimento, FAQ com link, pedido de CPF/CNPJ para seguir, "prove que você é humano" ou assistente de IA de terceiros NÃO são conversa. Nunca escolha opção, responda pergunta deles, faça pitch nem pergunte nada: use action = handoff e diga no motivo, em poucas palavras, o que é (ex.: "Caiu num menu automático da empresa", "Resposta automática de férias até 15/10").
+- Outro vendedor (ou robô de vendas) oferecendo produto a você: não demonstre interesse e não faça pergunta nova. Encerre em uma frase cordial (action = reply, declined = true) ou passe pro corretor.
 
 PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
@@ -272,7 +275,7 @@ ${leadBlock(lead)}`;
 export type AgentDecision = (
   | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[] }
   | { action: "book"; message: string; slotStart: Date }
-  // silent: passou pro corretor sem acordÃ¡-lo por push (era uma mensagem automÃ¡tica, nÃ£o uma pessoa).
+  // silent: passou pro corretor sem acordá-lo por push (era uma mensagem automática, não uma pessoa).
   | { action: "handoff"; reason: string; silent?: boolean }
 ) & { analysis: string; model: string; usage: Usage; attempts: number; checkIssues: string[] };
 
@@ -328,10 +331,10 @@ export interface ConversationInput {
 
 export async function decideResponse(
   input: ConversationInput,
-  // skipAutoFilter: sÃ³ o banco de testes usa, pra medir o prompt sozinho (sem a regra de mensagem automÃ¡tica).
+  // skipAutoFilter: só o banco de testes usa, pra medir o prompt sozinho (sem a regra de mensagem automática).
   opts: { model?: string; complete?: Completer; skipAutoFilter?: boolean } = {},
 ): Promise<AgentDecision> {
-  // Menu de atendimento, resposta de fÃ©rias, protocolo etc.: nÃ£o Ã© uma pessoa, nem gasta chamada ao modelo.
+  // Menu de atendimento, resposta de férias, protocolo etc.: não é uma pessoa, nem gasta chamada ao modelo.
   const lastLead = [...input.history].reverse().find((m) => m.sender === "LEAD");
   const auto = !opts.skipAutoFilter && lastLead ? detectAutomatedMessage(lastLead.content) : null;
   if (auto) {
@@ -339,7 +342,7 @@ export async function decideResponse(
       action: "handoff",
       reason: auto.reason,
       silent: auto.silent,
-      analysis: `Regra: mensagem automÃ¡tica (${auto.kind})`,
+      analysis: `Regra: mensagem automática (${auto.kind})`,
       model: "regra",
       usage: { inputTokens: 0, outputTokens: 0, cost: 0 },
       attempts: 0,

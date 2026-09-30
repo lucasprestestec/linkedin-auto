@@ -15,8 +15,8 @@ const arg = (name: string, fallback = "") => {
   return i >= 0 ? process.argv[i + 1] : fallback;
 };
 
-// Chama o Claude Code em modo programÃ¡tico (usa a assinatura, nÃ£o a API). Roda numa pasta vazia,
-// sem ferramentas, sem configuraÃ§Ãµes nem skills, pra responder sÃ³ com o prompt do agente.
+// Chama o Claude Code em modo programático (usa a assinatura, não a API). Roda numa pasta vazia,
+// sem ferramentas, sem configurações nem skills, pra responder só com o prompt do agente.
 const EMPTY_DIR = join(tmpdir(), "eval-cc");
 mkdirSync(EMPTY_DIR, { recursive: true });
 
@@ -50,7 +50,7 @@ function claudeCode(alias: string): Completer {
         p.stdin.end(input);
       });
     type Out = { is_error?: boolean; result?: string; structured_output?: unknown; usage?: { input_tokens?: number; output_tokens?: number }; total_cost_usd?: number };
-    // Ã€s vezes o modelo responde em texto em vez de usar a estrutura pedida: tenta de novo (atÃ© 3 vezes).
+    // Às vezes o modelo responde em texto em vez de usar a estrutura pedida: tenta de novo (até 3 vezes).
     let r: Out = {};
     let parsed: unknown;
     let cost = 0;
@@ -72,9 +72,9 @@ function claudeCode(alias: string): Completer {
   };
 }
 
-// Codex (assinatura da OpenAI): usa o codex.exe do app desktop (o do npm pode ser velho e nÃ£o ter o modelo).
-// As instruÃ§Ãµes de programador do Codex sÃ£o trocadas pelo prompt do agente (model_instructions_file).
-// A saÃ­da estruturada da OpenAI exige todos os campos obrigatÃ³rios: os opcionais viram "campo ou null".
+// Codex (assinatura da OpenAI): usa o codex.exe do app desktop (o do npm pode ser velho e não ter o modelo).
+// As instruções de programador do Codex são trocadas pelo prompt do agente (model_instructions_file).
+// A saída estruturada da OpenAI exige todos os campos obrigatórios: os opcionais viram "campo ou null".
 const CODEX_BIN = process.env.CODEX_BIN || join(process.env.LOCALAPPDATA ?? "", "OpenAI", "Codex", "bin", "c6fe824d725f02d7", "codex.exe");
 
 function strictSchema(node: unknown): unknown {

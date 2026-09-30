@@ -4,7 +4,7 @@ import { readableReason } from "@/lib/format";
 
 // Passa o lead pro corretor ("Precisa de você") e avisa por push. Um único
 // lugar pra isso: resposta da IA, follow-up, abertura e anexo usam daqui.
-// silent: nÃ£o manda push (mensagem automÃ¡tica do outro lado; fica na lista "Precisa de vocÃª" com o motivo).
+// silent: não manda push (mensagem automática do outro lado; fica na lista "Precisa de você" com o motivo).
 export async function markNeedsHuman(leadId: string, rawReason: string, opts: { silent?: boolean } = {}) {
   const reason = readableReason(rawReason);
   if (reason !== rawReason.trim()) console.error(`[handoff] lead=${leadId} motivo completo:`, rawReason);
