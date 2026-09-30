@@ -23,8 +23,46 @@ const TEST_STYLE = parseWritingStyle({
   ],
 });
 
+// Dois perfis opostos (EVAL_STYLE=informal / formal) pra provar que a calibragem muda o jeito de escrever.
+const INFORMAL_STYLE = parseWritingStyle({
+  emoji: "often",
+  formality: "very_informal",
+  length: "short",
+  treatment: "voce",
+  greeting: "oi",
+  closing: "abraco",
+  approach: "direct",
+  always: "show, tranquilo, combinado",
+  never: "prezado, estimado, gostaria",
+  answers: {
+    quem_e: "Opa! Trabalho com benefício pra empresa, plano de saúde e seguro de vida. Vocês já têm algo hoje? 😉",
+    ja_tenho: "Show, que bom! Quando renova? Vale comparar rapidinho, sem compromisso 😊",
+  },
+});
+
+const FORMAL_STYLE = parseWritingStyle({
+  emoji: "never",
+  formality: "very_formal",
+  length: "long",
+  treatment: "senhor",
+  greeting: "bomdia",
+  closing: "att",
+  approach: "warm",
+  never: "show, tranquilo, beleza",
+  answers: {
+    quem_e:
+      "Bom dia! Agradeço o retorno. Sou corretor de seguros e atuo com benefícios corporativos. Gostaria de entender, se o senhor permitir, como a empresa trata esse tema atualmente.",
+    ja_tenho:
+      "Compreendo perfeitamente e agradeço a transparência. Caso considere oportuno, posso apresentar, sem qualquer compromisso, uma análise comparativa das condições atuais.",
+  },
+});
+
 function evalStyle(): string | null {
-  return process.env.EVAL_STYLE === "1" ? renderStyleBlock(TEST_STYLE, () => 0) : null;
+  const mode = process.env.EVAL_STYLE;
+  if (mode === "1") return renderStyleBlock(TEST_STYLE, () => 0);
+  if (mode === "informal") return renderStyleBlock(INFORMAL_STYLE, () => 0);
+  if (mode === "formal") return renderStyleBlock(FORMAL_STYLE, () => 0);
+  return null;
 }
 
 export interface EvalResult {
