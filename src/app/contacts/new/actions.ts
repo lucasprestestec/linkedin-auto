@@ -70,7 +70,7 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
   }
   if (firstContact === "WHATSAPP") {
     if (!p.phone) return { error: "Pra a secretária falar pelo WhatsApp, informe o número." };
-    if (!(await deskcommConfig())) return { error: "Conecte o WhatsApp (Deskcomm) em Canais pra a secretária mandar a primeira mensagem." };
+    if (!(await deskcommConfig())) return { error: "Conecte o WhatsApp em Canais pra a secretária mandar a primeira mensagem." };
   }
 
   const channel: MessageChannel | null = firstContact === "EMAIL" || firstContact === "WHATSAPP" ? firstContact : null;

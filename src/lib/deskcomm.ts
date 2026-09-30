@@ -74,9 +74,9 @@ async function rpcRequest(cfg: Pick<DeskcommConfig, "url" | "token">, method: st
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new DeskcommError(`Não foi possível falar com o Deskcomm (${msg}). Confira o endereço e se ele está no ar.`);
+    throw new DeskcommError(`Não foi possível falar com o WhatsApp (${msg}). Confira o endereço e se ele está no ar.`);
   }
-  if (res.status === 401 || res.status === 403) throw new DeskcommError("O Deskcomm recusou o token. Confira se ele está ativo e com os escopos de MCP.");
+  if (res.status === 401 || res.status === 403) throw new DeskcommError("O WhatsApp recusou a chave. Confira se ele está ativo.");
   const text = await res.text();
   // A resposta vem como JSON ou como SSE ("data: {...}").
   const payloads = (res.headers.get("content-type") ?? "").includes("text/event-stream")
@@ -93,11 +93,11 @@ async function rpcRequest(cfg: Pick<DeskcommConfig, "url" | "token">, method: st
       continue;
     }
     if (msg.id !== id) continue;
-    if (msg.error) throw new DeskcommError(`Deskcomm: ${msg.error.message ?? "erro"}`);
+    if (msg.error) throw new DeskcommError(`WhatsApp: ${msg.error.message ?? "erro"}`);
     return msg.result;
   }
-  if (!res.ok) throw new DeskcommError(`O Deskcomm respondeu ${res.status}. Confira o endereço (${cfg.url}).`);
-  throw new DeskcommError("O Deskcomm respondeu num formato inesperado.");
+  if (!res.ok) throw new DeskcommError(`O WhatsApp respondeu ${res.status}. Confira o endereço (${cfg.url}).`);
+  throw new DeskcommError("O WhatsApp respondeu num formato inesperado.");
 }
 
 async function withClient<T>(cfg: Pick<DeskcommConfig, "url" | "token">, fn: (client: Rpc) => Promise<T>): Promise<T> {
@@ -116,12 +116,12 @@ async function withClient<T>(cfg: Pick<DeskcommConfig, "url" | "token">, fn: (cl
         structuredContent?: unknown;
       };
       const text = r.content?.find((c) => c.type === "text")?.text;
-      if (r.isError) throw new DeskcommError(`Deskcomm (${name}): ${text ?? "erro"}`);
+      if (r.isError) throw new DeskcommError(`WhatsApp (${name}): ${text ?? "erro"}`);
       if (r.structuredContent) return r.structuredContent as T;
       try {
         return JSON.parse(text ?? "null") as T;
       } catch {
-        throw new DeskcommError(`Deskcomm (${name}) respondeu num formato inesperado.`);
+        throw new DeskcommError(`WhatsApp (${name}) respondeu num formato inesperado.`);
       }
     },
   });
@@ -166,7 +166,7 @@ export interface SentWhatsapp {
 export class WhatsappNotSentError extends DeskcommError {
   constructor(public readonly conversationId: string) {
     super(
-      "O Deskcomm recusou o envio. Se o número estiver em modo de teste, autorize o destino em Conexões → Configurar acesso da IA; o motivo aparece na conversa dentro do Deskcomm.",
+      "O WhatsApp recusou o envio. Se o número estiver em modo de teste, autorize o destino em Conexões → Configurar acesso da IA; o motivo aparece na conversa dentro do sistema de WhatsApp.",
     );
   }
 }
@@ -175,7 +175,7 @@ export class WhatsappNotSentError extends DeskcommError {
 // canal configurado; depois segue na mesma conversa.
 export async function sendWhatsapp(input: { conversationId: string | null; phone: string; name: string | null; body: string; idempotencyKey: string }): Promise<SentWhatsapp> {
   const cfg = await deskcommConfig();
-  if (!cfg) throw new DeskcommError("WhatsApp (Deskcomm) não conectado.");
+  if (!cfg) throw new DeskcommError("WhatsApp não conectado.");
   return withClient(cfg, async (client) => {
     if (input.conversationId) {
       const r = await client.call<{ message_id: string; status?: string; sent_at?: string | null }>("crm_send_whatsapp_message", {
@@ -186,7 +186,7 @@ export async function sendWhatsapp(input: { conversationId: string | null; phone
       if (r.status === "failed") throw new WhatsappNotSentError(input.conversationId);
       return { conversationId: input.conversationId, messageId: r.message_id, sentAt: r.sent_at ? new Date(r.sent_at) : new Date() };
     }
-    if (!cfg.channelId) throw new DeskcommError("Falta escolher o número (canal) do Deskcomm de onde as conversas novas saem. Veja em Canais.");
+    if (!cfg.channelId) throw new DeskcommError("Falta escolher o número (canal) de onde as conversas novas saem. Veja em Canais.");
     const r = await client.call<{ conversation_id: string; message_id: string; status?: string; sent_at?: string | null }>("crm_start_conversation_and_send", {
       channel_session_id: cfg.channelId,
       phone_number: `+${input.phone.replace(/\D/g, "")}`,

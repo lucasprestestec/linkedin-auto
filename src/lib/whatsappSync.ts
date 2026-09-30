@@ -44,14 +44,14 @@ export async function syncWhatsapp(): Promise<{ checked: number; saved: number; 
     await prisma.lead.update({ where: { id: lead.id }, data: { whatsappLastAt: u.lastAt } });
     if (mediaOnly && !leadWrote) {
       // Áudio, foto ou arquivo: a IA não ouve nem vê — passa pro corretor.
-      await markNeedsHuman(lead.id, "Mandou áudio ou arquivo no WhatsApp — veja no Deskcomm");
+      await markNeedsHuman(lead.id, "Mandou áudio ou arquivo no WhatsApp; veja pelo aplicativo");
       continue;
     }
     // O corretor já respondeu direto no Deskcomm depois do lead: a conversa
     // está com ele, a secretária não entra por cima.
     const last = await prisma.message.findFirst({ where: { leadId: lead.id }, orderBy: { deliveredAt: "desc" }, select: { sender: true } });
     if (leadWrote && last?.sender !== "LEAD") {
-      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: 0, nextStep: "Você respondeu pelo Deskcomm; a secretária não interfere.", nextStepAt: null } });
+      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: 0, nextStep: "Você respondeu pelo WhatsApp; a secretária não interfere.", nextStepAt: null } });
       continue;
     }
     if (leadWrote) {
