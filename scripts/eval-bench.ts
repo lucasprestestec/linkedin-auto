@@ -1,5 +1,5 @@
 // Bateria do banco de testes do agente, por linha de comando.
-// Uso: npx tsx scripts/eval-bench.ts --models a,b --judge j --runs 3 --out resultado.json [--only id1,id2]
+// Uso: npx tsx scripts/eval-bench.ts --models a,b --judge j --runs 3 --out resultado.json [--only id1,id2] [--via claude-code | --judge-via claude-code]
 import { config } from "dotenv";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -79,6 +79,8 @@ async function main() {
   const judge = arg("judge") || null;
   // --via claude-code: os modelos (e o avaliador) viram apelidos do Claude Code (sonnet, opus), sem gastar a API.
   const viaCC = arg("via") === "claude-code";
+  // --judge-via claude-code: os modelos rodam pela API (Nous), mas o avaliador roda no Claude Code (sem gastar API).
+  const judgeViaCC = viaCC || arg("judge-via") === "claude-code";
   const runs = Number(arg("runs", "1"));
   const concurrency = Number(arg("concurrency", "6"));
   const out = arg("out", "eval-result.json");
@@ -95,7 +97,7 @@ async function main() {
     Array.from({ length: concurrency }, async () => {
       while (next < jobs.length) {
         const job = jobs[next++];
-        const r = await runScenario(job.id, job.model, judge, viaCC ? { complete: claudeCode(job.model), judgeComplete: judge ? claudeCode(judge) : undefined } : {});
+        const r = await runScenario(job.id, job.model, judge, { complete: viaCC ? claudeCode(job.model) : undefined, judgeComplete: judgeViaCC && judge ? claudeCode(judge) : undefined });
         results.push({ ...r, run: job.run });
         done++;
         if (done % 20 === 0) console.log(`${done}/${jobs.length}`);
