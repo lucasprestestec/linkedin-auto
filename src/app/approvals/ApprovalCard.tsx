@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
-import { approve, discard } from "./actions";
+import { FeedbackPanel } from "@/components/FeedbackPanel";
+import { DRAFT_REASON_KEYS } from "@/lib/writingStyle";
+import { approve, discard, markDraftFeedback } from "./actions";
 
 export interface ApprovalItem {
   id: string;
@@ -25,6 +27,7 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
   const [text, setText] = useState(item.content);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || "Contato";
   const changed = text.trim() !== item.content.trim();
 
@@ -86,7 +89,21 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
         <button type="button" className="btn-line" onClick={drop} disabled={pending}>
           Descartar
         </button>
+        {!feedbackOpen && (
+          <button type="button" className="btn-text" onClick={() => setFeedbackOpen(true)} disabled={pending}>
+            Não é meu jeito
+          </button>
+        )}
       </div>
+      {feedbackOpen && (
+        <FeedbackPanel
+          reasonKeys={DRAFT_REASON_KEYS}
+          title="O que não ficou com a sua cara?"
+          placeholder="Se quiser, escreva como você teria dito (opcional)."
+          onSubmit={(reasons, note) => markDraftFeedback(item.id, reasons, note)}
+          onDone={() => setFeedbackOpen(false)}
+        />
+      )}
     </article>
   );
 }

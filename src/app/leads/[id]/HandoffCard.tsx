@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { summarizeLead } from "./actions";
+import { FeedbackPanel } from "@/components/FeedbackPanel";
+import { HANDOFF_REASON_KEYS } from "@/lib/writingStyle";
+import { markHandoffFeedback, summarizeLead } from "./actions";
 
 // Aviso no fim da conversa quando ela passou pra você. "Assumir" leva ao campo de
 // resposta; "Ver resumo" pede um resumo à IA só quando clicado.
 export function HandoffCard({ leadId, firstName, reason, when }: { leadId: string; firstName: string; reason: string; when: string }) {
   const [summary, setSummary] = useState<{ text?: string; error?: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   function takeOver() {
     const box = document.getElementById("reply-box") as HTMLTextAreaElement | null;
@@ -38,7 +41,21 @@ export function HandoffCard({ leadId, firstName, reason, when }: { leadId: strin
         >
           {pending ? "Resumindo…" : "Ver resumo"}
         </button>
+        {!feedbackOpen && (
+          <button type="button" className="btn-text" onClick={() => setFeedbackOpen(true)}>
+            Não precisava passar pra mim
+          </button>
+        )}
       </div>
+      {feedbackOpen && (
+        <FeedbackPanel
+          reasonKeys={HANDOFF_REASON_KEYS}
+          title="Isso o assistente poderia ter respondido sozinho?"
+          placeholder="Se quiser, diga como você teria respondido (opcional)."
+          onSubmit={(reasons, note) => markHandoffFeedback(leadId, reasons, note)}
+          onDone={() => setFeedbackOpen(false)}
+        />
+      )}
       {summary && (
         <div className="stack" style={{ gap: 4 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>

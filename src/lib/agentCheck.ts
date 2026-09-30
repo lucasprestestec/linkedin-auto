@@ -42,10 +42,22 @@ export function checkMessage({ message, previousOutgoing, instructions }: CheckI
   if (/\*\*|__|^#{1,6}\s|^\s*([-*•]|\d+[.)])\s/m.test(text)) issues.push("usa formatação/lista, não parece mensagem de LinkedIn");
 
   if (
-    /\b(sou|como)\s+(uma?\s+)?(ia|intelig[eê]ncia artificial|assistente virtual|chatbot|bot|rob[oô]|modelo de linguagem)\b/i.test(text) ||
+    // (?![\p{L}\p{N}]) no lugar de \b: o \b do JavaScript não trata "ô" como letra e deixava passar "robô".
+    /\b(sou|como)\s+(uma?\s+)?(ia|intelig[eê]ncia artificial|assistente virtual|chatbot|bot|rob[oô]|modelo de linguagem)(?![\p{L}\p{N}])/iu.test(text) ||
     /\bmodelo de linguagem\b/i.test(text)
   ) {
     issues.push("se apresenta como IA/robô");
+  }
+
+  // O contrário também é proibido: afirmar ser uma pessoa de verdade (mesmo sem ninguém perguntar).
+  if (
+    /\bsou eu (mesmo|mesma)\s+(que\s+)?(estou\s+|to\s+|tô\s+)?(escrevendo|digitando)\b/i.test(text) ||
+    /\b(eu|a gente) (mesmo|mesma) (estou|to|tô) (escrevendo|digitando)\b/i.test(text) ||
+    /\bn[aã]o\s+(sou|é|e)\s+(um\s+|uma\s+)?(rob[oô]|bot|ia|m[aá]quina|mensagem autom[aá]tica)(?![\p{L}\p{N}])/iu.test(text) ||
+    /\bsou\s+(uma\s+)?(pessoa|humano|humana)\b(\s+de verdade|\s+real)?/i.test(text) ||
+    /\bpessoa de verdade\b/i.test(text)
+  ) {
+    issues.push("afirma ser uma pessoa de verdade (o assistente nunca pode dizer isso)");
   }
 
   // Valores em dinheiro só se o próprio material do corretor trouxer o número.
