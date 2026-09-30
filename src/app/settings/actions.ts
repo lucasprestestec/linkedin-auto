@@ -116,13 +116,41 @@ export async function updateFollowUpDefault(count: number, days: number) {
 // Desconecta o LinkedIn: apaga a identidade na edges.run (a mesma chamada que
 // já é usada ao gerar um link novo) e limpa o vínculo. Depois disso o botão
 // "Conectar" volta e dá pra entrar com outra conta — ou com a mesma de novo.
-export async function disconnectLinkedin() {
+// Pessoas que vieram do LinkedIn. Quem tem reunião marcada pra frente fica: a
+// reunião é real, mesmo que o LinkedIn saia.
+function linkedinLeadsWhere() {
+  return {
+    AND: [
+      { OR: [{ linkedinProfileUrl: { not: null } }, { linkedinThreadId: { not: null } }] },
+      // Data vazia também conta como "sem reunião" (NOT sozinho descartaria os nulos).
+      { OR: [{ meetingAt: null }, { meetingAt: { lt: new Date() } }] },
+    ],
+  };
+}
+
+export async function linkedinDataCount() {
+  return prisma.lead.count({ where: linkedinLeadsWhere() });
+}
+
+// "Conectar" volta e dá pra entrar com outra conta — ou com a mesma de novo.
+// Desconecta a conta. Com deleteData, apaga também as pessoas e conversas que
+// vieram do LinkedIn (irreversível: a tela avisa antes).
+export async function disconnectLinkedin(deleteData = false) {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { linkedinIdentityId: true } });
   if (settings.linkedinIdentityId) await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
   await prisma.settings.update({
     where: { id: "singleton" },
     data: { linkedinIdentityId: null, linkedinLoginLink: null, linkedinLoginLinkAt: null, linkedinNeedsReconnect: false, linkedinReconnectReason: null },
   });
+  if (deleteData) await deleteLinkedinData();
+  revalidatePath("/", "layout");
+}
+
+// Apaga as pessoas e conversas que vieram do LinkedIn (a conta já pode estar desconectada).
+export async function deleteLinkedinData() {
+  const ids = (await prisma.lead.findMany({ where: linkedinLeadsWhere(), select: { id: true } })).map((l) => l.id);
+  // Mensagens primeiro: elas não apagam junto com a pessoa. Rascunhos sim.
+  await prisma.$transaction([prisma.message.deleteMany({ where: { leadId: { in: ids } } }), prisma.lead.deleteMany({ where: { id: { in: ids } } })]);
   revalidatePath("/", "layout");
 }
 

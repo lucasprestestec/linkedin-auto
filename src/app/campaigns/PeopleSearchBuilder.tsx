@@ -2,20 +2,6 @@
 
 import { useState } from "react";
 import { TagInput } from "@/components/TagInput";
-import {
-  IconBriefcase,
-  IconBuilding,
-  IconExternal,
-  IconFactory,
-  IconGraduation,
-  IconHash,
-  IconLinkedin,
-  IconMapPin,
-  IconPlus,
-  IconSearch,
-  IconUser,
-  IconX,
-} from "@/components/Icons";
 import { EMPTY_SEARCH, buildLinkedinSearchUrl, hasAnyFilter, type PeopleSearchFilters } from "@/lib/linkedin";
 
 type ListKey = Exclude<keyof PeopleSearchFilters, "onlyNotConnected">;
@@ -27,7 +13,6 @@ const FIELDS: {
   label: string;
   placeholder: string;
   hint?: string;
-  Icon: (p: { size?: number }) => React.ReactElement;
   suggestions: string[];
   summary: (v: string) => string;
 }[] = [
@@ -35,7 +20,6 @@ const FIELDS: {
     key: "titles",
     label: "Cargo",
     placeholder: "Ex.: Diretor de RH",
-    Icon: IconBriefcase,
     suggestions: ["Diretor de RH", "Sócio", "CFO", "Diretor financeiro", "Gerente administrativo", "Proprietário"],
     summary: (v) => `com cargo ${v}`,
   },
@@ -43,7 +27,6 @@ const FIELDS: {
     key: "locations",
     label: "Cidade ou região",
     placeholder: "Ex.: Porto Alegre",
-    Icon: IconMapPin,
     suggestions: ["Porto Alegre", "São Paulo", "Curitiba", "Florianópolis", "Belo Horizonte"],
     summary: (v) => `em ${v}`,
   },
@@ -51,7 +34,6 @@ const FIELDS: {
     key: "companies",
     label: "Empresa atual",
     placeholder: "Ex.: nome da empresa",
-    Icon: IconBuilding,
     suggestions: [],
     summary: (v) => `trabalhando em ${v}`,
   },
@@ -59,7 +41,6 @@ const FIELDS: {
     key: "industries",
     label: "Setor",
     placeholder: "Ex.: Tecnologia",
-    Icon: IconFactory,
     suggestions: ["Tecnologia", "Saúde", "Advocacia", "Construção", "Logística", "Varejo"],
     summary: (v) => `do setor ${v}`,
   },
@@ -67,17 +48,15 @@ const FIELDS: {
     key: "keywords",
     label: "Palavra-chave",
     placeholder: "Qualquer termo do perfil",
-    Icon: IconHash,
     suggestions: [],
     summary: (v) => `com ${v} no perfil`,
   },
-  { key: "firstNames", label: "Nome", placeholder: "Primeiro nome", Icon: IconUser, suggestions: [], summary: (v) => `chamadas ${v}` },
-  { key: "lastNames", label: "Sobrenome", placeholder: "Sobrenome", Icon: IconUser, suggestions: [], summary: (v) => `de sobrenome ${v}` },
+  { key: "firstNames", label: "Nome", placeholder: "Primeiro nome", suggestions: [], summary: (v) => `chamadas ${v}` },
+  { key: "lastNames", label: "Sobrenome", placeholder: "Sobrenome", suggestions: [], summary: (v) => `de sobrenome ${v}` },
   {
     key: "schools",
     label: "Escola ou faculdade",
     placeholder: "Ex.: PUCRS",
-    Icon: IconGraduation,
     suggestions: [],
     summary: (v) => `que estudaram em ${v}`,
   },
@@ -131,14 +110,12 @@ export function PeopleSearchBuilder({
   return (
     <div className="stack" style={{ gap: 14 }}>
       {FIELDS.filter((f) => visible.includes(f.key)).map((f) => (
-        <div key={f.key} className="filter-field">
-          <div className="filter-field-head">
-            <span className="filter-field-label">
-              <f.Icon size={15} /> {f.label}
-            </span>
+        <div key={f.key}>
+          <div className="sec-head">
+            <label className="label">{f.label}</label>
             {!(f.key === "titles" && visible.length === 1) && (
-              <button type="button" className="filter-remove" onClick={() => removeField(f.key)} aria-label={`Remover filtro ${f.label}`}>
-                <IconX size={14} />
+              <button type="button" className="btn-text tiny" onClick={() => removeField(f.key)} aria-label={`Remover filtro ${f.label}`}>
+                Remover
               </button>
             )}
           </div>
@@ -149,11 +126,11 @@ export function PeopleSearchBuilder({
 
       {hidden.length > 0 && (
         <div className="stack" style={{ gap: 8 }}>
-          <span className="label">Adicionar filtro</span>
-          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+          <span className="label" style={{ margin: 0 }}>Adicionar filtro</span>
+          <div className="row wrap" style={{ gap: 6 }}>
             {hidden.map((f) => (
-              <button key={f.key} type="button" className="chip" style={{ height: 34 }} onClick={() => setVisible((prev) => [...prev, f.key])}>
-                <IconPlus size={13} /> {f.label}
+              <button key={f.key} type="button" className="pill" style={{ border: 0, cursor: "pointer" }} onClick={() => setVisible((prev) => [...prev, f.key])}>
+                + {f.label}
               </button>
             ))}
           </div>
@@ -161,26 +138,27 @@ export function PeopleSearchBuilder({
       )}
 
       {!onSearch && (
-      <label className="setting-row filter-toggle">
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 700 }}>Só quem ainda não é conexão</span>
-          <span className="tiny faint">Conexões não podem receber convite</span>
-        </span>
-        <input
-          type="checkbox"
-          className="sr-only"
-          checked={filters.onlyNotConnected}
-          onChange={(e) => setFilters((prev) => ({ ...prev, onlyNotConnected: e.target.checked }))}
-        />
-        <span className="switch switch-light" role="switch" aria-checked={filters.onlyNotConnected} aria-hidden="true" />
-      </label>
+        <div className="setting" style={{ padding: 0 }}>
+          <span className="setting-text">
+            <b>Só quem ainda não é conexão</b>
+            <small>Conexões não podem receber convite</small>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={filters.onlyNotConnected}
+            aria-label="Só quem ainda não é conexão"
+            className="switch"
+            onClick={() => setFilters((prev) => ({ ...prev, onlyNotConnected: !prev.onlyNotConnected }))}
+          />
+        </div>
       )}
 
-      <div className="search-summary" aria-live="polite">
+      <div aria-live="polite" className="note">
         <span className="label">Você vai buscar</span>
         <p>{onSearch && ready ? summary.replace(", que ainda não são suas conexões", "") : summary}</p>
         {ready && (
-          <span className="tiny muted">
+          <span className="hint">
             {onSearch
               ? "A busca procura esses termos nos perfis públicos do LinkedIn (cargo, empresa, cidade)."
               : "O LinkedIn procura esses termos no perfil inteiro (cargo, empresa, resumo). Confira os resultados antes de copiar os links."}
@@ -189,53 +167,42 @@ export function PeopleSearchBuilder({
       </div>
 
       {onSearch && (
-        <div className="stack" style={{ gap: 8 }}>
-          <button type="button" className="btn btn-primary btn-lg btn-block" disabled={!ready || searching} onClick={() => onSearch(filters)}>
-            {searching ? (
-              <>
-                <span className="spinner" /> Buscando…
-              </>
-            ) : (
-              <>
-                <IconSearch size={18} /> Buscar pessoas
-              </>
-            )}
+        <div className="stack" style={{ gap: 8, alignItems: "flex-start" }}>
+          <button type="button" className="btn-solid btn-block" disabled={!ready || searching} onClick={() => onSearch(filters)}>
+            {searching ? "Buscando…" : "Buscar pessoas"}
           </button>
           {ready && (
-            <a href={buildLinkedinSearchUrl(filters)} target="_blank" rel="noopener noreferrer" className="link-btn" style={{ alignSelf: "center" }}>
-              ou abrir a mesma busca no LinkedIn <IconExternal size={13} />
+            <a href={buildLinkedinSearchUrl(filters)} target="_blank" rel="noopener noreferrer" className="btn-text">
+              ou abrir a mesma busca no LinkedIn
             </a>
           )}
         </div>
       )}
 
       {!onSearch && (
-      <div className="row" style={{ gap: 8 }}>
-        {ready && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => {
-              setFilters(EMPTY_SEARCH);
-              setVisible(["titles", "locations"]);
-            }}
+        <div className="row" style={{ gap: 8 }}>
+          {ready && (
+            <button
+              type="button"
+              className="btn-line"
+              onClick={() => {
+                setFilters(EMPTY_SEARCH);
+                setVisible(["titles", "locations"]);
+              }}
+            >
+              Limpar
+            </button>
+          )}
+          <a
+            href={ready ? buildLinkedinSearchUrl(filters) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={!ready}
+            className="btn-solid grow"
           >
-            Limpar
-          </button>
-        )}
-        <a
-          href={ready ? buildLinkedinSearchUrl(filters) : undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-disabled={!ready}
-          className="btn btn-dark"
-          style={{ flex: 1 }}
-        >
-          <IconLinkedin size={18} />
-          Buscar no LinkedIn
-          <IconExternal size={16} style={{ opacity: 0.6 }} />
-        </a>
-      </div>
+            Buscar no LinkedIn
+          </a>
+        </div>
       )}
     </div>
   );

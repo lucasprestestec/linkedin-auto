@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { removePushSubscription, savePushSubscription, sendTestPush } from "./actions";
-import { IconAlert, IconBell, IconCheck } from "@/components/Icons";
 
 type Status = "loading" | "unsupported" | "ios-install" | "no-keys" | "denied" | "off" | "on";
 
@@ -88,46 +87,29 @@ export function NotificationsCard({ publicKey }: { publicKey: string | null }) {
   };
 
   return (
-    <div className="card" style={{ overflow: "hidden" }}>
-      <div className="setting-row">
-        <span className="setting-icon" style={{ background: "var(--warning-soft)", color: "var(--warning-ink)" }}>
-          <IconBell size={19} />
-        </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 700 }}>Avisar quando precisar de você</span>
-          <span className="tiny faint">
-            {status === "on" ? "Ativado neste aparelho" : "Notificação no celular ou computador quando a IA passar um lead pra você"}
-          </span>
-        </span>
+    <div className="stack" style={{ gap: 12 }}>
+      <div className="setting" style={{ padding: 0 }}>
+        <p className="grow">
+          {status === "on" ? "Ativado neste aparelho." : "Aviso no celular ou no computador quando uma conversa passar para você."}
+        </p>
         {status === "off" && (
-          <button type="button" className="btn btn-primary btn-sm" onClick={enable} disabled={pending}>
+          <button type="button" className="btn-solid btn-sm" onClick={enable} disabled={pending}>
             {pending ? "Ativando…" : "Ativar"}
           </button>
         )}
-        {status === "on" && (
-          <span className="success-text">
-            <IconCheck size={15} strokeWidth={3} /> Ativo
-          </span>
-        )}
+        {status === "on" && <span className="ok-text">Ativo</span>}
       </div>
       {status === "on" && (
-        <div className="setting-row" style={{ justifyContent: "flex-end", gap: 8 }}>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={disable} disabled={pending}>
-            Desativar
-          </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={test} disabled={pending}>
+        <div className="row" style={{ gap: 8 }}>
+          <button type="button" className="btn-line btn-sm" onClick={test} disabled={pending}>
             Enviar teste
           </button>
+          <button type="button" className="btn-text" onClick={disable} disabled={pending}>
+            Desativar
+          </button>
         </div>
       )}
-      {(hint[status] || message) && (
-        <div className="setting-row" style={{ background: "var(--surface-2)" }}>
-          <p className="tiny muted row" style={{ gap: 6, lineHeight: 1.5 }}>
-            {hint[status] && <IconAlert size={14} style={{ flexShrink: 0, color: "var(--warning-ink)" }} />}
-            {hint[status] ?? message}
-          </p>
-        </div>
-      )}
+      {(hint[status] || message) && <p className="note note-warn">{hint[status] ?? message}</p>}
     </div>
   );
 }

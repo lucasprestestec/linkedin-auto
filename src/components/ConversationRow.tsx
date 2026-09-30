@@ -1,49 +1,30 @@
 import Link from "next/link";
 import type { ConvItem } from "@/lib/conversations";
-import { STATUS_TONE } from "@/lib/status";
+import { STATUS_LABEL } from "@/lib/status";
 import { Avatar } from "./Avatar";
-import { IconChevronRight } from "./Icons";
 
-function preview(c: ConvItem): React.ReactNode {
+function preview(c: ConvItem): string {
   if (c.status === "NEEDS_HUMAN" && c.needsHumanReason) return c.needsHumanReason;
-  if (c.lastMessage) {
-    return (
-      <>
-        {c.lastMessage.sender !== "LEAD" && <b>{c.lastMessage.sender === "AGENT" ? "IA: " : "Você: "}</b>}
-        {c.lastMessage.content}
-      </>
-    );
-  }
-  return c.status === "INVITE_SENT" ? "Aguardando aceite do convite" : "Conexão aceita · a IA vai abrir a conversa";
+  if (c.lastMessage) return `${c.lastMessage.sender === "AGENT" ? "Secretária: " : c.lastMessage.sender === "HUMAN" ? "Você: " : ""}${c.lastMessage.content}`;
+  return c.status === "INVITE_SENT" ? "Aguardando aceite do convite" : "Conexão aceita";
 }
 
-// Uma conversa numa lista: avatar, nome, cargo · empresa, prévia e o ponto de status.
-export function ConversationRow({ c, active, withReply }: { c: ConvItem; active?: boolean; withReply?: boolean }) {
-  const tone = STATUS_TONE[c.status];
-  const sub = [c.role, c.company].filter(Boolean).join(" · ");
+// Uma conversa na lista: avatar, nome, prévia, etiqueta de situação e há quanto tempo.
+export function ConversationRow({ c, active }: { c: ConvItem; active?: boolean }) {
+  const needsYou = c.status === "NEEDS_HUMAN" || (c.unanswered && c.status !== "LOST");
+  const pill = c.status === "NEEDS_HUMAN" ? "pill-danger" : needsYou ? "pill-warn" : c.status === "QUALIFIED" || c.status === "MEETING_SCHEDULED" ? "pill-ok" : "";
+  const label = c.status === "NEEDS_HUMAN" ? "Precisa de você" : needsYou ? "Responder" : STATUS_LABEL[c.status];
   return (
-    <Link href={`/leads/${c.id}`} className={`row-item${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
-      <Avatar firstName={c.firstName} lastName={c.lastName} size={46} status={tone} />
-      <span className="row-main">
-        <span className="row-top">
-          <span className="row-name">
-            {c.firstName} {c.lastName}
-          </span>
-          {!withReply && <span className="row-time">{c.when}</span>}
-        </span>
-        {sub && <span className="row-sub">{sub}</span>}
-        <span className={`row-preview${c.status === "NEEDS_HUMAN" ? " urgent" : ""}`}>{preview(c)}</span>
+    <Link href={`/leads/${c.id}`} className="item" aria-current={active ? "page" : undefined}>
+      <Avatar firstName={c.firstName} lastName={c.lastName} size={44} />
+      <span className="item-main">
+        <span className="item-title">{[c.firstName, c.lastName].filter(Boolean).join(" ") || "Contato"}</span>
+        <span className="item-sub">{preview(c)}</span>
       </span>
-      {withReply ? (
-        <span className="row-side">
-          <span className="row-time">{c.when}</span>
-          <span className="reply-btn">Responder</span>
-          <span className={`status-dot dot-${tone} only-mobile`} />
-        </span>
-      ) : (
-        <span className={`status-dot dot-${tone}`} />
-      )}
-      {withReply && <IconChevronRight size={16} className="faint only-desktop" />}
+      <span className="stack" style={{ gap: 4, alignItems: "flex-end" }}>
+        <span className="item-meta">{c.when}</span>
+        <span className={`pill ${pill}`}>{label}</span>
+      </span>
     </Link>
   );
 }

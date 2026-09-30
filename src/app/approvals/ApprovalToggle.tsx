@@ -13,7 +13,7 @@ export function ApprovalToggle({ on }: { on: boolean }) {
       role="switch"
       aria-checked={optimistic}
       aria-label={optimistic ? "Desligar aprovação antes de enviar" : "Ligar aprovação antes de enviar"}
-      className="switch switch-light"
+      className="switch"
       onClick={() =>
         startTransition(async () => {
           setOptimistic(!optimistic);

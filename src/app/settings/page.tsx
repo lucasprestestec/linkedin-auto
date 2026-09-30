@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
-import { linkedinStatus } from "../channels/LinkedinCard";
 import { logout } from "../actions";
 import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
@@ -15,36 +14,21 @@ import { CalendarForm } from "./CalendarForm";
 import { googleConfigured } from "@/lib/gmail";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
-import { IconBan, IconBell, IconCalendar, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
-// Uma linha que mostra o valor atual e abre pra editar — a página inteira cabe
+// Uma linha que mostra o valor atual e abre para editar: a página inteira cabe
 // numa olhada e ninguém precisa rolar por formulários que não vai mexer.
-function SettingItem({
-  icon,
-  tone,
-  title,
-  summary,
-  children,
-}: {
-  icon: React.ReactNode;
-  tone: string;
-  title: string;
-  summary: string;
-  children: React.ReactNode;
-}) {
+function SettingItem({ id, title, summary, children }: { id?: string; title: string; summary: string; children: React.ReactNode }) {
   return (
-    <details className="setting-item">
-      <summary className="setting-row">
-        <span className={`setting-icon tone-${tone}`}>{icon}</span>
+    <details className="fold" id={id} style={{ scrollMarginTop: 90 }}>
+      <summary>
         <span className="setting-text">
           <b>{title}</b>
-          <span className="tiny faint setting-summary">{summary}</span>
+          <small>{summary}</small>
         </span>
-        <IconChevronDown size={18} className="chev" />
       </summary>
-      <div className="setting-body">{children}</div>
+      <div className="fold-body">{children}</div>
     </details>
   );
 }
@@ -67,119 +51,107 @@ function exclusionSummary(raw: string | null) {
 
 export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [status, email] = await Promise.all([linkedinStatus(settings), emailConnection()]);
-  const linkedinOk = status.connected;
+  const email = await emailConnection();
 
   return (
-    <main className="page account">
+    <main className="page">
       <MobileHeader />
-      <header className="page-hero rise">
-        <h1 className="display page-title">
-          Sua <span className="name-grad">conta.</span>
-        </h1>
-        <p className="hero-sub">Seus canais e como a secretária deve abordar as pessoas. Toque num item pra mudar.</p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Conta</h1>
+          <p className="t-sub">Como a secretária deve trabalhar por você.</p>
+        </div>
       </header>
 
-      <div className="account-col">
-        <section className="group rise">
-          <h2 className="group-title">Canais</h2>
-          <Link href="/channels" className="card channels-summary">
-            <span className="stack" style={{ gap: 8, flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 700 }}>LinkedIn, e-mail e WhatsApp</span>
-              <span className="channel-chips">
-                <span className={linkedinOk ? "chip on" : "chip off"}>
-                  <IconLinkedin size={13} /> {linkedinOk ? "Conectado" : settings.linkedinNeedsReconnect ? "Reconectar" : "Não conectado"}
-                </span>
-                <span className={email ? "chip on" : "chip"}>
-                  <IconMail size={13} /> {email ? "Conectado" : "Opcional"}
-                </span>
-                <span className={settings.deskcommUrl ? "chip on" : "chip"}>
-                  <IconChat size={13} /> {settings.deskcommUrl ? "Conectado" : "Opcional"}
-                </span>
-              </span>
-            </span>
-            <IconChevronRight size={18} className="chev" />
-          </Link>
-        </section>
+      <OwnerNameForm value={settings.ownerName ?? ""} />
 
-        <section className="group rise">
-          <h2 className="group-title">Você</h2>
-          <OwnerNameForm value={settings.ownerName ?? ""} />
-        </section>
-
-        <section id="alcance" className="group rise" style={{ scrollMarginTop: 90 }}>
-          <h2 className="group-title">Sua abordagem</h2>
-          <div className="card setting-list">
-            <SettingItem icon={<IconTarget size={19} />} tone="brand" title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
-              <IdealClientForm value={settings.targetAudience ?? ""} />
+      <section id="alcance" className="sec" style={{ scrollMarginTop: 90 }}>
+        <h2 className="t-label">Sua abordagem</h2>
+        <div>
+          <SettingItem title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
+            <IdealClientForm value={settings.targetAudience ?? ""} />
+          </SettingItem>
+          <SettingItem
+            title="Acompanhamento"
+            summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
+          >
+            <FollowUpDefaultForm
+              count={Math.min(10, settings.followUpMaxCount)}
+              days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
+            />
+          </SettingItem>
+          <SettingItem title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
+            <ExclusionListForm value={settings.exclusionList ?? ""} />
+          </SettingItem>
+          <SettingItem
+            title="Agenda de reuniões"
+            summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: a secretária passa a conversa para você"}
+          >
+            <CalendarForm
+              minutes={settings.meetingMinutes}
+              googleEmail={settings.googleEmail}
+              calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
+              configured={googleConfigured()}
+              workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
+            />
+          </SettingItem>
+          <SettingItem
+            title="Resumo do dia"
+            summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
+          >
+            <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
+          </SettingItem>
+          {/* Sem as chaves de push no servidor, o bloco só mostraria um aviso técnico. */}
+          {pushPublicKey() && (
+            <SettingItem title="Avisos no celular" summary="Quando alguém precisar de você">
+              <NotificationsCard publicKey={pushPublicKey()} />
             </SettingItem>
-            <SettingItem
-              icon={<IconClock size={19} />}
-              tone="waiting"
-              title="Follow-up"
-              summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
-            >
-              <FollowUpDefaultForm
-                count={Math.min(10, settings.followUpMaxCount)}
-                days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
-              />
-            </SettingItem>
-            <SettingItem icon={<IconBan size={19} />} tone="urgent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
-              <ExclusionListForm value={settings.exclusionList ?? ""} />
-            </SettingItem>
-            <SettingItem
-              icon={<IconCalendar size={19} />}
-              tone="brand"
-              title="Agenda de reuniões"
-              summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: a secretária passa a conversa pra você"}
-            >
-              <CalendarForm
-                minutes={settings.meetingMinutes}
-                googleEmail={settings.googleEmail}
-                calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
-                configured={googleConfigured()}
-                workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
-              />
-            </SettingItem>
-            <SettingItem
-              icon={<IconCalendar size={19} />}
-              tone="open"
-              title="Resumo do dia"
-              summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
-            >
-              <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
-            </SettingItem>
-            {/* Sem as chaves de push no servidor, o card só mostraria um aviso técnico. */}
-            {pushPublicKey() && (
-              <SettingItem icon={<IconBell size={19} />} tone="open" title="Avisos no celular" summary="Quando alguém precisar de você">
-                <NotificationsCard publicKey={pushPublicKey()} />
-              </SettingItem>
-            )}
-          </div>
-        </section>
-
-        <div className="card rise" style={{ overflow: "hidden" }}>
-          <a href="/api/export/leads" className="setting-row" download>
-            <span className="setting-icon" style={{ background: "var(--brand-soft)", color: "var(--brand-ink)" }}>
-              <IconDownload size={19} />
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 700 }}>Baixar meus leads</span>
-              <span className="tiny faint">Planilha para Excel ou Google Planilhas</span>
-            </span>
-            <IconChevronRight size={18} className="chev" />
-          </a>
-          <form action={logout} style={{ borderTop: "1px solid var(--border)" }}>
-            <button type="submit" className="setting-row" style={{ width: "100%", border: "none", background: "none", textAlign: "left" }}>
-              <span className="setting-icon" style={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}>
-                <IconLogout size={19} />
-              </span>
-              <span style={{ flex: 1, fontWeight: 700, color: "var(--urgent-ink)" }}>Sair</span>
-              <IconChevronRight size={18} className="chev" />
-            </button>
-          </form>
+          )}
         </div>
-      </div>
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Mais</h2>
+        <ul className="list">
+          <li>
+            <Link href="/prospect" className="item">
+              <span className="item-main">
+                <span className="item-title">Prospectar</span>
+                <span className="item-sub">Adicionar pessoas para a secretária abordar</span>
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link href="/campaigns" className="item">
+              <span className="item-main">
+                <span className="item-title">Campanhas</span>
+                <span className="item-sub">Grupos de pessoas com uma oferta</span>
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link href="/channels" className="item">
+              <span className="item-main">
+                <span className="item-title">Canais</span>
+                <span className="item-sub">LinkedIn, e-mail e WhatsApp</span>
+              </span>
+            </Link>
+          </li>
+          <li>
+            <a href="/api/export/leads" download className="item">
+              <span className="item-main">
+                <span className="item-title">Baixar meus contatos</span>
+                <span className="item-sub">Planilha para Excel ou Google Planilhas</span>
+              </span>
+            </a>
+          </li>
+        </ul>
+        <form action={logout}>
+          <button type="submit" className="btn-line btn-danger-line">
+            Sair
+          </button>
+        </form>
+      </section>
     </main>
   );
 }

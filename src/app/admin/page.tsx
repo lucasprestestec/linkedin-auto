@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { adminEnabled, isAdmin } from "@/lib/admin";
-import { IconLogout } from "@/components/Icons";
 import { AdminLogin } from "./AdminLogin";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { LimitsForm } from "./LimitsForm";
@@ -27,8 +26,8 @@ export default async function AdminPage() {
   if (!(await isAdmin())) {
     return (
       <main className="page">
-        <header className="page-hero">
-          <h1 className="display page-title">Admin.</h1>
+        <header className="p-head">
+          <h1 className="t-title">Admin</h1>
         </header>
         <AdminLogin />
       </main>
@@ -42,76 +41,72 @@ export default async function AdminPage() {
 
   return (
     <main className="page">
-      <header className="page-hero row" style={{ justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+      <header className="p-head">
         <div>
-          <h1 className="display page-title">
-            Ad<span className="name-grad">min.</span>
-          </h1>
-          <p className="hero-sub">Configurações técnicas. O usuário do painel não vê esta página.</p>
+          <h1 className="t-title">Admin</h1>
+          <p className="t-sub">Configurações técnicas. O usuário do painel não vê esta página.</p>
         </div>
         <form action={adminLogout}>
-          <button type="submit" className="btn btn-secondary btn-sm">
-            <IconLogout size={16} /> Sair do admin
+          <button type="submit" className="btn-line btn-sm">
+            Sair do admin
           </button>
         </form>
       </header>
 
-      <section className="group">
-        <h2 className="group-title">Agente de IA — banco de testes e modelo</h2>
-        <p className="tiny faint" style={{ padding: "0 4px 8px" }}>
-          Roda situações difíceis de conversa em cada modelo e mostra quem decide melhor, escreve mais natural e erra menos. Depois é só escolher
-          qual usar nas conversas.
-        </p>
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Agente de IA: banco de testes e modelo</h2>
+          <small>Roda situações difíceis de conversa em cada modelo e mostra quem decide melhor, escreve mais natural e erra menos.</small>
+        </div>
         <AgentEval />
       </section>
 
-      <div className="settings-grid">
-        <div className="settings-col">
-          <section className="group">
-            <h2 className="group-title">Agente de IA — instruções gerais</h2>
-            <p className="tiny faint" style={{ padding: "0 4px 8px" }}>
-              Valem para todas as conversas. O texto de cada campanha (escrito pelo usuário) é somado a estas instruções.
-            </p>
-            <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Limites diários</h2>
-            <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-          </section>
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Agente de IA: instruções gerais</h2>
+          <small>Valem para todas as conversas. O texto de cada campanha é somado a estas instruções.</small>
         </div>
-        <div className="settings-col">
-          <section className="group">
-            <h2 className="group-title">Horário de trabalho</h2>
-            <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Ações extras do LinkedIn</h2>
-            <EngagementForm
-              values={{
-                acceptInvitesEnabled: settings.acceptInvitesEnabled,
-                withdrawInvitesEnabled: settings.withdrawInvitesEnabled,
-                warmupEnabled: settings.warmupEnabled,
-                archiveLostEnabled: settings.archiveLostEnabled,
-              }}
-              withdrawAfterDays={settings.withdrawAfterDays}
-            />
-          </section>
-          <section className="group">
-            <h2 className="group-title">E-mail da secretária</h2>
-            <EmailStatus
-              googleConfigured={googleConfigured()}
-              redirectUri={googleRedirectUri(origin)}
-              connectedAddress={email?.address ?? null}
-              provider={email?.provider ?? null}
-              appUrlSet={Boolean(process.env.APP_URL)}
-            />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Tipo de conta do LinkedIn</h2>
-            <AccountTypeNotice />
-          </section>
-        </div>
-      </div>
+        <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Limites diários</h2>
+        <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Horário de trabalho</h2>
+        <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Ações extras do LinkedIn</h2>
+        <EngagementForm
+          values={{
+            acceptInvitesEnabled: settings.acceptInvitesEnabled,
+            withdrawInvitesEnabled: settings.withdrawInvitesEnabled,
+            warmupEnabled: settings.warmupEnabled,
+            archiveLostEnabled: settings.archiveLostEnabled,
+          }}
+          withdrawAfterDays={settings.withdrawAfterDays}
+        />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">E-mail da secretária</h2>
+        <EmailStatus
+          googleConfigured={googleConfigured()}
+          redirectUri={googleRedirectUri(origin)}
+          connectedAddress={email?.address ?? null}
+          provider={email?.provider ?? null}
+          appUrlSet={Boolean(process.env.APP_URL)}
+        />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Tipo de conta do LinkedIn</h2>
+        <AccountTypeNotice />
+      </section>
     </main>
   );
 }

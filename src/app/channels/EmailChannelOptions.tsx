@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
-import { IconAlert } from "@/components/Icons";
 import { updateEmailChannel } from "./actions";
 
 // O que a secretária pode fazer sozinha por e-mail. Salva a cada mudança.
@@ -25,64 +25,62 @@ export function EmailChannelOptions({ enabled, dailyLimit, fallbackDays }: { ena
   }
 
   return (
-    <div className="channel-options">
-      <div className="setting-row">
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 700 }}>A secretária pode usar o e-mail</span>
-          <span className="tiny faint">Desligado, ela só responde quem escrever por e-mail; não inicia nem retoma por lá.</span>
+    <div className="settings">
+      <div className="setting">
+        <span className="setting-text">
+          <b>
+            Usar o e-mail{" "}
+            <Help>Desligado, a secretária só responde quem escrever por e-mail. Ela não começa nem retoma conversa por lá.</Help>
+          </b>
         </span>
         <button
           type="button"
           role="switch"
           aria-checked={value.enabled}
-          aria-label="A secretária pode usar o e-mail"
-          className="switch switch-light"
+          aria-label="Usar o e-mail"
+          className="switch"
           onClick={() => save({ ...value, enabled: !value.enabled })}
         />
       </div>
 
       {value.enabled && (
         <>
-          <div className="setting-row">
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 700 }}>Convite parado? Apresentar-se por e-mail</span>
-              <span className="tiny faint">
-                {value.fallbackDays == null
-                  ? "Desligado: ela espera o convite ser aceito."
-                  : `Se o convite do LinkedIn não for aceito em ${value.fallbackDays} dias e a pessoa tiver e-mail na ficha.`}
-              </span>
+          <div className="setting">
+            <span className="setting-text">
+              <b>
+                Convite parado: apresentar-se por e-mail{" "}
+                <Help>Se o convite do LinkedIn não for aceito e a pessoa tiver e-mail na ficha, a secretária se apresenta por e-mail.</Help>
+              </b>
+              {value.fallbackDays != null && <small>Depois de {value.fallbackDays} dias sem aceite</small>}
             </span>
             <button
               type="button"
               role="switch"
               aria-checked={value.fallbackDays != null}
               aria-label="Apresentar-se por e-mail quando o convite ficar parado"
-              className="switch switch-light"
+              className="switch"
               onClick={() => save({ ...value, fallbackDays: value.fallbackDays == null ? 5 : null })}
             />
           </div>
           {value.fallbackDays != null && (
-            <div className="setting-row" style={{ paddingTop: 0 }}>
-              <label htmlFor="fallbackDays" className="small muted" style={{ flex: 1 }}>
-                Depois de quantos dias sem aceite
+            <div className="setting" style={{ paddingTop: 0 }}>
+              <label htmlFor="fallbackDays" className="setting-text">
+                <small>Dias sem aceite</small>
               </label>
               <Stepper id="fallbackDays" name="fallbackDays" value={value.fallbackDays} min={1} max={30} onChange={(v) => save({ ...value, fallbackDays: v })} />
             </div>
           )}
-          <div className="setting-row">
-            <label htmlFor="dailyEmailLimit" style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 700 }}>E-mails por dia</span>
-              <span className="tiny faint">Apresentações e retomadas param no limite; respostas a quem escreveu sempre saem.</span>
+          <div className="setting">
+            <label htmlFor="dailyEmailLimit" className="setting-text">
+              <b>
+                E-mails por dia <Help>Apresentações e retomadas param no limite. Respostas a quem escreveu sempre saem.</Help>
+              </b>
             </label>
             <Stepper id="dailyEmailLimit" name="dailyEmailLimit" value={value.dailyLimit} min={1} max={100} onChange={(v) => save({ ...value, dailyLimit: v })} />
           </div>
         </>
       )}
-      {error && (
-        <p className="error-text" style={{ padding: "0 16px 12px" }}>
-          <IconAlert size={15} /> {error}
-        </p>
-      )}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

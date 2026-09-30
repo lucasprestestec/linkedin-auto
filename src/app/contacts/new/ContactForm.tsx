@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { startTransition, useActionState, useState } from "react";
-import { IconAlert, IconChat, IconLinkedin, IconMail, IconUser } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import { createContact, type ContactFormState } from "./actions";
 
 type FirstContact = "ME" | "LINKEDIN" | "EMAIL" | "WHATSAPP";
@@ -19,13 +19,12 @@ export function ContactForm({
   const [first, setFirst] = useState<FirstContact>("ME");
 
   // Cada opção de primeiro contato só aparece habilitada com o dado e o canal prontos.
-  const options: { id: FirstContact; label: string; hint: string; icon: React.ReactNode; enabled: boolean; why?: string }[] = [
-    { id: "ME", label: "Eu mesmo começo", hint: "Nada é enviado agora. Quando você mandar a primeira mensagem, a secretária acompanha.", icon: <IconUser size={16} />, enabled: true },
+  const options: { id: FirstContact; label: string; hint: string; enabled: boolean; why?: string }[] = [
+    { id: "ME", label: "Eu mesmo começo", hint: "Nada é enviado agora. Quando você mandar a primeira mensagem, a secretária acompanha.", enabled: true },
     {
       id: "WHATSAPP",
       label: "A secretária manda um WhatsApp",
       hint: "Primeira mensagem curta, no próximo horário de trabalho, usando o que você escrever sobre a pessoa.",
-      icon: <IconChat size={16} />,
       enabled: ready.WHATSAPP && Boolean(values.phone.trim()),
       why: !ready.WHATSAPP ? "Conecte o WhatsApp em Canais" : "Informe o WhatsApp",
     },
@@ -33,7 +32,6 @@ export function ContactForm({
       id: "EMAIL",
       label: "A secretária se apresenta por e-mail",
       hint: "E-mail de apresentação no próximo horário de trabalho, com rastreio de abertura.",
-      icon: <IconMail size={16} />,
       enabled: ready.EMAIL && Boolean(values.email.trim()),
       why: !ready.EMAIL ? "Conecte o e-mail em Canais" : "Informe o e-mail",
     },
@@ -41,7 +39,6 @@ export function ContactForm({
       id: "LINKEDIN",
       label: "Convidar no LinkedIn",
       hint: "Convite de conexão; quando aceitar, a secretária abre a conversa por lá.",
-      icon: <IconLinkedin size={16} />,
       enabled: ready.LINKEDIN && Boolean(values.linkedin.trim()),
       why: !ready.LINKEDIN ? "Conecte o LinkedIn em Canais" : "Informe o link do perfil",
     },
@@ -51,81 +48,81 @@ export function ContactForm({
 
   return (
     <form
-      className="stack contact-form"
-      style={{ gap: 18 }}
+      className="stack"
+      style={{ gap: 16 }}
       // Envio manual (não `action=`): com action, o React limpa o formulário ao
-      // terminar — e um erro de validação apagaria tudo que foi digitado.
+      // terminar, e um erro de validação apagaria tudo que foi digitado.
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
         startTransition(() => action(data));
       }}
     >
-      <section className="card card-pad stack" style={{ gap: 12 }}>
-        <div className="row two-cols" style={{ gap: 10 }}>
-          <label className="field" style={{ gap: 4, flex: 1 }}>
-            <span className="label">Nome *</span>
-            <input className="input" name="firstName" required autoComplete="off" placeholder="Mariana" />
-          </label>
-          <label className="field" style={{ gap: 4, flex: 1 }}>
-            <span className="label">Sobrenome</span>
-            <input className="input" name="lastName" autoComplete="off" placeholder="Costa" />
-          </label>
+      <section className="sec">
+        <div className="row" style={{ gap: 10, alignItems: "flex-start" }}>
+          <div className="grow">
+            <label className="label">Nome *</label>
+            <input className="field" name="firstName" required autoComplete="off" placeholder="Mariana" />
+          </div>
+          <div className="grow">
+            <label className="label">Sobrenome</label>
+            <input className="field" name="lastName" autoComplete="off" placeholder="Costa" />
+          </div>
         </div>
-        <label className="field" style={{ gap: 4 }}>
-          <span className="label">Cargo e empresa</span>
-          <input className="input" name="jobTitle" autoComplete="off" placeholder="Diretora de RH · Grupo Vértice" />
-        </label>
-        <div className="row two-cols" style={{ gap: 10 }}>
-          <label className="field" style={{ gap: 4, flex: 1 }}>
-            <span className="label">WhatsApp</span>
+        <div>
+          <label className="label">Cargo e empresa</label>
+          <input className="field" name="jobTitle" autoComplete="off" placeholder="Diretora de RH · Grupo Vértice" />
+        </div>
+        <div className="row" style={{ gap: 10, alignItems: "flex-start" }}>
+          <div className="grow">
+            <label className="label">WhatsApp</label>
             <input
-              className="input"
+              className="field"
               name="phone"
               inputMode="tel"
               placeholder="(51) 99999-0000"
               value={values.phone}
               onChange={(e) => setValues({ ...values, phone: e.target.value })}
             />
-          </label>
-          <label className="field" style={{ gap: 4, flex: 1 }}>
-            <span className="label">E-mail</span>
+          </div>
+          <div className="grow">
+            <label className="label">E-mail</label>
             <input
-              className="input"
+              className="field"
               name="email"
               type="email"
               placeholder="nome@empresa.com.br"
               value={values.email}
               onChange={(e) => setValues({ ...values, email: e.target.value })}
             />
-          </label>
+          </div>
         </div>
-        <label className="field" style={{ gap: 4 }}>
-          <span className="label">LinkedIn (opcional)</span>
+        <div>
+          <label className="label">LinkedIn (opcional)</label>
           <input
-            className="input"
+            className="field"
             name="linkedin"
             inputMode="url"
             placeholder="https://www.linkedin.com/in/…"
             value={values.linkedin}
             onChange={(e) => setValues({ ...values, linkedin: e.target.value })}
           />
-        </label>
-        <label className="field" style={{ gap: 4 }}>
-          <span className="label">O que você sabe dessa pessoa</span>
+        </div>
+        <div>
+          <label className="label">
+            O que você sabe dessa pessoa <Help>A secretária usa isso para fazer a ponte na primeira mensagem e deixar a conversa pessoal.</Help>
+          </label>
           <textarea
-            className="textarea"
+            className="field"
             name="personal"
             rows={3}
             placeholder="Ex.: indicação do João da Construtora X; nos conhecemos no evento da ACIPA; tem 2 filhos."
-            style={{ resize: "vertical" }}
           />
-          <span className="tiny faint">A secretária usa isso pra fazer a ponte na primeira mensagem e deixar a conversa pessoal.</span>
-        </label>
+        </div>
         {campaigns.length > 0 && (
-          <label className="field" style={{ gap: 4 }}>
-            <span className="label">Campanha (opcional)</span>
-            <select className="input" name="campaignId" defaultValue="">
+          <div>
+            <label className="label">Campanha (opcional)</label>
+            <select className="field" name="campaignId" defaultValue="">
               <option value="">Sem campanha</option>
               {campaigns.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -133,39 +130,31 @@ export function ContactForm({
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         )}
       </section>
 
-      <section className="stack" style={{ gap: 8 }}>
-        <h2 className="group-title">Primeiro contato</h2>
+      <section className="sec">
+        <h2 className="t-label">Primeiro contato</h2>
         <input type="hidden" name="firstContact" value={effective} />
-        <div className="first-contact" role="radiogroup" aria-label="Primeiro contato">
+        <div className="stack" style={{ gap: 8 }} role="radiogroup" aria-label="Primeiro contato">
           {options.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="radio"
-              aria-checked={effective === o.id}
-              disabled={!o.enabled}
-              className={effective === o.id ? "fc-option active" : "fc-option"}
-              onClick={() => setFirst(o.id)}
-            >
-              <span className="fc-icon">{o.icon}</span>
-              <span className="fc-text">
+            <button key={o.id} type="button" role="radio" aria-checked={effective === o.id} disabled={!o.enabled} className="choice-row" onClick={() => setFirst(o.id)}>
+              <span className="setting-text">
                 <b>{o.label}</b>
                 <small>{o.enabled ? o.hint : o.why}</small>
               </span>
+              <span className="radio-dot" aria-hidden />
             </button>
           ))}
         </div>
       </section>
 
       {state?.error && (
-        <p className="error-text">
-          <IconAlert size={15} /> {state.error}{" "}
+        <p className="field-error">
+          {state.error}{" "}
           {state.existingLeadId && (
-            <Link href={`/leads/${state.existingLeadId}`} className="link-btn brand">
+            <Link href={`/leads/${state.existingLeadId}`} className="btn-text">
               Abrir a conversa dela
             </Link>
           )}
@@ -173,10 +162,10 @@ export function ContactForm({
       )}
 
       <div className="row" style={{ gap: 10, justifyContent: "flex-end" }}>
-        <Link href="/conversations" className="btn btn-secondary">
+        <Link href="/conversations" className="btn-line">
           Cancelar
         </Link>
-        <button type="submit" className="btn btn-primary" disabled={pending}>
+        <button type="submit" className="btn-solid" disabled={pending}>
           {pending ? "Salvando…" : "Adicionar contato"}
         </button>
       </div>

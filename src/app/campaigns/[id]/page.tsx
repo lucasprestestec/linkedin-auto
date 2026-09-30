@@ -6,7 +6,6 @@ import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
 import { CampaignStatus } from "@/components/CampaignStatus";
 import { ConversationRow } from "@/components/ConversationRow";
-import { IconArrowLeft, IconCheck, IconPlus, IconRefresh } from "@/components/Icons";
 import { describeRule } from "@/lib/followupPolicy";
 import { CampaignMenu } from "../CampaignMenu";
 
@@ -30,91 +29,86 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
   const active = campaign.status === "ACTIVE";
   const full = campaign.maxLeads != null && n.leads >= campaign.maxLeads;
 
+  const stats = [
+    { value: `${n.leads}${campaign.maxLeads ? `/${campaign.maxLeads}` : ""}`, label: "Pessoas" },
+    { value: n.connected, label: "Aceitaram" },
+    { value: n.rate === null ? "—" : `${n.rate}%`, label: "Responderam" },
+    { value: n.qualified, label: "Oportunidades" },
+  ];
+
   return (
     <main className="page">
       <MobileHeader />
-      <Link href="/campaigns" className="back-link">
-        <IconArrowLeft size={18} /> Campanhas
+      <Link href="/campaigns" className="btn-text" style={{ alignSelf: "flex-start" }}>
+        ← Campanhas
       </Link>
 
       {isNew && (
-        <div className="success-banner">
-          <span className="success-banner-icon">
-            <IconCheck size={16} strokeWidth={3} />
-          </span>
-          <span>
-            <b>Campanha criada!</b> Agora adicione as pessoas que você quer alcançar.
-          </span>
-        </div>
+        <p className="note note-ok">
+          <b>Campanha criada.</b> Agora adicione as pessoas que você quer alcançar.
+        </p>
       )}
 
-      <header className="stack" style={{ gap: 10 }}>
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-          <div className="stack" style={{ gap: 8, minWidth: 0 }}>
+      <header className="p-head">
+        <div className="stack" style={{ gap: 8 }}>
+          <span>
             <CampaignStatus status={campaign.status} />
-            <h1 className="display page-title" style={{ overflowWrap: "anywhere" }}>
-              {campaign.name}
-            </h1>
-          </div>
-          <CampaignMenu id={campaign.id} name={campaign.name} status={campaign.status} leads={n.leads} />
+          </span>
+          <h1 className="t-title" style={{ overflowWrap: "anywhere" }}>
+            {campaign.name}
+          </h1>
+          {campaign.description && <p className="t-sub" style={{ margin: 0 }}>{campaign.description}</p>}
         </div>
-        {campaign.description && <p className="hero-sub" style={{ margin: 0 }}>{campaign.description}</p>}
+        <CampaignMenu id={campaign.id} name={campaign.name} status={campaign.status} leads={n.leads} />
       </header>
 
-      <dl className="kpis">
-        <div className="kpi-item">
-          <dd>
-            {n.leads}
-            {campaign.maxLeads ? <small className="faint">/{campaign.maxLeads}</small> : null}
-          </dd>
-          <dt>Leads</dt>
-        </div>
-        <div className="kpi-item">
-          <dd>{n.connected}</dd>
-          <dt>Aceitaram</dt>
-        </div>
-        <div className="kpi-item">
-          <dd>{n.rate === null ? "—" : `${n.rate}%`}</dd>
-          <dt>Resposta</dt>
-        </div>
-        <div className="kpi-item">
-          <dd>{n.qualified}</dd>
-          <dt>Oportunidades</dt>
-        </div>
-      </dl>
+      <div className="h-stats">
+        {stats.map((s) => (
+          <div key={s.label} className="h-stat">
+            <b>{s.value}</b>
+            <span>{s.label}</span>
+          </div>
+        ))}
+      </div>
 
-      <p className="small muted row" style={{ gap: 6 }}>
-        <IconRefresh size={15} /> Follow-up:{" "}
-        {campaign.followUpMaxCount != null && campaign.followUpDelayHours != null
-          ? describeRule(campaign.followUpMaxCount, campaign.followUpDelayHours)
-          : `padrão da conta (${describeRule(settings.followUpMaxCount, settings.followUpDelayHours)})`}
-        <Link href={`/campaigns/${campaign.id}/edit`} className="sec-link" style={{ color: "var(--brand)" }}>
-          Alterar
-        </Link>
-      </p>
-
-      {campaign.instructions && (
-        <section className="offer-box">
-          <span className="label">Oferta que a IA usa nas conversas</span>
-          <p>{campaign.instructions}</p>
-        </section>
-      )}
-
-      <section className="stack" style={{ gap: 8 }}>
+      <section className="sec">
         <div className="sec-head">
-          <h2>Pessoas nesta campanha</h2>
+          <h2 className="t-label">Como a secretária conduz</h2>
+          <Link href={`/campaigns/${campaign.id}/edit`} className="btn-text">
+            Alterar
+          </Link>
+        </div>
+        <dl className="kv" style={{ gridTemplateColumns: "130px 1fr" }}>
+          <dt>Acompanhamento</dt>
+          <dd>
+            {campaign.followUpMaxCount != null && campaign.followUpDelayHours != null
+              ? describeRule(campaign.followUpMaxCount, campaign.followUpDelayHours)
+              : `padrão da conta (${describeRule(settings.followUpMaxCount, settings.followUpDelayHours)})`}
+          </dd>
+          {campaign.instructions && (
+            <>
+              <dt>Oferta</dt>
+              <dd style={{ whiteSpace: "pre-line" }}>{campaign.instructions}</dd>
+            </>
+          )}
+        </dl>
+      </section>
+
+      <section className="sec">
+        <div className="sec-head">
+          <h2 className="t-label">Pessoas nesta campanha</h2>
           {active && !full ? (
-            <Link href={`/prospect?campaign=${campaign.id}`} className="btn btn-primary btn-sm">
-              <IconPlus size={16} /> Adicionar pessoas
+            <Link href={`/prospect?campaign=${campaign.id}`} className="btn-solid btn-sm">
+              Adicionar pessoas
             </Link>
           ) : (
-            <span className="small faint">{full ? "Limite de leads atingido" : "Campanha pausada — reative pra adicionar"}</span>
+            <span className="hint" style={{ margin: 0 }}>{full ? "Limite atingido" : "Campanha pausada. Reative para adicionar."}</span>
           )}
         </div>
         {people.length === 0 ? (
-          <p className="empty-line">Ninguém ainda. Quem você convidar aparece aqui, e a IA conversa com a oferta desta campanha.</p>
+          <p className="empty">Ninguém ainda. Quem você convidar aparece aqui, e a secretária conversa com a oferta desta campanha.</p>
         ) : (
-          <ul className="rows boxed">
+          <ul className="list">
             {people.map((c) => (
               <li key={c.id}>
                 <ConversationRow c={c} />

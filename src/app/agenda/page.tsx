@@ -1,5 +1,4 @@
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconAlert, IconCalendar } from "@/components/Icons";
 import { googleConfigured } from "@/lib/gmail";
 import { loadAgenda } from "@/lib/agendaView";
 import { parseView } from "@/lib/agendaBuild";
@@ -16,42 +15,43 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   return (
     <main className="page">
       <MobileHeader />
-      <header>
-        <h1 className="display page-title">Agenda</h1>
-        <p className="hero-sub">
-          {data.connected && data.googleEmail
-            ? `Esta é a agenda da conta Google conectada (${data.googleEmail}): as reuniões que a secretária marcar entram aqui.`
-            : "Sua agenda do Google: o que já está marcado e os horários que a secretária pode oferecer aos leads."}
-        </p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Agenda</h1>
+          <p className="t-sub">
+            {data.connected && data.googleEmail
+              ? `Agenda da conta Google conectada (${data.googleEmail}). As reuniões que a secretária marcar entram aqui.`
+              : "Sua agenda do Google: o que já está marcado e os horários que a secretária pode oferecer."}
+          </p>
+        </div>
       </header>
 
       {!data.connected ? (
-        <section className="panel" style={{ padding: 20, display: "grid", gap: 12 }}>
-          <p style={{ margin: 0 }}>
-            <IconCalendar size={16} />{" "}
+        <section className="sec">
+          <p>
             {data.needsReconnect
               ? "O Google está conectado, mas sem a permissão da agenda. Reconecte e marque a permissão de agenda."
               : "Conecte o seu Google para ver a agenda aqui e para a secretária marcar as reuniões."}
           </p>
           {data.configured ? (
-            <a href="/api/email/google/start" className="btn btn-primary btn-sm" style={{ justifySelf: "start" }}>
-              {data.needsReconnect ? "Reconectar o Google" : "Conectar o Google"}
-            </a>
+            <div>
+              <a href="/api/email/google/start" className="btn-solid btn-sm">
+                {data.needsReconnect ? "Reconectar o Google" : "Conectar o Google"}
+              </a>
+            </div>
           ) : (
-            <p className="tiny faint" style={{ margin: 0 }}>
-              O login do Google ainda não foi configurado neste sistema.
-            </p>
+            <p className="hint">O login do Google ainda não foi ativado neste sistema.</p>
           )}
         </section>
       ) : data.error ? (
-        <section className="panel" style={{ padding: 20, display: "grid", gap: 12 }} role="alert">
-          <p className="error-text" style={{ margin: 0 }}>
-            <IconAlert size={15} /> Não consegui ler a sua agenda: {data.error}
-          </p>
+        <section className="sec" role="alert">
+          <p className="field-error">Não consegui ler a sua agenda: {data.error}</p>
           {data.configured && (
-            <a href="/api/email/google/start" className="btn btn-secondary btn-sm" style={{ justifySelf: "start" }}>
-              Reconectar o Google
-            </a>
+            <div>
+              <a href="/api/email/google/start" className="btn-line btn-sm">
+                Reconectar o Google
+              </a>
+            </div>
           )}
         </section>
       ) : (

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconClock, IconEye, IconSparkles } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { WhatsappCard } from "./WhatsappCard";
@@ -34,74 +34,55 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
   ]);
 
   return (
-    <main className="page account">
+    <main className="page">
       <MobileHeader />
-      <header className="page-hero rise">
-        <h1 className="display page-title">
-          Seus <span className="name-grad">canais.</span>
-        </h1>
-        <p className="hero-sub">Por onde a secretária fala com as pessoas. Cada canal é independente: conecte só o que fizer sentido.</p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">
+            Canais{" "}
+            <Help>
+              Quando alguém não responde, a secretária olha os sinais e escolhe: retomar por um canal, esperar mais um pouco ou encerrar. Se a pessoa abriu o
+              e-mail e não respondeu, ela tenta de novo, de preferência por outro canal, sem dizer que sabe que foi aberto. Tudo respeita seu horário de
+              trabalho e os limites de cada canal.
+            </Help>
+          </h1>
+          <p className="t-sub">Por onde a secretária fala com as pessoas. Conecte só o que fizer sentido.</p>
+        </div>
       </header>
 
-      <div className="account-col">
-        <section className="group rise">
-          <h2 className="group-title">LinkedIn</h2>
-          <LinkedinCard settings={settings} status={status} />
-          <p className="tiny faint channel-foot">
-            Hoje: {linkedinToday} de {settings.dailyMessageLimit} mensagens.
-          </p>
-        </section>
+      <section className="sec">
+        <h2 className="t-label">LinkedIn</h2>
+        <LinkedinCard settings={settings} status={status} today={`Hoje: ${linkedinToday} de ${settings.dailyMessageLimit} mensagens`} />
+      </section>
 
-        <section className="group rise">
-          <h2 className="group-title">E-mail</h2>
-          <EmailCard
-            googleAddress={settings.googleEmail}
-            expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
-            fallbackAddress={email?.provider === "password" ? email.address : null}
-            result={typeof emailResult === "string" ? emailResult : null}
-          />
-          {email && (
-            <>
-              <div className="card" style={{ overflow: "hidden", marginTop: 10 }}>
-                <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
-              </div>
-              <p className="tiny faint channel-foot">
-                Hoje: {emailToday} de {settings.dailyEmailLimit} e-mails · Últimos 7 dias: {openedWeek} de {sentWeek} abertos
-              </p>
-            </>
-          )}
-        </section>
+      <section className="sec">
+        <h2 className="t-label">E-mail</h2>
+        <EmailCard
+          googleAddress={settings.googleEmail}
+          expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
+          fallbackAddress={email?.provider === "password" ? email.address : null}
+          result={typeof emailResult === "string" ? emailResult : null}
+        />
+        {email && (
+          <>
+            <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
+            <p className="hint">
+              Hoje: {emailToday} de {settings.dailyEmailLimit} e-mails · últimos 7 dias: {openedWeek} de {sentWeek} abertos
+            </p>
+          </>
+        )}
+      </section>
 
-        <section className="group rise">
-          <h2 className="group-title">WhatsApp</h2>
-          <WhatsappCard
-            host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
-            channelId={settings.deskcommChannelId}
-            enabled={settings.whatsappChannelEnabled}
-            dailyLimit={settings.dailyWhatsappLimit}
-            sentToday={whatsappToday}
-          />
-        </section>
-
-        <section className="group rise">
-          <h2 className="group-title">Como a secretária decide</h2>
-          <div className="card card-pad stack decide-card" style={{ gap: 12 }}>
-            <p className="small">
-              <IconSparkles size={16} /> Quando alguém não responde, ela olha os sinais e escolhe o próximo passo: <b>retomar</b> por um dos canais,{" "}
-              <b>esperar</b> um pouco mais ou <b>encerrar</b>.
-            </p>
-            <p className="small">
-              <IconEye size={16} /> Abriu o e-mail e não respondeu? É um sinal de interesse: ela tenta de novo, de preferência por outro canal. Nunca
-              diz à pessoa que sabe que ela abriu.
-            </p>
-            <p className="small">
-              <IconClock size={16} /> Respeita o horário de trabalho, os limites de cada canal e o número de retomadas da campanha. Nada de sinal
-              depois disso, ela encerra.
-            </p>
-            <p className="tiny faint">Em cada conversa, o campo &quot;Próximo passo&quot; mostra o que ela decidiu e por quê.</p>
-          </div>
-        </section>
-      </div>
+      <section className="sec">
+        <h2 className="t-label">WhatsApp</h2>
+        <WhatsappCard
+          host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
+          channelId={settings.deskcommChannelId}
+          enabled={settings.whatsappChannelEnabled}
+          dailyLimit={settings.dailyWhatsappLimit}
+          sentToday={whatsappToday}
+        />
+      </section>
     </main>
   );
 }
