@@ -28,6 +28,8 @@ export interface AgendaPayload {
   configured: boolean;
   error?: string;
   view: AgendaViewMode;
+  // A visão veio escolhida na URL (senão, no celular a tela abre em "Dia").
+  viewExplicit: boolean;
   focusKey: string;
   // Janela lida do Google (dias AAAA-MM-DD, inclusive).
   fromKey: string;
@@ -41,7 +43,7 @@ export interface AgendaPayload {
   upcomingMeetings: number;
 }
 
-export async function loadAgenda(googleConfigured: boolean, view: AgendaViewMode, focusParam: unknown): Promise<AgendaPayload> {
+export async function loadAgenda(googleConfigured: boolean, view: AgendaViewMode, focusParam: unknown, viewExplicit: boolean): Promise<AgendaPayload> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const now = new Date();
   const focusKey = parseFocus(focusParam, dayKeyOf(now));
@@ -53,6 +55,7 @@ export async function loadAgenda(googleConfigured: boolean, view: AgendaViewMode
     needsReconnect: Boolean(settings.googleEmail && settings.googleRefreshToken && !settings.googleCalendarEnabled),
     configured: googleConfigured,
     view,
+    viewExplicit,
     focusKey,
     fromKey,
     toKey,

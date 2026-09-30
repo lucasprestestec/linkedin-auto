@@ -2,28 +2,40 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { IconChevronRight, IconExternal } from "@/components/Icons";
 import { WEEKDAYS_SHORT, addDays, addMonths, longDayLabel } from "@/lib/dateKeys";
 import { buildAgenda, insideWindow, visibleKeys, type AgendaDay, type AgendaEvent, type AgendaViewMode, type BuiltAgenda } from "@/lib/agendaBuild";
 import type { AgendaPayload } from "@/lib/agendaView";
 import { minutesOfDay } from "@/lib/slots";
 
-// O calendário. Todos os compromissos já vieram do servidor (mês em foco + vizinhos):
-// escolher um dia, trocar Mês/Semana e andar para o mês seguinte não volta ao servidor,
-// então é instantâneo e a tela não pula. Só sair da janela carregada busca de novo.
+// A agenda. O padrão é uma GRADE DE HORÁRIOS (horas na vertical, dias na horizontal): cada
+// compromisso é um bloco no seu horário e os horários livres aparecem escritos "Livre".
+// Todos os compromissos já vieram do servidor (mês em foco + vizinhos): trocar de dia,
+// de visão ou de semana não volta ao servidor, então é instantâneo e a tela não pula.
 
 const urlFor = (view: AgendaViewMode, key: string) => `/agenda?v=${view}&d=${key}`;
 
-function chipClass(e: AgendaEvent) {
-  return `cal-chip${e.lead ? " sec" : e.busy ? "" : " soft"}`;
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+// Tela de celular? (no servidor, e na primeira pintura, é "não": evita divergência na hidratação)
+const MOBILE = "(max-width: 720px)";
+function subscribeMobile(onChange: () => void) {
+  const media = window.matchMedia(MOBILE);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
 }
 
 export function AgendaClient({ payload }: { payload: AgendaPayload }) {
   const router = useRouter();
   const [loading, startLoad] = useTransition();
-  const [view, setView] = useState<AgendaViewMode>(payload.view);
-  // `anchor` decide o mês (ou a semana) mostrado; `selected` é o dia aberto no painel.
+  const [pickedView, setView] = useState<AgendaViewMode>(payload.view);
+  // A pessoa já escolheu a visão (na URL ou clicando)? Se não, o celular abre em "Dia":
+  // uma coluna só, legível.
+  const [chosen, setChosen] = useState(payload.viewExplicit);
+  const isMobile = useSyncExternalStore(subscribeMobile, () => window.matchMedia(MOBILE).matches, () => false);
+  const view: AgendaViewMode = !chosen && isMobile ? "dia" : pickedView;
+  // `anchor` decide o período mostrado; `selected` é o dia em foco (painel do mês, destaque).
   const [anchor, setAnchor] = useState(payload.focusKey);
   const [selected, setSelected] = useState(payload.focusKey);
 
@@ -36,6 +48,7 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
     [events, payload.leads, payload.settings, now, view, anchor],
   );
   const day = built.days.find((d) => d.key === selected) ?? built.days.find((d) => d.key === anchor) ?? built.days[0];
+  const today = built.todayKey;
 
   // Mantém o endereço da tela igual ao que se vê (dá pra atualizar a página ou mandar o link).
   useEffect(() => {
@@ -46,6 +59,7 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
   function go(nextView: AgendaViewMode, nextAnchor: string, nextSelected: string) {
     if (insideWindow(visibleKeys(nextView, nextAnchor), loaded)) {
       setView(nextView);
+      if (nextView !== view) setChosen(true);
       setAnchor(nextAnchor);
       setSelected(nextSelected);
     } else {
@@ -53,22 +67,24 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
     }
   }
 
-  const today = built.todayKey;
-  const goPrevNext = (dir: 1 | -1) => {
-    const nextAnchor = view === "semana" ? addDays(anchor, 7 * dir) : addMonths(anchor, dir);
-    // No mês, abre o dia de hoje se ele estiver lá; senão o dia 1. Na semana, o mesmo dia da semana.
-    const inThatMonth = view === "mes" && nextAnchor.slice(0, 7) === today.slice(0, 7);
-    go(view, nextAnchor, view === "semana" ? addDays(selected, 7 * dir) : inThatMonth ? today : nextAnchor);
-  };
+  function step(dir: 1 | -1) {
+    if (view === "dia") return go(view, addDays(anchor, dir), addDays(anchor, dir));
+    if (view === "semana") return go(view, addDays(anchor, 7 * dir), addDays(selected, 7 * dir));
+    const next = addMonths(anchor, dir);
+    return go(view, next, next.slice(0, 7) === today.slice(0, 7) ? today : next);
+  }
+
+  const noun = view === "dia" ? "dia" : view === "semana" ? "semana" : "mês";
+  const empty = built.days.every((d) => d.events.length === 0);
 
   return (
-    <div className={`cal${loading ? " cal-loading" : ""}`} aria-busy={loading}>
+    <div className={`cal cal-${view}${loading ? " cal-loading" : ""}`} aria-busy={loading}>
       <div className="cal-toolbar">
         <div className="cal-nav">
-          <button type="button" className="cal-btn" onClick={() => goPrevNext(-1)} aria-label={view === "mes" ? "Mês anterior" : "Semana anterior"}>
+          <button type="button" className="cal-btn" onClick={() => step(-1)} aria-label={`Voltar um ${noun}`}>
             <IconChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
           </button>
-          <button type="button" className="cal-btn" onClick={() => goPrevNext(1)} aria-label={view === "mes" ? "Próximo mês" : "Próxima semana"}>
+          <button type="button" className="cal-btn" onClick={() => step(1)} aria-label={`Avançar um ${noun}`}>
             <IconChevronRight size={16} />
           </button>
           <h2 className="cal-title">{built.title}</h2>
@@ -78,60 +94,191 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
           {loading && <span className="small muted">Carregando…</span>}
         </div>
         <div className="cal-seg" role="group" aria-label="Visão">
-          <button type="button" aria-pressed={view === "mes"} onClick={() => go("mes", selected, selected)}>
-            Mês
-          </button>
-          <button type="button" aria-pressed={view === "semana"} onClick={() => go("semana", selected, selected)}>
-            Semana
-          </button>
+          {(["dia", "semana", "mes"] as const).map((v) => (
+            <button key={v} type="button" aria-pressed={view === v} onClick={() => go(v, selected, selected)}>
+              {v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mês"}
+            </button>
+          ))}
         </div>
       </div>
 
-      <Legend view={view} />
+      {view !== "mes" && (
+        <p className="cal-hint">
+          Os blocos <b className="cal-hint-free">verdes</b> são horários <b>livres</b>, onde a secretária pode marcar reunião. Os outros blocos são compromissos que já estão na agenda.
+          {empty && " Nada marcado neste período: tudo o que está em verde está livre."}
+        </p>
+      )}
 
-      <div className="cal-layout">
-        <div className="cal-main">
-          {view === "mes" ? (
+      {view === "mes" ? (
+        <div className="cal-layout">
+          <div className="cal-main">
             <MonthGrid built={built} selected={day?.key ?? selected} onSelect={setSelected} />
-          ) : (
-            <WeekGrid built={built} selected={day?.key ?? selected} onSelect={setSelected} nowMin={minutesOfDay(now)} />
-          )}
+          </div>
+          {day && <DayPanel day={day} minutes={built.minutes} />}
         </div>
-        {day && <DayPanel day={day} minutes={built.minutes} />}
-      </div>
+      ) : (
+        <TimeGrid built={built} selected={day?.key ?? selected} onSelect={setSelected} nowMin={minutesOfDay(now)} single={view === "dia"} />
+      )}
 
       <p className="small muted cal-foot">
         {payload.upcomingMeetings > 0
           ? `${payload.upcomingMeetings} reunião${payload.upcomingMeetings > 1 ? "ões" : ""} marcada${payload.upcomingMeetings > 1 ? "s" : ""} pela frente. `
           : ""}
-        Horário livre = expediente de {built.workHours}, reuniões de {built.minutes} minutos, com 4 horas de antecedência, só nos próximos 10 dias. <Link href="/settings">Ajustar</Link>
+        A secretária oferece horários dentro do seu expediente ({built.workHours}), para reuniões de {built.minutes} minutos, com 4 horas de antecedência e só nos próximos 10 dias. <Link href="/settings">Ajustar</Link>
       </p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Legenda: cada item mostra o mesmo desenho que aparece no calendário.
+// Grade de horários (dia e semana)
 // ---------------------------------------------------------------------------
 
-function Legend({ view }: { view: AgendaViewMode }) {
+interface Placed {
+  e: AgendaEvent;
+  lane: number;
+  lanes: number;
+}
+
+// Eventos que se sobrepõem ficam lado a lado (cada grupo divide a largura).
+function place(events: AgendaEvent[]): Placed[] {
+  const sorted = [...events].sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+  const out: Placed[] = [];
+  let cluster: Placed[] = [];
+  let clusterEnd = -1;
+  let laneEnds: number[] = [];
+  const flush = () => {
+    for (const p of cluster) p.lanes = laneEnds.length;
+    out.push(...cluster);
+    cluster = [];
+    laneEnds = [];
+  };
+  for (const e of sorted) {
+    if (cluster.length && e.startMin >= clusterEnd) flush();
+    let lane = laneEnds.findIndex((end) => end <= e.startMin);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(0);
+    }
+    laneEnds[lane] = e.endMin;
+    clusterEnd = Math.max(clusterEnd, e.endMin);
+    cluster.push({ e, lane, lanes: 1 });
+  }
+  flush();
+  return out;
+}
+
+const HPX = 56;
+
+function TimeGrid({ built, selected, onSelect, nowMin, single }: { built: BuiltAgenda; selected: string; onSelect: (key: string) => void; nowMin: number; single: boolean }) {
+  const timed = built.days.flatMap((d) => d.events.filter((e) => !e.allDay));
+  const first = Math.min(built.workStartHour - 1, ...timed.map((e) => Math.floor(e.startMin / 60)), 24);
+  const last = Math.max(built.workEndHour + 1, ...timed.map((e) => Math.ceil(e.endMin / 60)), 0);
+  const startHour = Math.max(0, Math.min(first, built.workStartHour - 1));
+  const endHour = Math.min(24, Math.max(last, built.workEndHour + 1));
+  const height = (endHour - startHour) * HPX;
+  const top = (min: number) => ((min - startHour * 60) / 60) * HPX;
+  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+  const hasAllDay = built.days.some((d) => d.events.some((e) => e.allDay));
+
   return (
-    <ul className="cal-legend" aria-label="Como ler o calendário">
-      <li>
-        <span className="cal-chip sec cal-sample">10:00 Ana</span> Reunião que a secretária marcou
-      </li>
-      <li>
-        <span className="cal-chip cal-sample">14:00 Almoço</span> Seus outros compromissos
-      </li>
-      <li>
-        {view === "mes" ? <i className="cal-free-dot cal-sample-dot" /> : <span className="cal-freeblk cal-sample-blk" />} {view === "mes" ? "Dia com horário livre para novas reuniões" : "Horário livre para novas reuniões"}
-      </li>
-    </ul>
+    <div className={`cal-week${single ? " single" : ""}`}>
+      <div className="cal-week-inner" style={{ ["--hpx" as string]: `${HPX}px` }}>
+        <div className="cal-wh" aria-hidden="true" />
+        {built.days.map((d) => (
+          <button key={d.key} type="button" onClick={() => onSelect(d.key)} aria-pressed={d.key === selected} className={`cal-wh${d.isToday ? " today" : ""}${d.key === selected ? " sel" : ""}`}>
+            {WEEKDAYS_SHORT[d.weekday]}
+            <b>{d.dayNumber}</b>
+            {d.isToday && <span className="cal-wh-today">hoje</span>}
+          </button>
+        ))}
+
+        {hasAllDay && (
+          <>
+            <div className="cal-allday-label">dia todo</div>
+            {built.days.map((d) => (
+              <div key={d.key} className="cal-allday">
+                {d.events
+                  .filter((e) => e.allDay)
+                  .map((e) => (
+                    <span key={e.id} className={`cal-chip${e.lead ? " sec" : e.busy ? "" : " soft"}`} title={e.title}>
+                      {e.title}
+                    </span>
+                  ))}
+              </div>
+            ))}
+          </>
+        )}
+
+        <div className="cal-hours" style={{ height }}>
+          {hours.map((h) => (
+            <span key={h} className="cal-hour-label" style={{ top: (h - startHour) * HPX }}>
+              {h === startHour ? "" : `${String(h).padStart(2, "0")}:00`}
+            </span>
+          ))}
+        </div>
+
+        {built.days.map((d) => (
+          <div key={d.key} className={`cal-col${d.offDay ? " off" : ""}${d.key === selected ? " sel" : ""}`} style={{ height }}>
+            {/* fora do expediente: mais escuro */}
+            <div className="cal-offhours" style={{ top: 0, height: Math.max(0, top(built.workStartHour * 60)) }} />
+            <div className="cal-offhours" style={{ top: top(built.workEndHour * 60), height: Math.max(0, height - top(built.workEndHour * 60)) }} />
+
+            {/* horários livres: verde, com a palavra "Livre" */}
+            {d.offerable &&
+              !d.offDay &&
+              d.free.map((r, i) => {
+                const h = ((r.endMin - r.startMin) / 60) * HPX;
+                return (
+                  <div key={i} className="cal-freeblk" style={{ top: top(r.startMin), height: h }}>
+                    <b>Livre</b>
+                    {h >= 44 && <span>{hhmm(r.startMin)} às {hhmm(r.endMin)}</span>}
+                  </div>
+                );
+              })}
+
+            {/* compromissos */}
+            {place(d.events.filter((e) => !e.allDay)).map(({ e, lane, lanes }) => {
+              const h = Math.max(26, ((e.endMin - e.startMin) / 60) * HPX - 2);
+              const style = {
+                top: top(e.startMin),
+                height: h,
+                left: `calc(${(lane / lanes) * 100}% + 3px)`,
+                width: `calc(${100 / lanes}% - 6px)`,
+              };
+              // Compromisso curto (30 min): nome e horário na mesma linha, senão o horário é cortado.
+              const cls = `cal-evblk${e.lead ? " sec" : e.busy ? "" : " soft"}${h < 46 ? " short" : ""}${h < 46 && lanes > 1 ? " narrow" : ""}`;
+              const inner = (
+                <>
+                  <b>{e.title}</b>
+                  <span>{e.time.replace("-", " às ")}</span>
+                  {e.lead && <em>Reunião marcada pela secretária com {e.lead.name}</em>}
+                </>
+              );
+              return e.lead ? (
+                <Link key={e.id} href={`/leads/${e.lead.id}`} className={cls} style={style} title={`${e.time} ${e.title}`}>
+                  {inner}
+                </Link>
+              ) : (
+                <div key={e.id} className={cls} style={style} title={`${e.time} ${e.title}`}>
+                  {inner}
+                </div>
+              );
+            })}
+
+            {/* o que já passou fica esmaecido; a linha vermelha é "agora" */}
+            {d.isPast && <div className="cal-past" style={{ top: 0, height }} />}
+            {d.isToday && nowMin > startHour * 60 && <div className="cal-past" style={{ top: 0, height: Math.min(height, top(nowMin)) }} />}
+            {d.isToday && nowMin >= startHour * 60 && nowMin <= endHour * 60 && <div className="cal-now" style={{ top: top(nowMin) }} />}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Mês
+// Mês (panorama) + painel do dia
 // ---------------------------------------------------------------------------
 
 const MAX_CHIPS = 3;
@@ -152,9 +299,8 @@ function MonthGrid({ built, selected, onSelect }: { built: BuiltAgenda; selected
           return (
             <button key={d.key} type="button" className={cls} onClick={() => onSelect(d.key)} aria-pressed={d.key === selected} aria-label={`${longDayLabel(d.key)}: ${d.events.length} compromisso(s)`}>
               <span className="cal-daynum">{d.dayNumber}</span>
-              {d.offerable && !d.offDay && d.free.length > 0 && <i className="cal-free-dot" title="Tem horário livre" />}
               {shown.map((e) => (
-                <span key={e.id + d.key} className={chipClass(e)} title={`${e.time} ${e.title}`}>
+                <span key={e.id + d.key} className={`cal-chip${e.lead ? " sec" : e.busy ? "" : " soft"}`} title={`${e.time} ${e.title}`}>
                   {e.allDay ? "" : `${e.time.slice(0, 5)} `}
                   {e.title}
                 </span>
@@ -174,10 +320,6 @@ function MonthGrid({ built, selected, onSelect }: { built: BuiltAgenda; selected
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Painel do dia (fica ao lado do calendário; no celular, embaixo)
-// ---------------------------------------------------------------------------
 
 function EventRow({ e }: { e: AgendaEvent }) {
   return (
@@ -243,129 +385,5 @@ function DayPanel({ day, minutes }: { day: AgendaDay; minutes: number }) {
         )}
       </section>
     </aside>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Semana
-// ---------------------------------------------------------------------------
-
-interface Placed {
-  e: AgendaEvent;
-  lane: number;
-  lanes: number;
-}
-
-// Eventos que se sobrepõem ficam lado a lado (cada grupo divide a largura).
-function place(events: AgendaEvent[]): Placed[] {
-  const sorted = [...events].sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
-  const out: Placed[] = [];
-  let cluster: Placed[] = [];
-  let clusterEnd = -1;
-  let laneEnds: number[] = [];
-  const flush = () => {
-    for (const p of cluster) p.lanes = laneEnds.length;
-    out.push(...cluster);
-    cluster = [];
-    laneEnds = [];
-  };
-  for (const e of sorted) {
-    if (cluster.length && e.startMin >= clusterEnd) flush();
-    let lane = laneEnds.findIndex((end) => end <= e.startMin);
-    if (lane === -1) {
-      lane = laneEnds.length;
-      laneEnds.push(0);
-    }
-    laneEnds[lane] = e.endMin;
-    clusterEnd = Math.max(clusterEnd, e.endMin);
-    cluster.push({ e, lane, lanes: 1 });
-  }
-  flush();
-  return out;
-}
-
-function WeekGrid({ built, selected, onSelect, nowMin }: { built: BuiltAgenda; selected: string; onSelect: (key: string) => void; nowMin: number }) {
-  const timed = built.days.flatMap((d) => d.events.filter((e) => !e.allDay));
-  const first = Math.min(built.workStartHour - 1, ...timed.map((e) => Math.floor(e.startMin / 60)), 24);
-  const last = Math.max(built.workEndHour + 1, ...timed.map((e) => Math.ceil(e.endMin / 60)), 0);
-  const startHour = Math.max(0, Math.min(first, built.workStartHour - 1));
-  const endHour = Math.min(24, Math.max(last, built.workEndHour + 1));
-  const HPX = 46;
-  const height = (endHour - startHour) * HPX;
-  const top = (min: number) => ((min - startHour * 60) / 60) * HPX;
-  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
-  const hasAllDay = built.days.some((d) => d.events.some((e) => e.allDay));
-
-  return (
-    <div className="cal-week">
-      <div className="cal-week-inner" style={{ ["--hpx" as string]: `${HPX}px` }}>
-        <div className="cal-wh" aria-hidden="true" />
-        {built.days.map((d) => (
-          <button key={d.key} type="button" onClick={() => onSelect(d.key)} aria-pressed={d.key === selected} className={`cal-wh${d.isToday ? " today" : ""}${d.key === selected ? " sel" : ""}`}>
-            {WEEKDAYS_SHORT[d.weekday]}
-            <b>{d.dayNumber}</b>
-          </button>
-        ))}
-
-        {hasAllDay && (
-          <>
-            <div className="cal-allday-label">dia todo</div>
-            {built.days.map((d) => (
-              <div key={d.key} className="cal-allday">
-                {d.events
-                  .filter((e) => e.allDay)
-                  .map((e) => (
-                    <span key={e.id} className={chipClass(e)} title={e.title}>
-                      {e.title}
-                    </span>
-                  ))}
-              </div>
-            ))}
-          </>
-        )}
-
-        <div className="cal-hours" style={{ height }}>
-          {hours.map((h) => (
-            <span key={h} className="cal-hour-label" style={{ top: (h - startHour) * HPX }}>
-              {h === startHour ? "" : `${String(h).padStart(2, "0")}:00`}
-            </span>
-          ))}
-        </div>
-        {built.days.map((d) => (
-          <div key={d.key} className={`cal-col${d.offDay ? " off" : ""}${d.key === selected ? " sel" : ""}`} style={{ height }}>
-            {d.offerable &&
-              !d.offDay &&
-              d.free.map((r, i) => (
-                <div key={i} className="cal-freeblk" style={{ top: top(r.startMin), height: ((r.endMin - r.startMin) / 60) * HPX }} title="Livre para reunião" />
-              ))}
-            {place(d.events.filter((e) => !e.allDay)).map(({ e, lane, lanes }) => {
-              const style = {
-                top: top(e.startMin),
-                height: Math.max(20, ((e.endMin - e.startMin) / 60) * HPX - 2),
-                left: `calc(${(lane / lanes) * 100}% + 2px)`,
-                width: `calc(${100 / lanes}% - 4px)`,
-              };
-              const cls = `cal-evblk${e.lead ? " sec" : e.busy ? "" : " soft"}`;
-              const inner = (
-                <>
-                  <b>{e.title}</b>
-                  {e.time}
-                </>
-              );
-              return e.lead ? (
-                <Link key={e.id} href={`/leads/${e.lead.id}`} className={cls} style={style} title={`${e.time} ${e.title} (marcada pela secretária)`}>
-                  {inner}
-                </Link>
-              ) : (
-                <div key={e.id} className={cls} style={style} title={`${e.time} ${e.title}`}>
-                  {inner}
-                </div>
-              );
-            })}
-            {d.isToday && nowMin >= startHour * 60 && nowMin <= endHour * 60 && <div className="cal-now" style={{ top: top(nowMin) }} />}
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

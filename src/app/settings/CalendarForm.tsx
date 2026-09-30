@@ -29,9 +29,15 @@ export function CalendarForm({
   return (
     <div className="card card-pad stack" style={{ gap: 14 }}>
       {calendarEnabled ? (
-        <p className="success-text" style={{ margin: 0 }}>
-          <IconCheck size={15} strokeWidth={3} /> Agenda conectada ({googleEmail}). A secretária oferece só horários livres e marca a reunião por você.
-        </p>
+        <div className="stack" style={{ gap: 6 }}>
+          <p className="success-text" style={{ margin: 0 }}>
+            <IconCheck size={15} strokeWidth={3} /> Agenda conectada: <strong>{googleEmail}</strong>. A secretária oferece só horários livres e marca a reunião por você.
+          </p>
+          <p className="tiny faint" style={{ margin: 0 }}>
+            Atenção: a agenda usada é a da <strong>mesma conta Google do e-mail</strong> ({googleEmail}). As reuniões são criadas na agenda dessa conta, e só os compromissos dela
+            bloqueiam horários. Se a sua agenda de verdade fica em outra conta, reconecte o Google com essa conta.
+          </p>
+        </div>
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           <p className="small" style={{ margin: 0 }}>
@@ -39,6 +45,9 @@ export function CalendarForm({
             {googleEmail
               ? "O Google está conectado, mas sem a permissão da agenda. Reconecte e marque a permissão de agenda."
               : "Conecte o seu Google para a secretária ver seus horários livres e marcar as reuniões."}
+          </p>
+          <p className="tiny faint" style={{ margin: 0 }}>
+            A agenda usada é a da mesma conta Google do e-mail. Entre com a conta em que você mantém a sua agenda.
           </p>
           {configured ? (
             <a href="/api/email/google/start" className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }}>
