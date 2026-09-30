@@ -42,17 +42,33 @@ async function calendarFetch<T>(path: string, init?: RequestInit): Promise<T> {
 interface GEvent {
   id?: string;
   status?: string;
+  summary?: string;
   transparency?: string;
+  hangoutLink?: string;
+  htmlLink?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   attendees?: { self?: boolean; responseStatus?: string }[];
 }
 
-// Compromissos que ocupam o corretor entre `from` e `to`. Ficam de fora: cancelados,
-// marcados como "livre" e os que o próprio corretor recusou. Evento de dia inteiro
-// só bloqueia se estiver como "ocupado" (o Google já marca aniversários como livre).
-export async function listBusy(from: Date, to: Date): Promise<Busy[]> {
-  const busy: Busy[] = [];
+// Um compromisso da agenda, já no formato que o sistema usa.
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  // Evento de dia inteiro (sem hora marcada).
+  allDay: boolean;
+  // Ocupa o corretor? Falso para o que está marcado como "livre" no Google.
+  busy: boolean;
+  meetLink: string | null;
+  htmlLink: string | null;
+}
+
+// Compromissos entre `from` e `to`, em ordem. Ficam de fora os cancelados e os que o
+// próprio corretor recusou.
+export async function listEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
+  const events: CalendarEvent[] = [];
   let pageToken: string | undefined;
   do {
     const q = new URLSearchParams({
@@ -65,15 +81,31 @@ export async function listBusy(from: Date, to: Date): Promise<Busy[]> {
     });
     const page = await calendarFetch<{ items?: GEvent[]; nextPageToken?: string }>(`/events?${q}`);
     for (const e of page.items ?? []) {
-      if (e.status === "cancelled" || e.transparency === "transparent") continue;
+      if (e.status === "cancelled") continue;
       if (e.attendees?.some((a) => a.self && a.responseStatus === "declined")) continue;
       const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00-03:00` : null);
       const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T00:00:00-03:00` : null);
-      if (start && end) busy.push({ start: new Date(start), end: new Date(end) });
+      if (!start || !end) continue;
+      events.push({
+        id: e.id ?? `${start}-${e.summary ?? ""}`,
+        title: e.summary?.trim() || "(sem título)",
+        start: new Date(start),
+        end: new Date(end),
+        allDay: Boolean(e.start?.date && !e.start?.dateTime),
+        busy: e.transparency !== "transparent",
+        meetLink: e.hangoutLink ?? null,
+        htmlLink: e.htmlLink ?? null,
+      });
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
-  return busy;
+  return events;
+}
+
+// O que ocupa o corretor entre `from` e `to` (base dos horários livres). Evento de dia
+// inteiro só bloqueia se estiver como "ocupado" (o Google já marca aniversários como livre).
+export async function listBusy(from: Date, to: Date): Promise<Busy[]> {
+  return (await listEvents(from, to)).filter((e) => e.busy).map((e) => ({ start: e.start, end: e.end }));
 }
 
 export interface MeetingInput {
