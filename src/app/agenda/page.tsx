@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AgendaPage({ searchParams }: PageProps<"/agenda">) {
   const params = await searchParams;
-  const data = await loadAgenda(googleConfigured(), parseView(params.v), params.d);
+  const data = await loadAgenda(googleConfigured(), parseView(params.v), params.d, typeof params.v === "string");
 
   return (
     <main className="page">
@@ -19,8 +19,9 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       <header>
         <h1 className="display page-title">Agenda</h1>
         <p className="hero-sub">
-          Sua agenda do Google: o que já está marcado e os horários que a secretária pode oferecer aos leads
-          {data.connected && data.googleEmail ? ` (${data.googleEmail})` : ""}.
+          {data.connected && data.googleEmail
+            ? `Esta é a agenda da conta Google conectada (${data.googleEmail}): as reuniões que a secretária marcar entram aqui.`
+            : "Sua agenda do Google: o que já está marcado e os horários que a secretária pode oferecer aos leads."}
         </p>
       </header>
 

@@ -88,38 +88,19 @@
   pointer-events: none;
 }
 
-/* ---- legenda: cada item é o mesmo desenho que aparece no calendário ---- */
-.cal-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 22px;
+/* ---- uma frase simples no lugar de legenda ---- */
+.cal-hint {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--text-2);
 }
-.cal-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.cal-sample {
-  display: inline-block;
-  max-width: none;
-  pointer-events: none;
-  white-space: nowrap;
-}
-.cal-legend .cal-free-dot {
-  position: static;
-  flex: none;
-}
-.cal-legend .cal-freeblk {
-  position: static;
-  display: inline-block;
-  width: 22px;
-  height: 14px;
-  border-radius: 4px;
+.cal-hint-free {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--cal-free-soft);
+  color: var(--cal-free-ink);
+  font-weight: 600;
 }
 
 /* ---- layout: calendário + painel do dia lado a lado quando há espaço ---- */
@@ -472,43 +453,124 @@ button.cal-wh:hover {
 .cal-col.off {
   background-color: var(--surface-2);
 }
-.cal-col.sel {
-  background-color: var(--cal-gold-soft);
-}
-.cal-freeblk {
+/* Fora do expediente (antes e depois): mais escuro. */
+.cal-offhours {
   position: absolute;
   left: 0;
   right: 0;
-  background: var(--cal-free-soft);
-  border-left: 2px solid rgba(62, 207, 122, 0.45);
+  background: rgba(0, 0, 0, 0.22);
   pointer-events: none;
 }
+/* O que já passou fica esmaecido. */
+.cal-past {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 1;
+}
+/* Horário livre: bloco verde com a palavra "Livre". */
+.cal-freeblk {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 8px;
+  border: 1px dashed rgba(62, 207, 122, 0.55);
+  background: rgba(62, 207, 122, 0.13);
+  color: var(--cal-free-ink);
+  text-align: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cal-freeblk b {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.cal-freeblk span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+/* Compromisso: bloco cheio, com o nome e o horário. */
 .cal-evblk {
   position: absolute;
-  padding: 2px 5px;
-  border-radius: 6px;
-  font-size: 11.5px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 13px;
   line-height: 1.25;
   overflow: hidden;
-  background: var(--cal-ev-soft);
-  color: var(--cal-ev-ink);
-  border-left: 3px solid var(--cal-ev);
+  background: #3d4494;
+  color: #fff;
+  border-left: 4px solid var(--cal-ev);
   text-decoration: none;
-  box-shadow: 0 0 0 1px var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.cal-evblk b {
+  font-weight: 700;
+}
+.cal-evblk span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.cal-evblk em {
+  font-style: normal;
+  font-size: 11.5px;
+  opacity: 0.95;
 }
 .cal-evblk.sec {
-  background: var(--cal-gold-soft);
-  color: var(--cal-gold);
-  border-left-color: var(--cal-gold);
+  background: #a67c3d;
+  border-left-color: #f0cf94;
 }
 .cal-evblk.soft {
   background: transparent;
   border: 1px dashed var(--border-strong);
   color: var(--text-2);
+  box-shadow: none;
 }
-.cal-evblk b {
+.cal-evblk.short {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.cal-evblk.short b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-evblk.short span {
+  flex: none;
+}
+.cal-evblk.short em {
+  display: none;
+}
+/* Curto e dividindo a linha com outro: só o nome cabe (o horário fica no aviso ao tocar). */
+.cal-evblk.short.narrow span {
+  display: none;
+}
+.cal-wh-today {
   display: block;
-  font-weight: 600;
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--cal-gold);
+}
+/* Visão "Dia": uma coluna só, larga. */
+.cal-week.single .cal-week-inner {
+  grid-template-columns: 52px minmax(0, 1fr);
+  min-width: 0;
 }
 .cal-now {
   position: absolute;

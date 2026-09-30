@@ -1,11 +1,12 @@
-import { addDays, addMonths, dayOfMonth, isValidKey, monthGrid, monthOf, monthTitle, weekKeys, weekTitle, weekdayOf } from "@/lib/dateKeys";
+import { addDays, addMonths, dayOfMonth, isValidKey, longDayLabel, monthGrid, monthOf, monthTitle, weekKeys, weekTitle, weekdayOf } from "@/lib/dateKeys";
 import { dayKeyOf, freeStarts, minutesOfDay, nextDays, timeLabel, windowsByDay, type SlotRules } from "@/lib/slots";
 
 // Monta o calendário (mês ou semana) a partir dos compromissos já lidos. Só conta e
 // data, sem Google nem banco: roda no navegador (a tela troca de dia e de mês sem
 // voltar ao servidor) e nos testes.
 
-export type AgendaViewMode = "mes" | "semana";
+// "dia" e "semana" são a grade de horários (o que se abre por padrão); "mes" é o panorama.
+export type AgendaViewMode = "dia" | "semana" | "mes";
 
 export interface AgendaEvent {
   id: string;
@@ -61,6 +62,7 @@ export interface SettingsForAgenda {
 
 // Os dias que a tela mostra para cada visão (mês = 6 semanas cheias; semana = dom a sáb).
 export function visibleKeys(view: AgendaViewMode, focusKey: string): string[] {
+  if (view === "dia") return [focusKey];
   return view === "semana" ? weekKeys(focusKey) : monthGrid(focusKey);
 }
 
@@ -166,9 +168,9 @@ export function buildAgenda({ events, leads, settings, now, view, focusKey }: Bu
     view,
     focusKey,
     todayKey,
-    title: view === "semana" ? weekTitle(keys) : monthTitle(focusKey),
-    prevKey: view === "semana" ? addDays(focusKey, -7) : addMonths(focusKey, -1),
-    nextKey: view === "semana" ? addDays(focusKey, 7) : addMonths(focusKey, 1),
+    title: view === "dia" ? longDayLabel(focusKey) : view === "semana" ? weekTitle(keys) : monthTitle(focusKey),
+    prevKey: view === "dia" ? addDays(focusKey, -1) : view === "semana" ? addDays(focusKey, -7) : addMonths(focusKey, -1),
+    nextKey: view === "dia" ? addDays(focusKey, 1) : view === "semana" ? addDays(focusKey, 7) : addMonths(focusKey, 1),
     days,
     selected: days.find((d) => d.key === focusKey) ?? null,
     minutes: settings.meetingMinutes,
@@ -178,8 +180,9 @@ export function buildAgenda({ events, leads, settings, now, view, focusKey }: Bu
   };
 }
 
+// Sem escolha na URL, abre a semana (a grade de horários).
 export function parseView(value: unknown): AgendaViewMode {
-  return value === "semana" ? "semana" : "mes";
+  return value === "dia" || value === "mes" ? value : "semana";
 }
 
 // Data em foco vinda da URL; se faltar ou for inválida, hoje.
