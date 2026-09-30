@@ -1,4 +1,4 @@
-import { IconCheck, IconHome, IconLayers, IconMegaphone, IconMessages, IconUser, IconUserSearch } from "./Icons";
+import { IconCalendar, IconCheck, IconHome, IconLayers, IconMegaphone, IconMessages, IconUser, IconUserSearch } from "./Icons";
 
 // As telas do painel — iguais no celular (menu inferior) e no computador
 // (barra lateral). "Canais" fica só na barra lateral; no celular abre pela Conta.
@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { href: "/prospect", label: "Prospectar", Icon: IconUserSearch },
   { href: "/campaigns", label: "Campanhas", Icon: IconMegaphone },
   { href: "/conversations", label: "Conversas", Icon: IconMessages, badge: "attention" as const },
+  { href: "/agenda", label: "Agenda", Icon: IconCalendar, desktopOnly: true },
   { href: "/approvals", label: "Aprovações", Icon: IconCheck, badge: "drafts" as const },
   { href: "/channels", label: "Canais", Icon: IconLayers, desktopOnly: true },
   { href: "/settings", label: "Conta", Icon: IconUser },

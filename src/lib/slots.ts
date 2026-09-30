@@ -112,16 +112,25 @@ export function slotIso(start: Date): string {
   return `${dayKey(l)}T${pad(l.h)}:${pad(l.min)}:00-03:00`;
 }
 
-// Janelas livres por dia, em texto curto pro modelo ("qui 02/10: 09:00-12:00, 14:00-17:30").
-// A janela vai do primeiro início ao fim da última reunião que cabe.
-export function describeWindows(starts: Date[], rules: Pick<SlotRules, "minutes" | "stepMinutes">): string[] {
+export interface DayWindows {
+  // "2026-10-01" (dia em Brasília).
+  key: string;
+  // "quinta, 01/10"
+  label: string;
+  // "08:00-10:00", "14:00-19:00": onde cabe uma reunião.
+  windows: string[];
+}
+
+// Janelas livres separadas por dia. A janela vai do primeiro início ao fim da última
+// reunião que cabe.
+export function windowsByDay(starts: Date[], rules: Pick<SlotRules, "minutes" | "stepMinutes">): DayWindows[] {
   const step = rules.stepMinutes ?? DEFAULTS.stepMinutes;
   const byDay = new Map<string, Date[]>();
   for (const s of starts) {
     const k = dayKey(local(s));
     byDay.set(k, [...(byDay.get(k) ?? []), s]);
   }
-  const lines: string[] = [];
+  const out: DayWindows[] = [];
   for (const [k, list] of byDay) {
     const l = local(list[0]);
     const windows: string[] = [];
@@ -141,9 +150,42 @@ export function describeWindows(starts: Date[], rules: Pick<SlotRules, "minutes"
       prev = s;
     }
     close();
-    lines.push(`${WEEKDAYS[l.weekday]} ${k.slice(8)}/${k.slice(5, 7)}: ${windows.join(", ")}`);
+    out.push({ key: k, label: `${WEEKDAYS[l.weekday]}, ${pad(l.d)}/${pad(l.m + 1)}`, windows });
   }
-  return lines;
+  return out;
+}
+
+// Janelas livres por dia, em texto curto pro modelo ("qui 02/10: 09:00-12:00, 14:00-17:30").
+export function describeWindows(starts: Date[], rules: Pick<SlotRules, "minutes" | "stepMinutes">): string[] {
+  return windowsByDay(starts, rules).map((d) => {
+    const [weekday, date] = d.label.split(", ");
+    return `${weekday} ${date}: ${d.windows.join(", ")}`;
+  });
+}
+
+// ---- Para mostrar na tela (tudo em horário de Brasília) ----
+
+// "2026-10-01": o dia em que o instante cai em Brasília.
+export function dayKeyOf(date: Date): string {
+  return dayKey(local(date));
+}
+
+// Os próximos `days` dias a partir de hoje, com o texto de cada um ("quinta, 01/10").
+export function nextDays(now: Date, days: number): { key: string; label: string; weekday: number }[] {
+  const today = local(now);
+  const out: { key: string; label: string; weekday: number }[] = [];
+  for (let i = 0; i < days; i++) {
+    const noon = new Date(fromLocal(today.y, today.m, today.d + i).getTime() + 12 * 60 * MIN_MS);
+    const l = local(noon);
+    out.push({ key: dayKey(l), label: `${WEEKDAYS[l.weekday]}, ${pad(l.d)}/${pad(l.m + 1)}`, weekday: l.weekday });
+  }
+  return out;
+}
+
+// "15:00" (hora em Brasília).
+export function timeLabel(date: Date): string {
+  const l = local(date);
+  return `${pad(l.h)}:${pad(l.min)}`;
 }
 
 // Até `n` sugestões em dias diferentes, alternando manhã e tarde: o lead escolhe

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { formatSlot } from "@/lib/slots";
 import { dayKeyOf, dayLabel, greeting, todayLabel, weekdayShort } from "@/lib/format";
 import { firstNameOf } from "@/lib/shell";
 import { remainingDailyInviteQuota } from "@/lib/prospect";
@@ -7,7 +8,7 @@ import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
 import { Avatar } from "@/components/Avatar";
 import { Sparkline } from "@/components/Sparkline";
-import { IconAlert, IconArrowRight, IconCheck, IconChevronRight, IconEye, IconFlame, IconMessages, IconSparkles, IconUserPlus } from "@/components/Icons";
+import { IconAlert, IconArrowRight, IconCalendar, IconCheck, IconChevronRight, IconEye, IconFlame, IconMessages, IconSparkles, IconUserPlus } from "@/components/Icons";
 import { dailyReport, type TimelineKind } from "@/lib/dailyReport";
 import { clockTime } from "@/lib/format";
 import { AutomationBar } from "./AutomationBar";
@@ -129,6 +130,11 @@ function listNames(names: string[]) {
 export default async function HomePage() {
   const { report, settings, conversations, levas, remaining, messagesToday, invitesToday, kpis, spark } = await getData();
   const draftCount = await prisma.draft.count({ where: { status: "PENDING" } });
+  // Próxima reunião marcada (pela secretária ou por você): atalho pra tela Agenda.
+  const [meetingCount, nextMeeting] = await Promise.all([
+    prisma.lead.count({ where: { meetingAt: { gte: new Date() } } }),
+    prisma.lead.findFirst({ where: { meetingAt: { gte: new Date() } }, orderBy: { meetingAt: "asc" }, select: { firstName: true, lastName: true, meetingAt: true } }),
+  ]);
   const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
@@ -188,6 +194,23 @@ export default async function HomePage() {
           <span style={{ flex: 1, minWidth: 0 }}>
             <strong>LinkedIn desconectado</strong>
             <p>{settings.linkedinReconnectReason ?? "A sessão expirou"}. Toque aqui pra reconectar.</p>
+          </span>
+          <IconChevronRight size={18} />
+        </Link>
+      )}
+
+      {nextMeeting?.meetingAt && (
+        <Link href="/agenda" className="alert">
+          <span className="alert-icon">
+            <IconCalendar size={20} />
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <strong>
+              Próxima reunião: {[nextMeeting.firstName, nextMeeting.lastName].filter(Boolean).join(" ") || "lead"} · {formatSlot(nextMeeting.meetingAt)}
+            </strong>
+            <p>
+              {meetingCount > 1 ? `${meetingCount} reuniões marcadas. ` : ""}Toque aqui para ver a agenda e os horários livres.
+            </p>
           </span>
           <IconChevronRight size={18} />
         </Link>
