@@ -10,6 +10,8 @@ import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
 import { validFollowUp } from "@/lib/settings-ranges";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
+import { recordFeedback } from "@/lib/agentFeedback";
+import { requireSession } from "@/lib/session";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -119,6 +121,14 @@ async function leadWithHistory(leadId: string) {
     where: { id: leadId },
     include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true } } },
   });
+}
+
+// "Não precisava passar pra mim": ensina o assistente a responder esse tipo de conversa sozinho.
+export async function markHandoffFeedback(leadId: string, reasons: string[], note: string): Promise<{ error?: string }> {
+  await requireSession();
+  const result = await recordFeedback({ leadId, reasons, note });
+  revalidatePath("/settings");
+  return result;
 }
 
 export async function summarizeLead(leadId: string): Promise<{ text?: string; error?: string }> {

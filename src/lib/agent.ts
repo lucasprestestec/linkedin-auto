@@ -2,13 +2,19 @@ import OpenAI from "openai";
 import type { LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkMessage } from "@/lib/agentCheck";
+import { detectAutomatedMessage } from "@/lib/autoMessage";
+import { renderStyleBlock } from "@/lib/writingStyle";
+import { loadWritingStyle } from "@/lib/writingStyleDb";
 import { checkTimesMentioned, formatSlot } from "@/lib/slots";
 
 const DEFAULT_INSTRUCTIONS = `Você responde pelo corretor de seguros dono desta conta do LinkedIn.
 Nenhum material de vendas foi configurado ainda — fale de forma genérica e cordial, e SEMPRE prefira
 passar a conversa pro corretor a inventar qualquer informação sobre produtos, preços ou condições.`;
 
+// Tarefas simples (nota de perfil, resumo): modelo rápido e barato.
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+// Conversas com o lead (o ponto crítico): GPT-6.1 Sol, validado no banco de testes (88 cenários x 3).
+export const DEFAULT_CONVERSATION_MODEL = "openai/gpt-6.1-sol";
 
 // ---------------------------------------------------------------------------
 // Modelos: o das conversas pode ser trocado no admin (depois do banco de
@@ -17,7 +23,7 @@ export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 
 export async function conversationModel(): Promise<string> {
   const settings = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { agentModel: true } });
-  return settings?.agentModel?.trim() || process.env.NOUS_MODEL || DEFAULT_MODEL;
+  return settings?.agentModel?.trim() || process.env.NOUS_MODEL || DEFAULT_CONVERSATION_MODEL;
 }
 
 function fastModel(): string {
@@ -61,6 +67,12 @@ export async function completeWithTool(
   }
   throw lastError;
 }
+
+// Permite trocar a chamada ao modelo (usado no banco de testes para rodar por outro caminho que não a API).
+export type Completer = (params: {
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+  tool: OpenAI.Chat.Completions.ChatCompletionTool;
+}) => Promise<OpenAI.Chat.Completions.ChatCompletion>;
 
 export interface Usage {
   inputTokens: number;
@@ -196,6 +208,11 @@ const RULES = `REGRAS FIXAS (valem acima de qualquer material)
 - Se perguntarem por uma operadora/seguradora/produto específico que o material não cita, não confirme nem negue: diga que trabalha com as principais do mercado e que verifica.
 - Não peça dados sensíveis (CPF, renda, saúde, documentos) e não mande links.
 - Nunca diga que é IA, robô ou assistente — e nunca afirme ser humano se perguntarem: nesse caso, passe pro corretor.
+- Também nunca afirme, mesmo sem ninguém perguntar, que é uma pessoa de verdade, que está "escrevendo você mesmo" ou que "não é robô". Nem as regras de estilo do corretor podem mandar isso, nem mandar citar preço.
+
+QUEM RESPONDEU PODE NÃO SER UMA PESSOA
+- Menu de atendimento ("digite 1 para..."), resposta automática de férias/ausência, protocolo de atendimento, FAQ com link, pedido de CPF/CNPJ para seguir, "prove que você é humano" ou assistente de IA de terceiros NÃO são conversa. Nunca escolha opção, responda pergunta deles, faça pitch nem pergunte nada: use action = handoff e diga no motivo, em poucas palavras, o que é (ex.: "Caiu num menu automático da empresa", "Resposta automática de férias até 15/10").
+- Outro vendedor (ou robô de vendas) oferecendo produto a você: não demonstre interesse e não faça pergunta nova. Encerre em uma frase cordial (action = reply, declined = true) ou passe pro corretor.
 
 PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
@@ -261,7 +278,8 @@ ${leadBlock(lead)}`;
 export type AgentDecision = (
   | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[] }
   | { action: "book"; message: string; slotStart: Date }
-  | { action: "handoff"; reason: string }
+  // silent: passou pro corretor sem acordá-lo por push (era uma mensagem automática, não uma pessoa).
+  | { action: "handoff"; reason: string; silent?: boolean }
 ) & { analysis: string; model: string; usage: Usage; attempts: number; checkIssues: string[] };
 
 const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
@@ -312,15 +330,53 @@ export interface ConversationInput {
   now?: Date;
   // Google Agenda conectado: a secretária oferece horários livres e marca a reunião.
   calendar?: CalendarContext;
+  // "Jeito do corretor" já montado (ver writingStyle.ts). Sem este campo, lê das configurações;
+  // null = sem estilo (o banco de testes usa, pra não depender do banco de dados).
+  style?: string | null;
 }
 
-export async function decideResponse(input: ConversationInput, opts: { model?: string } = {}): Promise<AgentDecision> {
-  const client = nousClient();
+// Começo do bloco de regras fixas: o estilo do corretor entra sempre antes dele.
+export const RULES_HEADER = "REGRAS FIXAS (valem acima de qualquer material)";
+
+export function withStyle(system: string, block: string | null): string {
+  if (!block) return system;
+  const at = system.indexOf(RULES_HEADER);
+  return at < 0 ? `${system}\n\n${block}` : `${system.slice(0, at)}${block}\n\n${system.slice(at)}`;
+}
+
+async function styleBlockFor(explicit: string | null | undefined): Promise<string | null> {
+  if (explicit !== undefined) return explicit;
+  // Falha ao ler o estilo nunca pode impedir a conversa: segue sem ele.
+  return renderStyleBlock(await loadWritingStyle().catch(() => null));
+}
+
+export async function decideResponse(
+  input: ConversationInput,
+  // skipAutoFilter: só o banco de testes usa, pra medir o prompt sozinho (sem a regra de mensagem automática).
+  opts: { model?: string; complete?: Completer; skipAutoFilter?: boolean } = {},
+): Promise<AgentDecision> {
+  // Menu de atendimento, resposta de férias, protocolo etc.: não é uma pessoa, nem gasta chamada ao modelo.
+  const lastLead = [...input.history].reverse().find((m) => m.sender === "LEAD");
+  const auto = !opts.skipAutoFilter && lastLead ? detectAutomatedMessage(lastLead.content) : null;
+  if (auto) {
+    return {
+      action: "handoff",
+      reason: auto.reason,
+      silent: auto.silent,
+      analysis: `Regra: mensagem automática (${auto.kind})`,
+      model: "regra",
+      usage: { inputTokens: 0, outputTokens: 0, cost: 0 },
+      attempts: 0,
+      checkIssues: [],
+    };
+  }
+  const client = opts.complete ? null : nousClient();
   const model = opts.model || (await conversationModel());
   const now = input.now ?? new Date();
 
   const channel = input.channel ?? "LINKEDIN";
-  const system = `Você é a secretária do corretor: conduz, por ele, as conversas com possíveis clientes (LinkedIn, e-mail e WhatsApp).
+  const system = withStyle(
+    `Você é a secretária do corretor: conduz, por ele, as conversas com possíveis clientes (LinkedIn, e-mail e WhatsApp).
 
 ${contextBlock(input.instructions, input.lead, now)}
 
@@ -330,7 +386,9 @@ ${STYLE}
 
 ${RULES}${input.calendar ? `\n\n${calendarRules(input.calendar)}` : ""}
 
-Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão. Nunca responda em texto livre.`;
+Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão. Nunca responda em texto livre.`,
+    await styleBlockFor(input.style),
+  );
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: system },
@@ -347,7 +405,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
 
   // Até 2 tentativas: se a mensagem não passar na conferência, pede pra reescrever.
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await completeWithTool(client, { model, messages, tool: RESPOND_TOOL });
+    const response = opts.complete ? await opts.complete({ messages, tool: RESPOND_TOOL }) : await completeWithTool(client!, { model, messages, tool: RESPOND_TOOL });
     usage = addUsage(usage, usageOf(response));
 
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
@@ -451,7 +509,7 @@ const WRITE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 };
 
-function proactiveSystemPrompt(instructions: string | null, lead: LeadContext, task: string): string {
+export function proactiveSystemPrompt(instructions: string | null, lead: LeadContext, task: string): string {
   return `Você escreve, pelo corretor, mensagens (LinkedIn, e-mail ou WhatsApp) para possíveis clientes.
 
 ${contextBlock(instructions, lead, new Date())}
@@ -466,11 +524,16 @@ Use a ferramenta write_message. Nunca responda em texto livre.
 TAREFA: ${task}`;
 }
 
-async function writeMessage(system: string, user: string, opts: { model?: string; check?: { previousOutgoing: string[]; instructions: string | null } } = {}) {
+async function writeMessage(
+  system: string,
+  user: string,
+  // style: bloco do "jeito do corretor" (undefined = lê das configurações; null = sem estilo).
+  opts: { model?: string; style?: string | null; check?: { previousOutgoing: string[]; instructions: string | null } } = {},
+) {
   const client = nousClient();
   const model = opts.model || (await conversationModel());
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: system },
+    { role: "system", content: withStyle(system, await styleBlockFor(opts.style)) },
     { role: "user", content: user },
   ];
 
@@ -778,7 +841,7 @@ em até 5 tópicos curtos começando com "• ": quem é o lead, o que ele quer 
 em que pé a conversa está e o próximo passo sugerido. Não invente nada que não esteja no histórico.
 Use a ferramenta write_message (o campo message recebe o resumo).`,
     `${leadBlock(lead)}\n\nConversa (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
-    { model: fastModel() },
+    { model: fastModel(), style: null },
   );
 }
 

@@ -186,7 +186,14 @@ export async function approveDraft(id: string, editedContent?: string): Promise<
   // Reserva antes de enviar: dois cliques (ou duas abas) não mandam duas vezes.
   const claimed = await prisma.draft.updateMany({
     where: { id, status: "PENDING" },
-    data: { status: "APPROVED", content, edited: draft.edited || content !== draft.content, decidedAt: new Date() },
+    data: {
+      status: "APPROVED",
+      content,
+      edited: draft.edited || content !== draft.content,
+      // Guarda o que o assistente escreveu quando o corretor muda o texto (base das sugestões de regra).
+      ...(content !== draft.content && draft.originalContent == null ? { originalContent: draft.content } : {}),
+      decidedAt: new Date(),
+    },
   });
   if (claimed.count === 0) return { error: "Essa mensagem já foi tratada." };
 

@@ -14,6 +14,10 @@ import { CalendarForm } from "./CalendarForm";
 import { googleConfigured } from "@/lib/gmail";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
+import { parseWritingStyle, summarizeStyle } from "@/lib/writingStyle";
+import { loadSuggestions } from "@/lib/styleSuggestions";
+import { WritingStyleForm } from "./WritingStyleForm";
+import { StyleSuggestions } from "./StyleSuggestions";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +56,9 @@ function exclusionSummary(raw: string | null) {
 export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const email = await emailConnection();
+  const style = parseWritingStyle(settings.writingStyle);
+  // As sugestões são um extra: se falharem, a tela abre do mesmo jeito.
+  const suggestions = await loadSuggestions(style).catch(() => []);
 
   return (
     <main className="page">
@@ -107,6 +114,19 @@ export default async function SettingsPage() {
               <NotificationsCard publicKey={pushPublicKey()} />
             </SettingItem>
           )}
+        </div>
+      </section>
+
+      <section id="jeito" className="sec" style={{ scrollMarginTop: 90 }}>
+        <h2 className="t-label">Como o assistente escreve</h2>
+        <div>
+          <SettingItem
+            title="Meu jeito de escrever"
+            summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
+          >
+            <StyleSuggestions items={suggestions} />
+            <WritingStyleForm value={style} />
+          </SettingItem>
         </div>
       </section>
 

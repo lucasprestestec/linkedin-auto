@@ -91,6 +91,7 @@ model Lead {
   updatedAt         DateTime  @updatedAt
   messages          Message[]
   drafts            Draft[]
+  feedbacks         AgentFeedback[]
 }
 
 // Campanha (opcional) = um público com uma oferta própria (ex.: "Saúde
@@ -169,14 +170,41 @@ model Draft {
   // O evento só é criado no envio: rascunho descartado não deixa evento sobrando.
   booking     Json?
   status      DraftStatus    @default(PENDING)
+  feedbacks   AgentFeedback[]
   // O corretor mudou o texto antes de aprovar (mede a confiança na IA).
   edited      Boolean        @default(false)
+  // Texto que a secretária escreveu, guardado quando o corretor edita (o content passa
+  // a ser o texto dele). A diferença entre os dois mostra o jeito que ele prefere.
+  originalContent String?    @db.Text
   error       String?
   createdAt   DateTime       @default(now())
   decidedAt   DateTime?
 
   @@index([status, createdAt])
   @@index([leadId, status])
+}
+
+// "Não é meu jeito": o corretor marca uma mensagem do assistente (ou uma conversa que ele
+// não devia ter passado pra você) e diz por quê. Vira sugestão de regra e, depois, cenário
+// do banco de testes (context guarda o trecho da conversa, sem nome de ninguém).
+model AgentFeedback {
+  id        String   @id @default(cuid())
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  leadId    String?
+  draft     Draft?   @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  draftId   String?
+  // Texto do assistente que motivou a marcação (vazio quando é sobre passar a conversa).
+  agentText String?  @db.Text
+  // Motivos escolhidos (chaves de src/lib/writingStyle.ts) e observação livre.
+  reasons   String[]
+  note      String?  @db.Text
+  // O que o corretor teria dito (opcional).
+  corrected String?  @db.Text
+  // Últimas mensagens da conversa ([{ sender, channel, content }]), sem nomes.
+  context   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // Inscrição de Web Push (um por navegador/aparelho do corretor).
@@ -233,6 +261,9 @@ model Settings {
   linkedinLoginLink   String?
   linkedinLoginLinkAt DateTime?
   agentInstructions   String? @db.Text
+  // "Meu jeito de escrever": tratamento, emojis, tamanho, regras e exemplos de
+  // mensagens do corretor (JSON, ver src/lib/writingStyle.ts).
+  writingStyle        Json?
   // Modelo do Nous usado nas conversas (escolhido no admin depois do banco de
   // testes). Vazio = NOUS_MODEL do ambiente.
   agentModel          String?

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { approveDraft, discardDraft, type ApproveResult } from "@/lib/outbox";
+import { recordFeedback } from "@/lib/agentFeedback";
+import { requireSession } from "@/lib/session";
 
 function refresh() {
   revalidatePath("/approvals");
@@ -21,6 +23,14 @@ export async function approve(id: string, content: string): Promise<ApproveResul
 export async function discard(id: string): Promise<{ error?: string }> {
   const result = await discardDraft(id);
   refresh();
+  return result;
+}
+
+// "Não é meu jeito": só registra o motivo (a mensagem continua esperando a sua decisão).
+export async function markDraftFeedback(draftId: string, reasons: string[], note: string): Promise<{ error?: string }> {
+  await requireSession();
+  const result = await recordFeedback({ draftId, reasons, note });
+  revalidatePath("/settings");
   return result;
 }
 
