@@ -1,9 +1,10 @@
 import type { Settings } from "@prisma/client";
 import { getIdentity } from "@/lib/edges";
-import { IconLinkedin } from "@/components/Icons";
 import { ConnectButton } from "../settings/ConnectButton";
 import { RefreshStatusButton } from "../settings/RefreshStatusButton";
 import { DisconnectButton } from "../settings/DisconnectButton";
+import { LeftoverData } from "../settings/LeftoverData";
+import { linkedinDataCount } from "../settings/actions";
 
 export async function linkedinStatus(settings: Settings): Promise<{ connected: boolean; name?: string }> {
   if (!settings.linkedinIdentityId) return { connected: false };
@@ -16,47 +17,31 @@ export async function linkedinStatus(settings: Settings): Promise<{ connected: b
 }
 
 // Canal principal: convites, abertura e conversas no LinkedIn.
-export function LinkedinCard({ settings, status }: { settings: Settings; status: { connected: boolean; name?: string } }) {
+export async function LinkedinCard({ settings, status, today }: { settings: Settings; status: { connected: boolean; name?: string }; today: string }) {
   const { connected } = status;
+  const leftover = settings.linkedinIdentityId ? 0 : await linkedinDataCount();
   return (
-    <section className="card card-pad connection rise" aria-label="Conta do LinkedIn">
-      <div className="row" style={{ gap: 14 }}>
-        <span className="li-mark">
-          <IconLinkedin size={26} />
-        </span>
-        <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
-          <span className="title-md">
-            LinkedIn <span className="channel-tag">principal</span>
-          </span>
-          {connected ? (
-            <span className="row small" style={{ gap: 8, color: "var(--success-ink)", fontWeight: 700 }}>
-              <span className="pulse" />
-              Conectado{status.name ? ` · ${status.name}` : ""}
-            </span>
-          ) : (
-            <span className="row small" style={{ gap: 8, color: "var(--urgent-ink)", fontWeight: 700 }}>
-              <span className="pulse" />
-              {settings.linkedinNeedsReconnect ? "Sessão expirou" : "Não conectado"}
-            </span>
-          )}
+    <div className="stack" aria-label="Conta do LinkedIn">
+      <div className="setting" style={{ padding: 0 }}>
+        <div className="setting-text">
+          <b>{connected ? `Conectado${status.name ? ` · ${status.name}` : ""}` : settings.linkedinNeedsReconnect ? "Precisa reconectar" : "Não conectado"}</b>
+          <small>
+            {connected
+              ? today
+              : settings.linkedinNeedsReconnect
+                ? `${settings.linkedinReconnectReason ?? "A sessão caiu"}. Reconecte para a secretária voltar a trabalhar.`
+                : "Convites, primeira mensagem e conversas."}
+          </small>
         </div>
+        {settings.linkedinIdentityId && <DisconnectButton />}
       </div>
-
-      <p className="small muted">
-        Convites, primeira mensagem quando aceitam e as conversas. Até {settings.dailyInviteLimit} convites e {settings.dailyMessageLimit} mensagens por
-        dia, pra proteger sua conta.
-      </p>
-
       {!connected && (
-        <>
-          {settings.linkedinNeedsReconnect && (
-            <p className="small muted">{settings.linkedinReconnectReason ?? "A sessão do LinkedIn caiu"}. Reconecte para a automação voltar a funcionar.</p>
-          )}
+        <div className="stack" style={{ gap: 8, alignItems: "flex-start" }}>
           <ConnectButton />
           <RefreshStatusButton />
-        </>
+        </div>
       )}
-      {settings.linkedinIdentityId && <DisconnectButton />}
-    </section>
+      {leftover > 0 && <LeftoverData count={leftover} />}
+    </div>
   );
 }

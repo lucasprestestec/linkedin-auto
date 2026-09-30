@@ -6,11 +6,10 @@ export const metadata: Metadata = {
   description: "Condições de uso da Secretaria Comercial.",
 };
 
-const wrap: React.CSSProperties = { maxWidth: 760, margin: "0 auto", padding: "40px 20px 64px", lineHeight: 1.65 };
 
 export default function TermsPage() {
   return (
-    <main style={wrap}>
+    <main className="legal">
       <h1 style={{ fontSize: 30, marginBottom: 4 }}>Termos de Serviço</h1>
       <p style={{ opacity: 0.7, marginTop: 0 }}>Secretaria Comercial · Última atualização: 29/09/2026</p>
 

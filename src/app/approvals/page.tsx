@@ -48,41 +48,45 @@ export default async function ApprovalsPage() {
   return (
     <main className="page">
       <MobileHeader />
-      <header>
-        <h1 className="display page-title">Aprovações</h1>
-        <p className="hero-sub">
-          {settings.approvalMode
-            ? "A secretária escreve, você dá o OK. Nada sai sem a sua aprovação."
-            : "Aprovação desligada: a secretária envia sozinha. Ligue de novo se quiser revisar antes."}
-        </p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Aprovações</h1>
+          <p className="t-sub">
+            {settings.approvalMode
+              ? "A secretária escreve, você dá o OK. Nada sai sem a sua aprovação."
+              : "Aprovação desligada: a secretária envia sozinha."}
+          </p>
+        </div>
       </header>
 
-      <section className="panel" style={{ padding: 16, display: "grid", gap: 10 }}>
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-          <strong>Aprovar antes de enviar</strong>
+      <section className="sec">
+        <div className="setting" style={{ padding: 0 }}>
+          <span className="setting-text">
+            <b>Aprovar antes de enviar</b>
+            <small>
+              {stats.decided === 0
+                ? "Quando você aprovar as primeiras mensagens, mostro quantas a secretária acertou sem você mexer."
+                : trusted
+                  ? `Acertou ${stats.untouched} de ${stats.decided} sem você mexer. Já dá para desligar a aprovação com segurança.`
+                  : `Aprovadas sem mudar nada: ${stats.untouched} de ${stats.decided}. Com ${TRUST_MIN_DECIDED} decisões e 90% de acerto, sugiro liberar o automático.`}
+            </small>
+          </span>
           <ApprovalToggle on={settings.approvalMode} />
         </div>
-        <p className="small muted" style={{ margin: 0 }}>
-          {stats.decided === 0
-            ? "Quando você aprovar as primeiras mensagens, mostro aqui quantas a secretária acertou sem você mexer."
-            : trusted
-              ? `A secretária acertou ${stats.untouched} de ${stats.decided} sem você mexer. Já dá pra desligar a aprovação com segurança.`
-              : `Aprovadas sem mudar nada: ${stats.untouched} de ${stats.decided} (as últimas ${TRUST_MIN_DECIDED}). Com ${TRUST_MIN_DECIDED} decisões e 90% de acerto, sugiro liberar o automático.`}
-        </p>
       </section>
 
       {waiting > 0 && (
-        <p className="small muted" role="status">
-          {waiting} mensagem{waiting > 1 ? "ns" : ""} já aprovada{waiting > 1 ? "s" : ""} aguardando o horário de trabalho ({settings.workStartHour}h às {settings.workEndHour}h).
+        <p className="note" role="status">
+          {waiting} mensage{waiting > 1 ? "ns" : "m"} já aprovada{waiting > 1 ? "s" : ""} aguardando o horário de trabalho ({settings.workStartHour}h às {settings.workEndHour}h).
         </p>
       )}
 
       {items.length === 0 ? (
-        <section className="panel" style={{ padding: 24 }}>
-          <p className="panel-empty">Nada esperando sua aprovação agora.</p>
+        <section className="sec">
+          <p className="empty">Nada esperando sua aprovação agora.</p>
         </section>
       ) : (
-        <div style={{ display: "grid", gap: 14 }}>
+        <div className="stack" style={{ gap: 16 }}>
           {items.map((item) => (
             <ApprovalCard key={item.id} item={item} />
           ))}

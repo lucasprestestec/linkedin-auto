@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { QUICK_IDS, SCENARIOS } from "@/lib/agentEval/scenarios";
 import type { EvalResult, ModelInfo } from "@/lib/agentEval/run";
 import { loadEvalSetup, setAgentModel } from "./actions";
-import { IconAlert, IconCheck, IconDownload, IconRefresh, IconSearch, IconX } from "@/components/Icons";
 
 const STORE_KEY = "admin:agent-eval";
 const CONCURRENCY = 8;
@@ -196,7 +195,7 @@ export function AgentEval() {
 
   if (loading) {
     return (
-      <div className="card card-pad row" style={{ gap: 10 }}>
+      <div className="card row" style={{ gap: 10 }}>
         <span className="spinner" /> Carregando modelos do Nous…
       </div>
     );
@@ -204,20 +203,20 @@ export function AgentEval() {
 
   return (
     <div className="stack eval" style={{ gap: 16 }}>
-      <div className="card card-pad stack" style={{ gap: 14 }}>
+      <div className="card" style={{ gap: 14 }}>
         <div className="row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div className="stack" style={{ gap: 2 }}>
             <span className="tiny faint">Modelo usado nas conversas agora</span>
             <b className="eval-current">{current}</b>
           </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => chooseModel(null)} disabled={saving !== null}>
+          <button type="button" className="btn-line btn-sm" onClick={() => chooseModel(null)} disabled={saving !== null}>
             Voltar ao padrão do ambiente
           </button>
         </div>
 
         {setupError ? (
-          <p className="error-text">
-            <IconAlert size={15} /> {setupError}
+          <p className="field-error">
+            {setupError}
           </p>
         ) : (
           <>
@@ -225,14 +224,13 @@ export function AgentEval() {
               <span className="label">Modelos para testar ({selected.length} marcados)</span>
               <div className="eval-picked">
                 {selected.map((id) => (
-                  <button key={id} type="button" className="chip" aria-pressed="true" onClick={() => toggle(id)}>
-                    {id} <IconX size={12} />
+                  <button key={id} type="button" className="tag" onClick={() => toggle(id)}>
+                    {id} ×
                   </button>
                 ))}
               </div>
-              <label className="pill-input">
-                <IconSearch size={16} />
-                <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Buscar entre ${models.length} modelos (ex.: claude, kimi, gemini)`} />
+              <label>
+                <input className="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Buscar entre ${models.length} modelos (ex.: claude, kimi, gemini)`} />
               </label>
               {filter && (
                 <div className="eval-model-list">
@@ -251,7 +249,7 @@ export function AgentEval() {
               )}
             </div>
 
-            <div className="seg-choice" role="radiogroup" aria-label="Quantos cenários">
+            <div className="choice" role="radiogroup" aria-label="Quantos cenários">
               <button type="button" role="radio" aria-checked={quick} onClick={() => setQuick(true)}>
                 Rápido · {QUICK_IDS.length} cenários
               </button>
@@ -260,9 +258,9 @@ export function AgentEval() {
               </button>
             </div>
 
-            <label className="field" style={{ gap: 6 }}>
+            <label style={{ display: "grid", gap: 6 }}>
               <span className="label">Avaliador (opcional — dá notas de naturalidade; dobra o tempo e o custo)</span>
-              <select className="input" value={judgeModel} onChange={(e) => setJudgeModel(e.target.value)}>
+              <select className="field" value={judgeModel} onChange={(e) => setJudgeModel(e.target.value)}>
                 <option value="">Sem avaliador (só as checagens automáticas — mais barato)</option>
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -274,19 +272,19 @@ export function AgentEval() {
 
             <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
               {running ? (
-                <button type="button" className="btn btn-secondary" onClick={() => (stopRef.current = true)}>
+                <button type="button" className="btn-line" onClick={() => (stopRef.current = true)}>
                   Parar
                 </button>
               ) : (
-                <button type="button" className="btn btn-primary" onClick={run} disabled={selected.length === 0}>
-                  <IconRefresh size={16} /> Rodar {scenarios.length} cenários em {selected.length} modelo{selected.length !== 1 ? "s" : ""}
+                <button type="button" className="btn-solid" onClick={run} disabled={selected.length === 0}>
+                  Rodar {scenarios.length} cenários em {selected.length} modelo{selected.length !== 1 ? "s" : ""}
                 </button>
               )}
               <span className="tiny faint">{calls} chamadas ao Nous. Usa os créditos da sua conta.</span>
             </div>
             {Object.entries(skipped).map(([m, err]) => (
-              <p key={m} className="small" style={{ color: "var(--warning-ink)" }}>
-                <IconAlert size={14} /> {m} ficou de fora: não respondeu ao primeiro teste ({err}).
+              <p key={m} className="small" style={{ color: "var(--warn)" }}>
+                {m} ficou de fora: não respondeu ao primeiro teste ({err}).
               </p>
             ))}
             {progress.total > 0 && (
@@ -302,8 +300,8 @@ export function AgentEval() {
       </div>
 
       {summaries.length > 0 && (
-        <div className="card eval-table-wrap">
-          <table className="simple-table eval-table">
+        <div className="card" style={{ overflowX: "auto" }}>
+          <table className="table">
             <thead>
               <tr>
                 <th>Modelo</th>
@@ -327,7 +325,7 @@ export function AgentEval() {
                       <button type="button" className="eval-model-name" onClick={() => setDetail(detail === s.model ? null : s.model)}>
                         {s.model}
                       </button>
-                      {s.errors > 0 && <small className="error-text"> {s.errors} falha{s.errors > 1 ? "s" : ""}</small>}
+                      {s.errors > 0 && <small className="field-error"> {s.errors} falha{s.errors > 1 ? "s" : ""}</small>}
                     </td>
                     <td>
                       <b>{ok ? Math.round((s.decisions / ok) * 100) : 0}%</b> <small className="faint">({s.decisions}/{ok})</small>
@@ -343,9 +341,9 @@ export function AgentEval() {
                     <td>{s.costPer1000 == null ? "—" : `US$ ${s.costPer1000.toFixed(2)}`}</td>
                     <td>
                       {current === s.model ? (
-                        <span className="badge badge-open">Em uso</span>
+                        <span className="pill pill-accent">Em uso</span>
                       ) : (
-                        <button type="button" className="btn btn-secondary btn-sm" disabled={saving !== null} onClick={() => chooseModel(s.model)}>
+                        <button type="button" className="btn-line btn-sm" disabled={saving !== null} onClick={() => chooseModel(s.model)}>
                           {saving === s.model ? "Salvando…" : "Usar nas conversas"}
                         </button>
                       )}
@@ -357,8 +355,8 @@ export function AgentEval() {
           </table>
           <div className="row" style={{ justifyContent: "space-between", padding: "10px 14px", gap: 10, flexWrap: "wrap" }}>
             <span className="tiny faint">Clique num modelo pra ver cada resposta. Resultados ficam salvos neste navegador.</span>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={exportJson}>
-              <IconDownload size={15} /> Baixar resultados
+            <button type="button" className="btn-text" onClick={exportJson}>
+              Baixar resultados
             </button>
           </div>
         </div>
@@ -366,7 +364,7 @@ export function AgentEval() {
 
       {detail && (
         <div className="stack" style={{ gap: 10 }}>
-          <h3 className="title-md">Respostas de {detail}</h3>
+          <h3 className="t-label">Respostas de {detail}</h3>
           {SCENARIOS.map((s) => {
             const r = results[key(detail, s.id)];
             if (!r) return null;
@@ -374,7 +372,7 @@ export function AgentEval() {
             return (
               <details key={s.id} className="card eval-case">
                 <summary>
-                  <span className={`eval-dot ${!r.ok ? "err" : good ? "ok" : "bad"}`}>{!r.ok ? <IconAlert size={12} /> : good ? <IconCheck size={12} strokeWidth={3} /> : <IconX size={12} />}</span>
+                  <span className={`eval-dot ${!r.ok ? "err" : good ? "ok" : "bad"}`}>{!r.ok ? "!" : good ? "ok" : "x"}</span>
                   <span className="eval-case-title">
                     <b>{s.title}</b>
                     <small className="faint">
@@ -391,7 +389,7 @@ export function AgentEval() {
                   <p className="tiny faint">Lead disse:</p>
                   <p className="eval-quote">{s.history.filter((m) => m.sender === "LEAD").at(-1)?.content}</p>
                   {!r.ok ? (
-                    <p className="error-text">{r.error}</p>
+                    <p className="field-error">{r.error}</p>
                   ) : r.action === "reply" ? (
                     <>
                       <p className="tiny faint">
@@ -407,8 +405,8 @@ export function AgentEval() {
                       <p className="eval-reply handoff">{r.reason}</p>
                     </>
                   )}
-                  {r.decisionNote && <p className="small" style={{ color: r.decisionOk ? "var(--warning-ink)" : "var(--urgent-ink)" }}>{r.decisionNote}</p>}
-                  {r.checkIssues && r.checkIssues.length > 0 && <p className="small" style={{ color: "var(--warning-ink)" }}>Conferência: {r.checkIssues.join("; ")}</p>}
+                  {r.decisionNote && <p className="small" style={{ color: r.decisionOk ? "var(--warn)" : "var(--danger)" }}>{r.decisionNote}</p>}
+                  {r.checkIssues && r.checkIssues.length > 0 && <p className="small" style={{ color: "var(--warn)" }}>Conferência: {r.checkIssues.join("; ")}</p>}
                   {r.judge && (
                     <p className="small">
                       <b>Avaliador:</b> {r.judge.comment}

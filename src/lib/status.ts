@@ -11,7 +11,7 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
   LOST: "Sem resposta",
 };
 
-// Sufixo das classes .badge-* / .status-* do globals.css.
+// Tom da situação de uma conversa.
 export type StatusTone = "urgent" | "open" | "waiting" | "qualified" | "invite" | "lost";
 
 export const STATUS_TONE: Record<LeadStatus, StatusTone> = {

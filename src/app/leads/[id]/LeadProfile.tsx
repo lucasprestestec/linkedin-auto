@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconAlert, IconMail, IconPlus, IconSparkles, IconUser } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import { updateLeadProfile } from "./actions";
 
 function formatPhone(phone: string | null) {
@@ -10,22 +10,20 @@ function formatPhone(phone: string | null) {
   return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : phone;
 }
 
-// Ficha pessoal: e-mail, WhatsApp e o que você sabe da pessoa. Diferente das
-// anotações (só você vê), a secretária LÊ a ficha e usa nas mensagens.
+// Contato e o que você sabe da pessoa. Diferente das anotações, a secretária LÊ
+// isto e usa nas mensagens.
 export function LeadProfile({
   leadId,
   firstName,
   email,
   phone,
   personal,
-  variant = "side",
 }: {
   leadId: string;
   firstName: string;
   email: string | null;
   phone: string | null;
   personal: string | null;
-  variant?: "side" | "tab";
 }) {
   const [saved, setSaved] = useState({ email: email ?? "", phone: formatPhone(phone), personal: personal ?? "" });
   const [form, setForm] = useState(saved);
@@ -47,49 +45,47 @@ export function LeadProfile({
   }
 
   return (
-    <section className={variant === "side" ? "side-card profile-card" : "stack profile-card"} style={variant === "tab" ? { gap: 12 } : undefined}>
-      <div className="side-card-head">
-        <h3>
-          <IconUser size={19} /> Ficha pessoal
-        </h3>
+    <section className="sec">
+      <div className="sec-head">
+        <h2 className="t-label">
+          Contato
+          <Help>Com e-mail ou WhatsApp, a secretária também fala por esses canais. O que você escrever em &ldquo;o que você sabe&rdquo; ela usa para deixar as mensagens mais pessoais.</Help>
+        </h2>
         {!editing && (
-          <button type="button" className="link-btn brand" onClick={() => setEditing(true)}>
-            <IconPlus size={15} /> {empty ? "Preencher" : "Editar"}
+          <button type="button" className="btn-text" onClick={() => setEditing(true)}>
+            {empty ? "Preencher" : "Editar"}
           </button>
         )}
       </div>
 
       {editing ? (
-        <div className="stack" style={{ gap: 10 }}>
-          <label className="field" style={{ gap: 4 }}>
-            <span className="label">E-mail</span>
-            <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com.br" />
-          </label>
-          <label className="field" style={{ gap: 4 }}>
-            <span className="label">WhatsApp</span>
-            <input className="input" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(51) 99999-0000" />
-          </label>
-          <label className="field" style={{ gap: 4 }}>
-            <span className="label">O que você sabe {firstName ? `sobre ${firstName}` : "dessa pessoa"}</span>
+        <div className="form" style={{ gap: 12 }}>
+          <div>
+            <label className="label">E-mail</label>
+            <input className="field" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com.br" />
+          </div>
+          <div>
+            <label className="label">WhatsApp</label>
+            <input className="field" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(51) 99999-0000" />
+          </div>
+          <div>
+            <label className="label">O que você sabe {firstName ? `sobre ${firstName}` : "dessa pessoa"}</label>
             <textarea
-              className="textarea"
+              className="field"
               rows={4}
               value={form.personal}
               onChange={(e) => setForm({ ...form, personal: e.target.value })}
-              placeholder="Ex.: tem 2 filhos, torce pro Grêmio, aniversário 12/03, nos conhecemos no evento da ACIPA."
-              style={{ fontSize: 14.5, resize: "vertical" }}
+              placeholder="Ex.: tem 2 filhos, torce pro Grêmio, nos conhecemos no evento da ACIPA."
             />
-            <span className="tiny faint">A secretária usa isso pra deixar as mensagens pessoais, com naturalidade.</span>
-          </label>
-          {error && (
-            <p className="error-text">
-              <IconAlert size={15} /> {error}
-            </p>
-          )}
-          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+          </div>
+          {error && <p className="field-error">{error}</p>}
+          <div className="form-actions">
+            <button type="button" className="btn-solid btn-sm" onClick={save} disabled={pending}>
+              {pending ? "Salvando…" : "Salvar"}
+            </button>
             <button
               type="button"
-              className="btn btn-secondary btn-sm"
+              className="btn-text"
               onClick={() => {
                 setForm(saved);
                 setEditing(false);
@@ -98,30 +94,15 @@ export function LeadProfile({
             >
               Cancelar
             </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </button>
           </div>
         </div>
       ) : empty ? (
-        <p className="small faint">Sem e-mail, WhatsApp ou detalhes pessoais ainda. Com eles, a secretária fala por mais canais e de um jeito mais pessoal.</p>
+        <p className="empty">Sem e-mail, WhatsApp ou detalhes ainda.</p>
       ) : (
-        <div className="stack profile-view" style={{ gap: 8 }}>
-          {saved.email && (
-            <span className="profile-line">
-              <IconMail size={15} /> {saved.email}
-            </span>
-          )}
-          {saved.phone && (
-            <span className="profile-line">
-              <span className="profile-wa">WA</span> {saved.phone}
-            </span>
-          )}
-          {saved.personal && (
-            <p className="profile-personal">
-              <IconSparkles size={14} /> {saved.personal}
-            </p>
-          )}
+        <div className="stack" style={{ gap: 6 }}>
+          {saved.email && <span>{saved.email}</span>}
+          {saved.phone && <span>{saved.phone}</span>}
+          {saved.personal && <p className="muted">{saved.personal}</p>}
         </div>
       )}
     </section>

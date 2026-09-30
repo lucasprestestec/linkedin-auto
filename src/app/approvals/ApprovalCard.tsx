@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
-import { IconAlert, IconCheck, IconX } from "@/components/Icons";
 import { approve, discard } from "./actions";
 
 export interface ApprovalItem {
@@ -26,7 +25,7 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
   const [text, setText] = useState(item.content);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
-  const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || "Lead";
+  const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || "Contato";
   const changed = text.trim() !== item.content.trim();
 
   function send() {
@@ -46,40 +45,46 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
   }
 
   return (
-    <article className="panel approval-card" style={{ padding: 16, display: "grid", gap: 12 }}>
-      <div className="row" style={{ gap: 12, alignItems: "center" }}>
-        <Avatar firstName={item.firstName} lastName={item.lastName} size={40} />
-        <div className="stack" style={{ gap: 2, minWidth: 0, flex: 1 }}>
-          <Link href={`/leads/${item.leadId}`} style={{ fontWeight: 600 }}>
+    <article className="card">
+      <div className="row" style={{ gap: 12 }}>
+        <Avatar firstName={item.firstName} lastName={item.lastName} size={44} />
+        <div className="item-main">
+          <Link href={`/leads/${item.leadId}`} className="item-title" style={{ textDecoration: "none" }}>
             {name}
           </Link>
-          <span className="small muted">
-            {item.kind} · {item.channel} · {item.when}
-            {item.jobTitle ? ` · ${item.jobTitle}` : ""}
-          </span>
+          <span className="item-sub">{item.jobTitle ?? item.channel}</span>
         </div>
+        <span className="stack" style={{ gap: 4, alignItems: "flex-end" }}>
+          <span className="item-meta">{item.when}</span>
+          <span className="pill pill-accent">
+            {item.kind} · {item.channel}
+          </span>
+        </span>
       </div>
 
-      {item.subject && (
-        <p className="small muted" style={{ margin: 0 }}>
-          Assunto: {item.subject}
-        </p>
-      )}
-      <textarea className="input" rows={Math.min(8, Math.max(3, Math.ceil(text.length / 60)))} value={text} onChange={(e) => setText(e.target.value)} disabled={pending} aria-label={`Mensagem para ${name}`} />
-      {item.reason && <p className="small muted" style={{ margin: 0 }}>Por quê: {item.reason}</p>}
+      {item.subject && <p className="small muted">Assunto: {item.subject}</p>}
+      <textarea
+        className="field"
+        rows={Math.min(8, Math.max(3, Math.ceil(text.length / 60)))}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={pending}
+        aria-label={`Mensagem para ${name}`}
+      />
+      {item.reason && <p className="hint" style={{ margin: 0 }}>Por que a secretária escreveu isso: {item.reason}</p>}
 
       {notice && (
-        <p className={`small${notice.tone === "error" ? " error" : ""}`} style={{ margin: 0 }} role="status">
-          {notice.tone === "error" ? <IconAlert size={14} /> : <IconCheck size={14} />} {notice.text}
+        <p className={notice.tone === "error" ? "field-error" : "ok-text"} role="status">
+          {notice.text}
         </p>
       )}
 
-      <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-        <button type="button" className="btn btn-primary btn-pill" onClick={send} disabled={pending || !text.trim()}>
-          {pending ? <span className="spinner" /> : <IconCheck size={18} />} {changed ? "Enviar com meu ajuste" : "Enviar"}
+      <div className="row wrap" style={{ gap: 8 }}>
+        <button type="button" className="btn-solid" onClick={send} disabled={pending || !text.trim()}>
+          {pending ? "Enviando…" : changed ? "Enviar com meu ajuste" : "Enviar"}
         </button>
-        <button type="button" className="btn btn-secondary btn-pill" onClick={drop} disabled={pending}>
-          <IconX size={18} /> Descartar
+        <button type="button" className="btn-line" onClick={drop} disabled={pending}>
+          Descartar
         </button>
       </div>
     </article>

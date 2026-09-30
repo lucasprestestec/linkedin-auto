@@ -6,21 +6,15 @@ import { InviteSheet, SelectionBar } from "./InviteSheet";
 import type { WarmSuggestion } from "@/lib/warm";
 import { relativeTime } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
-import { IconAlert, IconCheck, IconEye, IconFlame, IconRefresh } from "@/components/Icons";
+import { Help } from "@/components/Help";
 
 function SourceBadges({ s }: { s: WarmSuggestion }) {
   return (
-    <span className="row" style={{ gap: 5, flexWrap: "wrap", marginTop: 3 }}>
+    <span className="row wrap" style={{ gap: 5, marginTop: 3 }}>
       {s.sources.includes("viewer") && (
-        <span className="badge badge-urgent badge-plain" style={{ height: 20, fontSize: 11 }}>
-          <IconEye size={11} /> Visitou seu perfil{s.viewedAt ? ` · ${relativeTime(new Date(s.viewedAt))}` : ""}
-        </span>
+        <span className="pill pill-danger">Visitou seu perfil{s.viewedAt ? ` · ${relativeTime(new Date(s.viewedAt))}` : ""}</span>
       )}
-      {s.sources.includes("follower") && (
-        <span className="badge badge-waiting badge-plain" style={{ height: 20, fontSize: 11 }}>
-          Segue você
-        </span>
-      )}
+      {s.sources.includes("follower") && <span className="pill pill-warn">Segue você</span>}
     </span>
   );
 }
@@ -29,10 +23,10 @@ const GOOD_FIT = 60;
 
 function FitBadge({ s }: { s: WarmSuggestion }) {
   if (s.icpScore == null) return null;
-  const tone = s.icpScore >= 80 ? "badge-qualified" : s.icpScore >= GOOD_FIT ? "badge-open" : s.icpScore >= 40 ? "badge-invite" : "";
+  const tone = s.icpScore >= 80 ? "pill-ok" : s.icpScore >= GOOD_FIT ? "pill-accent" : "";
   return (
-    <span className={`badge badge-plain ${tone}`} style={{ height: 22, flexShrink: 0 }} title={s.icpReason ?? undefined}>
-      {s.icpScore}% encaixe
+    <span className={`pill ${tone}`} title={s.icpReason ?? undefined}>
+      {s.icpScore}% de encaixe
     </span>
   );
 }
@@ -41,7 +35,7 @@ function excludedSummary(ex: { anonymous: number; connections: number; leads: nu
   const parts = [];
   if (ex.blocked) parts.push(`${ex.blocked} em "Nunca contatar"`);
   if (ex.connections) parts.push(`${ex.connections} já ${ex.connections > 1 ? "são conexões" : "é conexão"}`);
-  if (ex.leads) parts.push(`${ex.leads} já ${ex.leads > 1 ? "são leads" : "é lead"}`);
+  if (ex.leads) parts.push(`${ex.leads} já ${ex.leads > 1 ? "são contatos" : "é contato"}`);
   if (ex.anonymous) parts.push(`${ex.anonymous} visita${ex.anonymous > 1 ? "s" : ""} anônima${ex.anonymous > 1 ? "s" : ""}`);
   return parts.length ? `Fora da lista: ${parts.join(" · ")}.` : "";
 }
@@ -64,9 +58,7 @@ export function WarmSuggestions() {
       const result = await loadWarmSuggestions();
       setState(result);
       // Com nota, já vem marcado só quem tem bom encaixe; sem nota, todo mundo.
-      const preselected = result.ok
-        ? result.suggestions.filter((s) => result.scoring !== "ok" || (s.icpScore ?? 0) >= GOOD_FIT)
-        : [];
+      const preselected = result.ok ? result.suggestions.filter((s) => result.scoring !== "ok" || (s.icpScore ?? 0) >= GOOD_FIT) : [];
       setSelected(new Set(preselected.map((s) => s.linkedinProfileUrl)));
     });
   }
@@ -85,116 +77,89 @@ export function WarmSuggestions() {
     setSelected(new Set());
   }
 
-  const header = (
-    <div className="step-head">
-      <span className="step-num" style={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}>
-        <IconFlame size={18} />
-      </span>
-      <div className="stack" style={{ minWidth: 0, flex: 1 }}>
-        <h2 className="title-md">Sugestões quentes</h2>
-        <p className="small muted">Quem visitou seu perfil ou segue você — já conhece seu nome.</p>
-      </div>
-    </div>
-  );
-
   return (
-    <section className="card step rise" style={{ padding: "18px 0 0", overflow: "hidden" }}>
-      <div className="stack" style={{ gap: 14, padding: "0 18px 18px" }}>
-        {header}
-
-        {!state && (
-          <>
-            <button type="button" className="btn btn-dark btn-block" onClick={load} disabled={loading}>
-              {loading ? (
-                <>
-                  <span className="spinner" /> Buscando…
-                </>
-              ) : (
-                <>
-                  <IconFlame size={18} /> Buscar sugestões
-                </>
-              )}
-            </button>
-            <p className="hint">
-              Sem custo extra. Na conta gratuita do LinkedIn só as últimas visitas ao perfil aparecem, então a maior parte vem de
-              quem segue você.
-            </p>
-          </>
-        )}
-
-        {state && !state.ok && (
-          <>
-            <p className="error-text">
-              <IconAlert size={15} /> {state.error}
-            </p>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={load} disabled={loading}>
-              <IconRefresh size={15} /> Tentar de novo
-            </button>
-          </>
-        )}
-
+    <section className="sec">
+      <div className="sec-head">
+        <div className="setting-text">
+          <h2 className="t-label">
+            Quem já te notou{" "}
+            <Help>Sem custo extra. Na conta gratuita do LinkedIn só as últimas visitas ao perfil aparecem, então a maior parte vem de quem segue você.</Help>
+          </h2>
+          <small>Quem visitou seu perfil ou segue você já conhece seu nome.</small>
+        </div>
         {state?.ok && (
-          <div className="stack" style={{ gap: 6 }}>
-            <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
-              <span className="small" style={{ fontWeight: 700 }}>
-                {suggestions.length === 0
-                  ? "Ninguém novo por enquanto"
-                  : `${suggestions.length} pessoa${suggestions.length > 1 ? "s" : ""} · ${chosen.length} selecionada${chosen.length !== 1 ? "s" : ""}`}
-              </span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={load} disabled={loading}>
-                <IconRefresh size={15} style={loading ? { animation: "spin 0.8s linear infinite" } : undefined} /> Atualizar
+          <button type="button" className="btn-text" onClick={load} disabled={loading}>
+            {loading ? "Atualizando…" : "Atualizar"}
+          </button>
+        )}
+      </div>
+
+      {!state && (
+        <div>
+          <button type="button" className="btn-solid" onClick={load} disabled={loading}>
+            {loading ? "Buscando…" : "Buscar sugestões"}
+          </button>
+        </div>
+      )}
+
+      {state && !state.ok && (
+        <div className="stack" style={{ gap: 8, alignItems: "flex-start" }}>
+          <p className="field-error">{state.error}</p>
+          <button type="button" className="btn-line btn-sm" onClick={load} disabled={loading}>
+            Tentar de novo
+          </button>
+        </div>
+      )}
+
+      {state?.ok && (
+        <div className="stack" style={{ gap: 8 }}>
+          <p className="setting-text">
+            <b>
+              {suggestions.length === 0
+                ? "Ninguém novo por enquanto"
+                : `${suggestions.length} pessoa${suggestions.length > 1 ? "s" : ""} · ${chosen.length} selecionada${chosen.length !== 1 ? "s" : ""}`}
+            </b>
+          </p>
+          {excludedSummary(state.excluded) && <p className="hint" style={{ margin: 0 }}>{excludedSummary(state.excluded)}</p>}
+          {state.scoring === "off" && (
+            <p className="hint" style={{ margin: 0 }}>
+              Dica: descreva seu cliente ideal em <a href="/settings#alcance" className="btn-text">Conta</a> e a secretária dá uma nota de encaixe para cada pessoa.
+            </p>
+          )}
+          {state.scoring === "error" && <p className="hint" style={{ margin: 0 }}>Não deu para calcular o encaixe agora; a lista segue sem nota.</p>}
+          {scored && all.length > 0 && (
+            <div className="tabs">
+              <button type="button" aria-pressed={!onlyGoodFit} onClick={() => setOnlyGoodFit(false)}>
+                Todos <span className="count">{all.length}</span>
+              </button>
+              <button type="button" aria-pressed={onlyGoodFit} onClick={() => setOnlyGoodFit(true)}>
+                Bom encaixe <span className="count">{all.filter((s) => (s.icpScore ?? 0) >= GOOD_FIT).length}</span>
               </button>
             </div>
-            {excludedSummary(state.excluded) && <p className="hint">{excludedSummary(state.excluded)}</p>}
-            {state.scoring === "off" && (
-              <p className="hint">
-                Dica: descreva seu cliente ideal em <a href="/settings" style={{ color: "var(--brand-ink)", fontWeight: 700 }}>Ajustes</a> e a IA dá uma nota de encaixe pra cada pessoa.
-              </p>
-            )}
-            {state.scoring === "error" && <p className="hint" style={{ color: "var(--warning-ink)" }}>Não deu pra calcular o encaixe agora; a lista segue sem nota.</p>}
-            {scored && all.length > 0 && (
-              <div className="chips" style={{ margin: "4px -18px 0" }}>
-                <button type="button" className="chip" aria-pressed={!onlyGoodFit} onClick={() => setOnlyGoodFit(false)}>
-                  Todos <span className="chip-count">{all.length}</span>
-                </button>
-                <button type="button" className="chip" aria-pressed={onlyGoodFit} onClick={() => setOnlyGoodFit(true)}>
-                  Bom encaixe <span className="chip-count">{all.filter((s) => (s.icpScore ?? 0) >= GOOD_FIT).length}</span>
-                </button>
-              </div>
-            )}
-            {state.failed.length > 0 && (
-              <p className="hint" style={{ color: "var(--warning-ink)" }}>
-                Não deu pra carregar {state.failed.map((f) => (f === "viewer" ? "as visitas ao perfil" : "os seguidores")).join(" nem ")} agora.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+          {state.failed.length > 0 && (
+            <p className="hint" style={{ margin: 0 }}>
+              Não deu para carregar {state.failed.map((f) => (f === "viewer" ? "as visitas ao perfil" : "os seguidores")).join(" nem ")} agora.
+            </p>
+          )}
+        </div>
+      )}
 
       {suggestions.length > 0 && (
         <>
-          <ul className="list" style={{ border: "none", borderTop: "1px solid var(--border)", borderRadius: 0, boxShadow: "none" }}>
+          <ul className="list">
             {suggestions.map((s) => (
               <li key={s.linkedinProfileUrl}>
-                <label className="check-row">
+                <label className="item pick">
                   <input type="checkbox" checked={selected.has(s.linkedinProfileUrl)} onChange={() => toggle(s.linkedinProfileUrl)} />
-                  <span className="checkbox">
-                    <IconCheck size={15} strokeWidth={3.2} />
-                  </span>
                   <Avatar firstName={s.firstName} lastName={s.lastName} size={40} />
-                  <span className="lead-main">
-                    <span className="lead-top">
-                      <span className="lead-name" style={{ fontSize: 14.5 }}>
-                        {[s.firstName, s.lastName].filter(Boolean).join(" ") || "Perfil do LinkedIn"}
-                      </span>
-                      <span style={{ marginLeft: "auto" }}>
-                        <FitBadge s={s} />
-                      </span>
-                    </span>
-                    {s.headline && <span className="lead-sub tiny">{s.headline}</span>}
-                    {s.icpReason && <span className="tiny faint">{s.icpReason}</span>}
+                  <span className="item-main">
+                    <span className="item-title">{[s.firstName, s.lastName].filter(Boolean).join(" ") || "Perfil do LinkedIn"}</span>
+                    {s.headline && <span className="item-sub">{s.headline}</span>}
+                    {s.icpReason && <span className="hint" style={{ margin: 0 }}>{s.icpReason}</span>}
                     <SourceBadges s={s} />
                   </span>
+                  <FitBadge s={s} />
                 </label>
               </li>
             ))}
@@ -203,12 +168,7 @@ export function WarmSuggestions() {
         </>
       )}
       {sheetOpen && (
-        <InviteSheet
-          count={chosen.length}
-          onInvite={(campaignId) => inviteWarm(chosen, campaignId)}
-          onClose={() => setSheetOpen(false)}
-          onDone={finishInvite}
-        />
+        <InviteSheet count={chosen.length} onInvite={(campaignId) => inviteWarm(chosen, campaignId)} onClose={() => setSheetOpen(false)} onDone={finishInvite} />
       )}
     </section>
   );

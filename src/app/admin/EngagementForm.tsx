@@ -8,12 +8,12 @@ const OPTIONS: { flag: EngagementFlag; title: string; text: string }[] = [
   {
     flag: "acceptInvitesEnabled",
     title: "Aceitar convites recebidos",
-    text: "Quem te convidar vira lead e a IA abre a conversa. Checado 1x por hora.",
+    text: "Quem te convidar vira contato e a secretária abre a conversa. Checado 1x por hora.",
   },
   {
     flag: "warmupEnabled",
     title: "Aquecer antes de convidar",
-    text: "Visita e segue o perfil antes do convite — a pessoa vê seu nome primeiro.",
+    text: "Visita e segue o perfil antes do convite: a pessoa vê seu nome primeiro.",
   },
   {
     flag: "withdrawInvitesEnabled",
@@ -23,7 +23,7 @@ const OPTIONS: { flag: EngagementFlag; title: string; text: string }[] = [
   {
     flag: "archiveLostEnabled",
     title: "Arquivar conversas perdidas",
-    text: "Leads sem resposta saem da sua caixa de entrada do LinkedIn.",
+    text: "Quem não respondeu sai da sua caixa de entrada do LinkedIn.",
   },
 ];
 
@@ -48,38 +48,27 @@ export function EngagementForm({ values, withdrawAfterDays }: { values: Record<E
   }
 
   return (
-    <div className="card" style={{ overflow: "hidden" }}>
-      {OPTIONS.map((o, i) => (
-        <div key={o.flag} style={i > 0 ? { borderTop: "1px solid var(--border)" } : undefined}>
-          <div className="setting-row">
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 700 }}>{o.title}</span>
-              <span className="tiny faint">{o.text}</span>
+    <div className="settings">
+      {OPTIONS.map((o) => (
+        <div key={o.flag}>
+          <div className="setting">
+            <span className="setting-text">
+              <b>{o.title}</b>
+              <small>{o.text}</small>
             </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={optimistic[o.flag]}
-              aria-label={o.title}
-              className="switch switch-light"
-              onClick={() => toggle(o.flag)}
-            />
+            <button type="button" role="switch" aria-checked={optimistic[o.flag]} aria-label={o.title} className="switch" onClick={() => toggle(o.flag)} />
           </div>
           {o.flag === "withdrawInvitesEnabled" && optimistic.withdrawInvitesEnabled && (
-            <div className="setting-row" style={{ paddingTop: 0, borderTop: "none" }}>
-              <label htmlFor="withdrawAfterDays" className="small muted" style={{ flex: 1 }}>
-                Retirar depois de {days} dias sem aceite
+            <div className="setting" style={{ paddingTop: 0 }}>
+              <label htmlFor="withdrawAfterDays" className="setting-text">
+                <small>Retirar depois de {days} dias sem aceite</small>
               </label>
               <Stepper id="withdrawAfterDays" name="withdrawAfterDays" value={days} min={7} max={90} onChange={changeDays} />
             </div>
           )}
         </div>
       ))}
-      <div className="setting-row" style={{ background: "var(--surface-2)" }}>
-        <p className="tiny muted" style={{ lineHeight: 1.5 }}>
-          Ações Engagement da edges.run, sem crédito extra. Só rodam com a automação ligada e dentro do horário de trabalho.
-        </p>
-      </div>
+      <p className="hint">Ações Engagement da edges.run, sem crédito extra. Só rodam com a automação ligada e dentro do horário de trabalho.</p>
     </div>
   );
 }

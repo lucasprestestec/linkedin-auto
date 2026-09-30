@@ -1,5 +1,3 @@
-import { IconChevronRight, IconShield } from "@/components/Icons";
-
 // Aviso fixo sobre como o tipo de conta do LinkedIn (gratuita x Premium,
 // pessoal x página de empresa) muda o que o sistema consegue fazer. Considera
 // a conta atual do corretor: pessoal e gratuita.
@@ -7,8 +5,8 @@ import { IconChevronRight, IconShield } from "@/components/Icons";
 type Status = "ok" | "limited" | "unavailable";
 
 const STATUS: Record<Status, { label: string; className: string }> = {
-  ok: { label: "Funciona", className: "badge-qualified" },
-  limited: { label: "Limitado", className: "badge-invite" },
+  ok: { label: "Funciona", className: "pill-ok" },
+  limited: { label: "Limitado", className: "pill-warn" },
   unavailable: { label: "Indisponível", className: "" },
 };
 
@@ -46,51 +44,35 @@ const ITEMS: { title: string; status: Status; yours: string; other: string }[] =
   {
     title: "Mensagens",
     status: "ok",
-    yours: "A IA só conversa com quem já é conexão, o que funciona em qualquer conta.",
+    yours: "A secretária só conversa com quem já é conexão, o que funciona em qualquer conta.",
     other: "Mandar mensagem para quem não é conexão (InMail) exige Premium. O sistema não usa isso.",
   },
 ];
 
 export function AccountTypeNotice() {
   return (
-    <details className="card notice rise" style={{ "--i": 1 } as React.CSSProperties}>
-      <summary className="notice-summary">
-        <span className="setting-icon" style={{ background: "var(--info-soft)", color: "var(--info-ink)" }}>
-          <IconShield size={19} />
+    <details className="fold">
+      <summary>
+        <span className="setting-text">
+          <b>O tipo de conta muda o que aparece aqui</b>
+          <small>Sua conta: pessoal e gratuita</small>
         </span>
-        <span className="stack" style={{ flex: 1, minWidth: 0, gap: 3 }}>
-          <span style={{ fontWeight: 700 }}>O tipo de conta muda o que aparece aqui</span>
-          <span className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-            <span className="badge badge-open badge-plain" style={{ height: 22 }}>
-              Sua conta: pessoal · gratuita
-            </span>
-          </span>
-        </span>
-        <IconChevronRight size={18} className="chev notice-chev" />
       </summary>
-
-      <ul className="notice-list">
-        {ITEMS.map((item) => (
-          <li key={item.title}>
-            <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{item.title}</span>
-              <span className={`badge ${STATUS[item.status].className}`} style={{ height: 22, flexShrink: 0 }}>
-                {STATUS[item.status].label}
-              </span>
-            </div>
-            <p className="small muted" style={{ marginTop: 4 }}>
-              {item.yours}
-            </p>
-            <p className="tiny faint" style={{ marginTop: 3 }}>
-              {item.other}
-            </p>
-          </li>
-        ))}
-      </ul>
-
-      <p className="tiny faint notice-foot">
-        Limites e recursos são do próprio LinkedIn e podem mudar. Nada aqui gasta crédito extra da edges.run.
-      </p>
+      <div className="fold-body">
+        <ul className="list">
+          {ITEMS.map((item) => (
+            <li key={item.title} className="item" style={{ alignItems: "flex-start", flexDirection: "column", gap: 4 }}>
+              <div className="row" style={{ justifyContent: "space-between", width: "100%" }}>
+                <b>{item.title}</b>
+                <span className={`pill ${STATUS[item.status].className}`}>{STATUS[item.status].label}</span>
+              </div>
+              <p className="small muted">{item.yours}</p>
+              <p className="hint" style={{ margin: 0 }}>{item.other}</p>
+            </li>
+          ))}
+        </ul>
+        <p className="hint">Limites e recursos são do próprio LinkedIn e podem mudar. Nada aqui gasta crédito extra da edges.run.</p>
+      </div>
     </details>
   );
 }

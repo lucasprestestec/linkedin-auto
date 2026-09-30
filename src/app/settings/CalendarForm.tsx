@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconAlert, IconCheck } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import { updateMeetingMinutes } from "./actions";
 
 const DURATIONS = [15, 20, 30, 45, 60];
@@ -27,48 +27,45 @@ export function CalendarForm({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="card card-pad stack" style={{ gap: 14 }}>
+    <div className="stack" style={{ gap: 14 }}>
       {calendarEnabled ? (
-        <div className="stack" style={{ gap: 6 }}>
-          <p className="success-text" style={{ margin: 0 }}>
-            <IconCheck size={15} strokeWidth={3} /> Agenda conectada: <strong>{googleEmail}</strong>. A secretária oferece só horários livres e marca a reunião por você.
-          </p>
-          <p className="tiny faint" style={{ margin: 0 }}>
-            Atenção: a agenda usada é a da <strong>mesma conta Google do e-mail</strong> ({googleEmail}). As reuniões são criadas na agenda dessa conta, e só os compromissos dela
-            bloqueiam horários. Se a sua agenda de verdade fica em outra conta, reconecte o Google com essa conta.
-          </p>
-        </div>
+        <p className="note note-ok">
+          <b>Agenda conectada</b> ({googleEmail}). A secretária oferece só horários livres e marca a reunião por você.{" "}
+          <Help>
+            A agenda usada é a da mesma conta Google do e-mail. As reuniões são criadas nela e só os compromissos dela bloqueiam horários. Se a sua agenda de
+            verdade fica em outra conta, reconecte o Google com essa conta.
+          </Help>
+        </p>
       ) : (
-        <div className="stack" style={{ gap: 8 }}>
-          <p className="small" style={{ margin: 0 }}>
-            <IconAlert size={14} />{" "}
+        <div className="stack" style={{ gap: 8, alignItems: "flex-start" }}>
+          <p>
             {googleEmail
               ? "O Google está conectado, mas sem a permissão da agenda. Reconecte e marque a permissão de agenda."
-              : "Conecte o seu Google para a secretária ver seus horários livres e marcar as reuniões."}
-          </p>
-          <p className="tiny faint" style={{ margin: 0 }}>
-            A agenda usada é a da mesma conta Google do e-mail. Entre com a conta em que você mantém a sua agenda.
+              : "Conecte o Google para a secretária ver seus horários livres e marcar as reuniões."}{" "}
+            <Help>A agenda usada é a da mesma conta Google do e-mail. Entre com a conta em que você mantém a sua agenda.</Help>
           </p>
           {configured ? (
-            <a href="/api/email/google/start" className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }}>
+            <a href="/api/email/google/start" className="btn-solid btn-sm">
               {googleEmail ? "Reconectar o Google" : "Conectar o Google"}
             </a>
           ) : (
-            <p className="tiny faint" style={{ margin: 0 }}>
-              O login do Google ainda não foi configurado neste sistema (GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET).
-            </p>
+            <p className="hint">O login do Google ainda não foi ativado neste sistema. Fale com o suporte.</p>
           )}
         </div>
       )}
 
-      <div className="stack" style={{ gap: 6 }}>
+      <div>
         <label htmlFor="meeting-minutes" className="label">
-          Duração da reunião
+          Duração da reunião{" "}
+          <Help>
+            Só oferece horários dentro do seu horário de trabalho ({workHours}), de hora cheia ou meia hora, com 4 horas de antecedência e folga entre
+            compromissos. Vídeo pelo Google Meet.
+          </Help>
         </label>
         <select
           id="meeting-minutes"
-          className="input"
-          style={{ height: 46, fontSize: 16, maxWidth: 200 }}
+          className="field"
+          style={{ maxWidth: 200 }}
           value={value}
           disabled={pending}
           onChange={(e) => {
@@ -86,11 +83,8 @@ export function CalendarForm({
             </option>
           ))}
         </select>
-        <span className="tiny faint">
-          Só oferece horários dentro do seu horário de trabalho ({workHours}), de hora cheia ou meia hora, com 4 horas de antecedência e folga entre compromissos. Vídeo pelo Google Meet.
-        </span>
       </div>
-      {error && <p className="error-text">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

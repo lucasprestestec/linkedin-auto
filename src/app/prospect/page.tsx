@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconArrowLeft, IconShield } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import { AddPeople } from "./AddPeople";
 import { searchesLeftThisMonth, webSearchEnabled } from "@/lib/websearch";
 
@@ -25,24 +25,32 @@ export default async function AddPeoplePage({ searchParams }: { searchParams: Pr
     <main className="page">
       <MobileHeader />
       {initialCampaignId && (
-        <Link href={`/campaigns/${initialCampaignId}`} className="back-link">
-          <IconArrowLeft size={18} /> Campanha
+        <Link href={`/campaigns/${initialCampaignId}`} className="btn-text" style={{ alignSelf: "flex-start" }}>
+          ← Campanha
         </Link>
       )}
-      <header>
-        <h1 className="display page-title">Prospectar</h1>
-        <p className="hero-sub">Busque, marque quem te interessa e convide. Quando aceitarem, a IA começa a conversa.</p>
-        <p className="quota-note" style={{ marginTop: 10 }}>
-          <IconShield size={14} /> {left > 0 ? `Hoje ainda dá pra convidar ${left} pessoas` : "Limite de convites de hoje atingido"}
-          <span className="faint"> · máx. {settings.dailyInviteLimit}/dia</span>
-        </p>
-        <p className="small muted" style={{ marginTop: 6 }}>
-          Já conhece a pessoa (indicação, evento, cliente)?{" "}
-          <Link href="/contacts/new" className="link-btn brand">
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Prospectar</h1>
+          <p className="t-sub">
+            Busque, marque quem te interessa e convide. Quando aceitarem, a secretária começa a conversa.{" "}
+            <Help>O LinkedIn limita quantos convites uma conta pode mandar por dia. O sistema respeita esse limite para proteger sua conta.</Help>
+          </p>
+        </div>
+      </header>
+
+      <section className="sec">
+        <div className="setting" style={{ padding: 0 }}>
+          <span className="setting-text">
+            <b>{left > 0 ? `Hoje ainda dá para convidar ${left} pessoas` : "Limite de convites de hoje atingido"}</b>
+            <small>No máximo {settings.dailyInviteLimit} por dia</small>
+          </span>
+          <Link href="/contacts/new" className="btn-line btn-sm">
             Adicionar contato
           </Link>
-        </p>
-      </header>
+        </div>
+      </section>
+
       <AddPeople
         campaigns={campaigns.map(({ id, name, description }) => ({ id, name, description }))}
         initialCampaignId={initialCampaignId}

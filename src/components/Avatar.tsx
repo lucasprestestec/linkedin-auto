@@ -1,25 +1,19 @@
-import { initials, avatarGradient } from "@/lib/format";
-import type { StatusTone } from "@/lib/status";
+import { initials } from "@/lib/format";
 
+// Iniciais num círculo neutro. Sem cor por pessoa: nada compete com o texto.
 export function Avatar({
   firstName,
   lastName,
-  size = 44,
-  status,
+  size = 36,
 }: {
   firstName?: string | null;
   lastName?: string | null;
   size?: number;
-  status?: StatusTone;
+  status?: string;
 }) {
-  const label = `${firstName ?? ""} ${lastName ?? ""}`.trim() || "?";
   return (
-    <span
-      className="avatar"
-      style={{ width: size, height: size, background: avatarGradient(label), fontSize: Math.round(size * 0.36) }}
-    >
+    <span className="avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden>
       {initials(firstName, lastName)}
-      {status && <span className={`avatar-status status-${status}`} />}
     </span>
   );
 }

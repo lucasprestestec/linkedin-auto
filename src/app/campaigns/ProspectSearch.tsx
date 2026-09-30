@@ -10,24 +10,20 @@ import { nameFromProfileUrl } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { PeopleSearchBuilder } from "./PeopleSearchBuilder";
 import { InviteSheet, SelectionBar } from "./InviteSheet";
-import { IconAlert, IconCheck, IconClipboard, IconClock, IconExternal } from "@/components/Icons";
 
-function StepHeader({ n, title, subtitle, done }: { n: number; title: string; subtitle: string; done?: boolean }) {
+function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className={`step-head${done ? " step-done" : ""}`}>
-      <span className="step-num">{done ? <IconCheck size={18} strokeWidth={3} /> : n}</span>
-      <div className="stack" style={{ minWidth: 0 }}>
-        <h2 className="title-md">{title}</h2>
-        <p className="small muted">{subtitle}</p>
-      </div>
+    <div className="setting-text">
+      <h2 className="t-label">{title}</h2>
+      <small>{subtitle}</small>
     </div>
   );
 }
 
 function LinkedinSearchStep({ initialKeywords }: { initialKeywords: string[] }) {
   return (
-    <section id="search-step" className="card card-pad step rise" style={{ "--i": 1, scrollMarginTop: 16 } as React.CSSProperties}>
-      <StepHeader n={1} title="Encontre pessoas" subtitle="Monte a busca com os filtros que quiser — é grátis, direto no LinkedIn." />
+    <section id="search-step" className="sec" style={{ scrollMarginTop: 16 }}>
+      <StepHeader title="Encontre pessoas" subtitle="Monte a busca com os filtros que quiser. É grátis, direto no LinkedIn." />
       <PeopleSearchBuilder initialKeywords={initialKeywords} />
       <p className="hint">Abre numa aba nova. Escolha quem quiser e copie o link do perfil de cada pessoa.</p>
     </section>
@@ -63,62 +59,52 @@ function ProspectResults({ results }: { results: ProspectResult[] }) {
   }
 
   return (
-    <section className="card step rise" style={{ padding: "18px 0 0", overflow: "hidden" }}>
-      <div style={{ padding: "0 18px" }}>
+    <section className="sec">
+      <div className="sec-head">
         <StepHeader
-          n={3}
           title="Marque quem convidar"
           subtitle={`${results.length} perfi${results.length !== 1 ? "s" : "l"} reconhecido${results.length !== 1 ? "s" : ""}${
             results.length > newResults.length ? ` · ${results.length - newResults.length} não podem ser convidados` : ""
           }`}
         />
+        {newResults.length > 1 && (
+          <button type="button" className="btn-text" onClick={toggleAll}>
+            {allSelected ? "Limpar" : "Selecionar todos"}
+          </button>
+        )}
       </div>
 
-      {newResults.length > 1 && (
-        <div className="row" style={{ justifyContent: "space-between", padding: "0 18px" }}>
-          <span className="small faint" style={{ fontWeight: 600 }}>
-            {selectedResults.length} de {newResults.length} selecionados
-          </span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={toggleAll}>
-            {allSelected ? "Limpar seleção" : "Selecionar todos"}
-          </button>
-        </div>
-      )}
-
-      <ul className="list" style={{ border: "none", borderTop: "1px solid var(--border)", borderRadius: 0, boxShadow: "none" }}>
+      <ul className="list">
         {results.map((r) => {
           const { firstName, lastName, slug } = nameFromProfileUrl(r.linkedinProfileUrl);
+          const blocked = isLead(r) || r.excluded;
           return (
             <li key={r.linkedinProfileUrl}>
-              <label className="check-row" style={isLead(r) || r.excluded ? { opacity: 0.5, cursor: "default" } : undefined}>
-                {!isLead(r) && !r.excluded && (
-                  <>
-                    <input type="checkbox" checked={selected.has(r.linkedinProfileUrl)} onChange={() => toggle(r.linkedinProfileUrl)} />
-                    <span className="checkbox">
-                      <IconCheck size={15} strokeWidth={3.2} />
-                    </span>
-                  </>
+              <label className={`item pick${blocked ? " blocked" : ""}`}>
+                {!blocked ? (
+                  <input type="checkbox" checked={selected.has(r.linkedinProfileUrl)} onChange={() => toggle(r.linkedinProfileUrl)} />
+                ) : (
+                  <span style={{ width: 18, flex: "none" }} />
                 )}
                 <Avatar firstName={firstName} lastName={lastName} size={40} />
-                <span className="lead-main">
-                  <span className="lead-name" style={{ fontSize: 14.5 }}>
+                <span className="item-main">
+                  <span className="item-title">
                     {firstName} {lastName}
                   </span>
-                  <span className="lead-sub tiny">linkedin.com/in/{slug}</span>
+                  <span className="item-sub">linkedin.com/in/{slug}</span>
                 </span>
-                {isLead(r) || r.excluded ? (
-                  <span className="badge badge-plain">{invited.has(r.linkedinProfileUrl) ? "Convidado agora" : r.alreadyLead ? "Já é lead" : "Está em Nunca contatar"}</span>
+                {blocked ? (
+                  <span className="pill">{invited.has(r.linkedinProfileUrl) ? "Convidado agora" : r.alreadyLead ? "Já é contato" : "Nunca contatar"}</span>
                 ) : (
                   <a
                     href={r.linkedinProfileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="icon-btn icon-btn-round"
-                    style={{ width: 34, height: 34 }}
+                    className="btn-text tiny"
                     aria-label={`Abrir perfil de ${firstName}`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <IconExternal size={15} />
+                    Perfil
                   </a>
                 )}
               </label>
@@ -169,7 +155,7 @@ function recentLabel(f: PeopleSearchFilters) {
   return parts.join(" · ");
 }
 
-// Com a busca pelo Google configurada: filtros → "Buscar pessoas" → lista aqui
+// Com a busca pelo Google configurada: filtros, "Buscar pessoas" e lista aqui
 // mesmo, com caixinhas. Buscas recentes repetem a leva de ontem num toque.
 // Colar links fica como alternativa recolhida.
 function GoogleSearchFlow({ initialKeywords, searchesLeft }: { initialKeywords: string[]; searchesLeft: number }) {
@@ -227,13 +213,11 @@ function GoogleSearchFlow({ initialKeywords, searchesLeft }: { initialKeywords: 
   return (
     <div className="stack" style={{ gap: 16 }}>
       {recent.length > 0 && (
-        <section className="recent-searches" aria-label="Buscas recentes">
-          <span className="recent-title">
-            <IconClock size={14} /> Repetir uma busca
-          </span>
-          <div className="recent-list">
+        <section className="stack" style={{ gap: 8 }} aria-label="Buscas recentes">
+          <span className="label" style={{ margin: 0 }}>Repetir uma busca</span>
+          <div className="tabs" style={{ flexWrap: "wrap" }}>
             {recent.map((f) => (
-              <button key={JSON.stringify(f)} type="button" className="chip recent-chip" disabled={searching || left <= 0} onClick={() => repeat(f)}>
+              <button key={JSON.stringify(f)} type="button" disabled={searching || left <= 0} onClick={() => repeat(f)}>
                 {recentLabel(f)}
               </button>
             ))}
@@ -241,24 +225,18 @@ function GoogleSearchFlow({ initialKeywords, searchesLeft }: { initialKeywords: 
         </section>
       )}
 
-      <section id="search-step" className="card card-pad step rise" style={{ scrollMarginTop: 16 }}>
-        <StepHeader n={1} title="Quem você procura?" subtitle="Preencha os filtros e toque em Buscar. As pessoas aparecem aqui mesmo." />
+      <section id="search-step" className="sec" style={{ scrollMarginTop: 16 }}>
+        <StepHeader title="Quem você procura?" subtitle="Preencha os filtros e toque em Buscar. As pessoas aparecem aqui mesmo." />
         <PeopleSearchBuilder key={builder.key} initialKeywords={initialKeywords} initialFilters={builder.filters} onSearch={run} searching={searching} />
-        {left <= 0 && <p className="hint">As buscas grátis deste mês acabaram. Voltam no dia 1º — até lá, use &ldquo;abrir no LinkedIn&rdquo;.</p>}
-        {error && (
-          <p className="error-text">
-            <IconAlert size={15} /> {error}
-          </p>
-        )}
+        {left <= 0 && <p className="hint">As buscas grátis deste mês acabaram. Voltam no dia 1º. Até lá, use &ldquo;abrir no LinkedIn&rdquo;.</p>}
+        {error && <p className="field-error">{error}</p>}
       </section>
 
       <div id="found-people" style={{ scrollMarginTop: 16 }}>
-        {people && (
-          <FoundPeople key={JSON.stringify(filters)} people={people} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={more} left={left} />
-        )}
+        {people && <FoundPeople key={JSON.stringify(filters)} people={people} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={more} left={left} />}
       </div>
 
-      <details className="paste-alt">
+      <details className="sec h-fold">
         <summary>Já tem os links dos perfis? Cole aqui</summary>
         <PasteFlow />
       </details>
@@ -277,18 +255,14 @@ export function ProspectSearch({
 }) {
   if (searchEnabled) return <GoogleSearchFlow initialKeywords={initialKeywords} searchesLeft={searchesLeft} />;
   return (
-    <div className="search-flow">
-      <div className="col">
-        <LinkedinSearchStep initialKeywords={initialKeywords} />
-      </div>
-      <div className="col">
-        <PasteFlow numbered />
-      </div>
+    <div className="stack" style={{ gap: 16 }}>
+      <LinkedinSearchStep initialKeywords={initialKeywords} />
+      <PasteFlow numbered />
     </div>
   );
 }
 
-// Colar links de perfis (um por linha) → revisar → convidar.
+// Colar links de perfis (um por linha), revisar e convidar.
 function PasteFlow({ numbered = false }: { numbered?: boolean }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
@@ -313,52 +287,37 @@ function PasteFlow({ numbered = false }: { numbered?: boolean }) {
     }
   }
 
-  const hasResults = Boolean(state && !state.error);
-
   return (
-    <>
-        <section id="paste-step" className="card card-pad step rise" style={{ "--i": 2, scrollMarginTop: 16 } as React.CSSProperties}>
-          {numbered && <StepHeader n={2} title="Cole os perfis escolhidos" subtitle="Um link por linha — pode colar vários de uma vez." done={hasResults} />}
-          <form action={formAction} className="stack" style={{ gap: 12 }}>
-            <div className="stack" style={{ gap: 10 }}>
-              <textarea
-                name="urls"
-                rows={4}
-                className="textarea"
-                value={raw}
-                onChange={(e) => setRaw(e.target.value)}
-                placeholder={"https://www.linkedin.com/in/fulano\nhttps://www.linkedin.com/in/ciclana"}
-                aria-label="Links dos perfis"
-                style={{ fontSize: 14.5 }}
-              />
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <span className={`badge ${detected > 0 ? "badge-open" : "badge-plain"}`}>
-                  {detected} perfi{detected !== 1 ? "s" : "l"} detectado{detected !== 1 ? "s" : ""}
-                </span>
-                <button type="button" className="btn btn-soft btn-sm" onClick={pasteFromClipboard}>
-                  <IconClipboard size={15} /> Colar
-                </button>
-              </div>
-            </div>
-            {clipboardError && <p className="hint">Não foi possível ler a área de transferência — cole manualmente no campo.</p>}
-            <button type="submit" className="btn btn-primary btn-block" disabled={parsing || raw.trim() === ""}>
-              {parsing ? (
-                <>
-                  <span className="spinner" /> Verificando…
-                </>
-              ) : (
-                "Verificar perfis"
-              )}
+    <div className="stack" style={{ gap: 16 }}>
+      <section id="paste-step" className={numbered ? "sec" : "stack"} style={{ scrollMarginTop: 16 }}>
+        {numbered && <StepHeader title="Cole os perfis escolhidos" subtitle="Um link por linha. Pode colar vários de uma vez." />}
+        <form action={formAction} className="stack" style={{ gap: 12 }}>
+          <textarea
+            name="urls"
+            rows={4}
+            className="field"
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            placeholder={"https://www.linkedin.com/in/fulano\nhttps://www.linkedin.com/in/ciclana"}
+            aria-label="Links dos perfis"
+          />
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className={`pill ${detected > 0 ? "pill-accent" : ""}`}>
+              {detected} perfi{detected !== 1 ? "s" : "l"} detectado{detected !== 1 ? "s" : ""}
+            </span>
+            <button type="button" className="btn-text" onClick={pasteFromClipboard}>
+              Colar
             </button>
-            {state?.error && (
-              <p className="error-text">
-                <IconAlert size={15} /> {state.error}
-              </p>
-            )}
-          </form>
-        </section>
+          </div>
+          {clipboardError && <p className="hint">Não foi possível ler a área de transferência. Cole manualmente no campo.</p>}
+          <button type="submit" className="btn-solid" disabled={parsing || raw.trim() === ""}>
+            {parsing ? "Verificando…" : "Verificar perfis"}
+          </button>
+          {state?.error && <p className="field-error">{state.error}</p>}
+        </form>
+      </section>
 
-        {state && !state.error && <ProspectResults key={state.parseId} results={state.results} />}
-    </>
+      {state && !state.error && <ProspectResults key={state.parseId} results={state.results} />}
+    </div>
   );
 }

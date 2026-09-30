@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { TagInput } from "@/components/TagInput";
-import { IconAlert, IconArrowLeft, IconArrowRight, IconCheck, IconHash, IconMessages, IconUser } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import type { CampaignFormState } from "./actions";
 import { FollowUpOverride, type FollowUpValue } from "@/components/FollowUpFields";
 
 const followUpShort = (v: FollowUpValue) =>
-  v.count === 0 ? "Sem follow-up" : `${v.count} follow-up${v.count > 1 ? "s" : ""} a cada ${v.days} dia${v.days > 1 ? "s" : ""}`;
+  v.count === 0 ? "Sem acompanhamento" : `${v.count} mensage${v.count > 1 ? "ns" : "m"} de acompanhamento, uma a cada ${v.days} dia${v.days > 1 ? "s" : ""}`;
 
 const STEPS = ["Detalhes", "Público", "Mensagem", "Revisão"];
 
@@ -45,7 +45,7 @@ export function CampaignWizard({
   const canNext = step !== 0 || d.name.trim().length > 0;
 
   return (
-    <form action={formAction} className="wizard">
+    <form action={formAction} className="stack" style={{ gap: 16 }}>
       <input type="hidden" name="name" value={d.name} />
       <input type="hidden" name="description" value={d.description} />
       <input type="hidden" name="audience" value={JSON.stringify(d.audience)} />
@@ -55,40 +55,41 @@ export function CampaignWizard({
       <input type="hidden" name="followUpCount" value={d.followUp?.count ?? ""} />
       <input type="hidden" name="followUpDays" value={d.followUp?.days ?? ""} />
 
-      <ol className="wizard-steps" aria-label="Etapas">
+      <div className="tabs" aria-label="Etapas">
         {STEPS.map((label, i) => (
-          <li key={label} className={i === step ? "current" : i < step ? "done" : undefined} aria-current={i === step ? "step" : undefined}>
-            <button type="button" onClick={() => (i < step || canNext ? setStep(i) : undefined)} disabled={i > step && !canNext}>
-              <span className="wizard-num">{i < step ? <IconCheck size={14} strokeWidth={3} /> : i + 1}</span>
-              <span className="wizard-label">{label}</span>
-            </button>
-          </li>
+          <button
+            key={label}
+            type="button"
+            aria-pressed={i === step}
+            aria-current={i === step ? "step" : undefined}
+            onClick={() => (i < step || canNext ? setStep(i) : undefined)}
+            disabled={i > step && !canNext}
+          >
+            {i + 1}. {label}
+          </button>
         ))}
-      </ol>
+      </div>
 
-      <div className="wizard-body">
+      <div className="sec">
         {step === 0 && (
           <>
-            <label className="wfield">
-              <span>Nome da campanha</span>
-              <span className="winput">
-                <IconHash size={17} />
-                <input value={d.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex.: Saúde empresarial" maxLength={60} autoFocus />
-              </span>
-            </label>
-            <label className="wfield">
-              <span>
-                Descrição <em>(opcional)</em>
-              </span>
-              <textarea className="wtext" rows={4} value={d.description} onChange={(e) => set("description", e.target.value)} placeholder="Qual é o objetivo desta campanha?" maxLength={200} />
-            </label>
+            <div>
+              <label className="label">Nome da campanha</label>
+              <input className="field" value={d.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex.: Saúde empresarial" maxLength={60} autoFocus />
+            </div>
+            <div>
+              <label className="label">Descrição (opcional)</label>
+              <textarea className="field" rows={4} value={d.description} onChange={(e) => set("description", e.target.value)} placeholder="Qual é o objetivo desta campanha?" maxLength={200} />
+            </div>
           </>
         )}
 
         {step === 1 && (
           <>
-            <div className="wfield">
-              <span>Público-alvo</span>
+            <div>
+              <label className="label">
+                Público-alvo <Help>Já vem preenchido na busca quando você for adicionar pessoas a esta campanha.</Help>
+              </label>
               <TagInput
                 label="Público-alvo"
                 values={d.audience}
@@ -96,97 +97,81 @@ export function CampaignWizard({
                 placeholder="Cargo, setor ou empresa"
                 suggestions={["Diretor de RH", "Sócio", "CFO", "Clínicas", "Advocacia", "Tecnologia"]}
               />
-              <p className="hint">Já vem preenchido na busca quando você for adicionar pessoas a esta campanha.</p>
             </div>
-            <label className="wfield">
-              <span>
-                Limite de leads <em>(opcional)</em>
-              </span>
-              <span className="winput">
-                <IconUser size={17} />
-                <input inputMode="numeric" value={d.maxLeads} onChange={(e) => set("maxLeads", e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="Ex.: 50" />
-              </span>
-              <p className="hint">Depois de chegar nesse número, a campanha não recebe mais pessoas.</p>
-            </label>
+            <div>
+              <label className="label">
+                Limite de pessoas (opcional) <Help>Depois de chegar nesse número, a campanha não recebe mais pessoas.</Help>
+              </label>
+              <input
+                className="field"
+                inputMode="numeric"
+                value={d.maxLeads}
+                onChange={(e) => set("maxLeads", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="Ex.: 50"
+                style={{ maxWidth: 160 }}
+              />
+            </div>
           </>
         )}
 
         {step === 2 && (
-          <label className="wfield">
-            <span>Oferta ou mensagem principal</span>
-            <span className="winput winput-area">
-              <IconMessages size={17} />
+          <>
+            <div>
+              <label className="label">
+                Oferta ou mensagem principal <Help>Escreva do seu jeito. A secretária usa isso para conversar com as pessoas desta campanha.</Help>
+              </label>
               <textarea
+                className="field"
                 rows={6}
                 value={d.instructions}
                 onChange={(e) => set("instructions", e.target.value)}
-                placeholder="Ex.: Convite para conhecer nosso plano de saúde empresarial, com economia em relação ao plano atual. Se pedirem valores, passe pra mim."
+                placeholder="Ex.: Convite para conhecer nosso plano de saúde empresarial, com economia em relação ao plano atual. Se pedirem valores, passe para mim."
               />
-            </span>
-            <p className="hint">Escreva do seu jeito. A IA usa isso pra conversar com as pessoas desta campanha.</p>
-          </label>
-        )}
-
-        {step === 2 && (
-          <div className="wfield">
-            <span>Follow-up</span>
-            <FollowUpOverride custom={d.followUp} onChange={(v) => set("followUp", v)} inheritedLabel={accountFollowUp} idPrefix="fu-camp" />
-          </div>
+            </div>
+            <div>
+              <label className="label">Acompanhamento</label>
+              <FollowUpOverride custom={d.followUp} onChange={(v) => set("followUp", v)} inheritedLabel={accountFollowUp} idPrefix="fu-camp" />
+            </div>
+          </>
         )}
 
         {step === 3 && (
-          <dl className="wreview">
-            <div>
-              <dt>Nome</dt>
-              <dd>{d.name || "—"}</dd>
-            </div>
-            <div>
-              <dt>Descrição</dt>
-              <dd>{d.description || "—"}</dd>
-            </div>
-            <div>
-              <dt>Público-alvo</dt>
-              <dd>{d.audience.length ? d.audience.join(", ") : "—"}</dd>
-            </div>
-            <div>
-              <dt>Limite de leads</dt>
-              <dd>{d.maxLeads || "Sem limite"}</dd>
-            </div>
-            <div>
-              <dt>Follow-up</dt>
-              <dd>{d.followUp ? followUpShort(d.followUp) : `Padrão da conta (${accountFollowUp})`}</dd>
-            </div>
-            <div>
-              <dt>Oferta</dt>
-              <dd style={{ whiteSpace: "pre-line" }}>{d.instructions || "—"}</dd>
-            </div>
+          <dl className="kv" style={{ gridTemplateColumns: "130px 1fr" }}>
+            <dt>Nome</dt>
+            <dd>{d.name || "—"}</dd>
+            <dt>Descrição</dt>
+            <dd>{d.description || "—"}</dd>
+            <dt>Público-alvo</dt>
+            <dd>{d.audience.length ? d.audience.join(", ") : "—"}</dd>
+            <dt>Limite</dt>
+            <dd>{d.maxLeads || "Sem limite"}</dd>
+            <dt>Acompanhamento</dt>
+            <dd>{d.followUp ? followUpShort(d.followUp) : `Padrão da conta (${accountFollowUp})`}</dd>
+            <dt>Oferta</dt>
+            <dd style={{ whiteSpace: "pre-line" }}>{d.instructions || "—"}</dd>
           </dl>
         )}
 
-        {state?.error && (
-          <p className="error-text">
-            <IconAlert size={15} /> {state.error}
-          </p>
-        )}
+        {state?.error && <p className="field-error">{state.error}</p>}
       </div>
 
-      <div className="wizard-foot">
+      <div className="row" style={{ justifyContent: "space-between" }}>
         {step === 0 ? (
-          <Link href={cancelHref} className="btn btn-secondary">
+          <Link href={cancelHref} className="btn-line">
             Cancelar
           </Link>
         ) : (
-          <button type="button" className="btn btn-secondary" onClick={() => setStep(step - 1)}>
-            <IconArrowLeft size={16} /> Voltar
+          <button type="button" className="btn-line" onClick={() => setStep(step - 1)}>
+            Voltar
           </button>
         )}
         {step < STEPS.length - 1 ? (
-          <button key="next" type="button" className="btn btn-primary wizard-next" disabled={!canNext} onClick={() => setStep(step + 1)}>
-            Salvar e continuar <IconArrowRight size={17} />
+          <button key="next" type="button" className="btn-solid" disabled={!canNext} onClick={() => setStep(step + 1)}>
+            Continuar
           </button>
         ) : (
-          <button key="submit" type="submit" className="btn btn-primary wizard-next" disabled={pending || !d.name.trim()}>
-            {pending ? "Salvando…" : submitLabel} {!pending && <IconCheck size={17} strokeWidth={2.6} />}
+          <button key="submit" type="submit" className="btn-solid" disabled={pending || !d.name.trim()}>
+            {pending ? "Salvando…" : submitLabel}
           </button>
         )}
       </div>

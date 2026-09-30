@@ -6,13 +6,12 @@ export const metadata: Metadata = {
   description: "Secretária de prospecção que conversa com seus contatos por LinkedIn, e-mail e WhatsApp e marca reuniões na sua agenda.",
 };
 
-const wrap: React.CSSProperties = { maxWidth: 720, margin: "0 auto", padding: "40px 20px 64px", lineHeight: 1.65 };
 
 // Página pública (sem login): é a "página inicial do aplicativo" que o Google exige
 // na tela de consentimento, e explica ao corretor o que o sistema faz com o Google.
 export default function AboutPage() {
   return (
-    <main style={wrap}>
+    <main className="legal">
       <h1 style={{ fontSize: 32, marginBottom: 8 }}>Secretaria Comercial</h1>
       <p style={{ opacity: 0.8, marginTop: 0 }}>Uma secretária de prospecção para corretores e profissionais que vendem por conversa.</p>
 

@@ -2,7 +2,6 @@
 
 import { useActionState, useState } from "react";
 import { updateWorkHours } from "./actions";
-import { IconCheck, IconClock } from "@/components/Icons";
 import { Stepper } from "@/components/Stepper";
 
 export function WorkHoursForm({ start, end, weekdaysOnly }: { start: number; end: number; weekdaysOnly: boolean }) {
@@ -13,54 +12,42 @@ export function WorkHoursForm({ start, end, weekdaysOnly }: { start: number; end
   const dirty = from !== start || to !== end || weekdays !== weekdaysOnly;
 
   return (
-    <form action={formAction} className="card" style={{ overflow: "hidden" }}>
-      <div className="setting-row">
-        <span className="setting-icon" style={{ background: "var(--info-soft)", color: "var(--info-ink)" }}>
-          <IconClock size={19} />
-        </span>
-        <label htmlFor="workStartHour" style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 700 }}>Começa às</span>
-          <span className="tiny faint">horário de Brasília</span>
+    <form action={formAction} className="stack" style={{ gap: 4 }}>
+      <div className="setting" style={{ padding: "8px 0" }}>
+        <label htmlFor="workStartHour" className="setting-text">
+          <b>Começa às</b>
+          <small>horário de Brasília</small>
         </label>
         <Stepper id="workStartHour" name="workStartHour" value={from} min={0} max={Math.min(23, to - 1)} onChange={setFrom} />
       </div>
-      <div className="setting-row">
-        <span className="setting-icon" style={{ background: "var(--info-soft)", color: "var(--info-ink)" }}>
-          <IconClock size={19} />
-        </span>
-        <label htmlFor="workEndHour" style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 700 }}>Termina às</span>
-          <span className="tiny faint">nada sai depois disso</span>
+      <div className="setting" style={{ padding: "8px 0" }}>
+        <label htmlFor="workEndHour" className="setting-text">
+          <b>Termina às</b>
+          <small>nada sai depois disso</small>
         </label>
         <Stepper id="workEndHour" name="workEndHour" value={to} min={Math.max(1, from + 1)} max={24} onChange={setTo} />
       </div>
-      <label className="setting-row" style={{ cursor: "pointer" }}>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 700 }}>Só em dias úteis</span>
-          <span className="tiny faint">sem mensagens sábado e domingo</span>
+      <div className="setting" style={{ padding: "8px 0" }}>
+        <span className="setting-text">
+          <b>Só em dias úteis</b>
+          <small>sem mensagens sábado e domingo</small>
         </span>
-        <input type="checkbox" name="workWeekdaysOnly" checked={weekdays} onChange={(e) => setWeekdays(e.target.checked)} className="sr-only" />
-        <span className="switch switch-light" role="switch" aria-checked={weekdays} aria-hidden="true" />
-      </label>
-      <div className="setting-row" style={{ background: "var(--surface-2)" }}>
-        <p className="tiny muted" style={{ lineHeight: 1.5 }}>
-          A IA só manda mensagem {weekdays ? "de segunda a sexta" : "todos os dias"}, das {from}h às {to}h. Se um lead escrever fora
-          disso, a resposta sai quando o horário abrir.
-        </p>
+        <input type="hidden" name="workWeekdaysOnly" value={weekdays ? "on" : ""} />
+        <button type="button" role="switch" aria-checked={weekdays} aria-label="Só em dias úteis" className="switch" onClick={() => setWeekdays((w) => !w)} />
       </div>
+      <p className="hint">
+        A secretária só manda mensagem {weekdays ? "de segunda a sexta" : "todos os dias"}, das {from}h às {to}h. Se uma pessoa escrever fora disso, a resposta sai
+        quando o horário abrir.
+      </p>
       {(dirty || state?.saved || state?.error) && (
-        <div className="setting-row" style={{ justifyContent: "flex-end", gap: 12 }}>
-          {state?.error && <span className="error-text">{state.error}</span>}
-          {!dirty && state?.saved && (
-            <span className="success-text">
-              <IconCheck size={15} strokeWidth={3} /> Salvo
-            </span>
-          )}
+        <div className="form-actions">
           {dirty && (
-            <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
+            <button type="submit" className="btn-solid btn-sm" disabled={pending}>
               {pending ? "Salvando…" : "Salvar horário"}
             </button>
           )}
+          {!dirty && state?.saved && <span className="ok-text">Salvo</span>}
+          {state?.error && <span className="field-error">{state.error}</span>}
         </div>
       )}
     </form>

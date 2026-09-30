@@ -348,7 +348,7 @@ function DayPanel({ day, minutes }: { day: AgendaDay; minutes: number }) {
     <aside className="cal-side" aria-label={`Detalhes de ${longDayLabel(day.key)}`}>
       <header className="cal-side-head">
         <h3>{longDayLabel(day.key)}</h3>
-        {day.isToday && <span className="count-pill">hoje</span>}
+        {day.isToday && <span className="pill pill-accent">hoje</span>}
       </header>
 
       <section>

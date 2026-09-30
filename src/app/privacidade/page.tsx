@@ -6,13 +6,12 @@ export const metadata: Metadata = {
   description: "Como a Secretaria Comercial trata dados pessoais e dados da sua conta Google.",
 };
 
-const wrap: React.CSSProperties = { maxWidth: 760, margin: "0 auto", padding: "40px 20px 64px", lineHeight: 1.65 };
 
 // Página pública exigida pelo Google na tela de consentimento (escopos do Gmail e da
 // Agenda). Descreve o que o sistema faz de fato; se o comportamento mudar, atualize aqui.
 export default function PrivacyPage() {
   return (
-    <main style={wrap}>
+    <main className="legal">
       <h1 style={{ fontSize: 30, marginBottom: 4 }}>Política de Privacidade</h1>
       <p style={{ opacity: 0.7, marginTop: 0 }}>Secretaria Comercial · Última atualização: 29/09/2026</p>
 
