@@ -1,18 +1,22 @@
 import OpenAI from "openai";
 import { completeWithTool, decideResponse, nousClient, type Usage } from "@/lib/agent";
-import { EVAL_INSTRUCTIONS, SCENARIOS, type Scenario } from "./scenarios";
+import { EVAL_BUSY, EVAL_INSTRUCTIONS, EVAL_NOW, EVAL_RULES, SCENARIOS, type Scenario } from "./scenarios";
+import { calendarContextFrom } from "@/lib/scheduling";
+import { slotIso } from "@/lib/slots";
 
 export interface EvalResult {
   scenarioId: string;
   model: string;
   ok: boolean;
   error?: string;
-  action?: "reply" | "handoff";
+  action?: "reply" | "handoff" | "book";
   message?: string;
   reason?: string;
   analysis?: string;
   qualified?: boolean;
   declined?: boolean;
+  // Horarios oferecidos (reply) ou horario marcado (book), em ISO.
+  slots?: string[];
   attempts?: number;
   checkIssues?: string[];
   // Acertou a decisão esperada (responder / passar pro corretor / recusa)?
@@ -23,16 +27,24 @@ export interface EvalResult {
   ms?: number;
 }
 
-function decisionCheck(s: Scenario, action: "reply" | "handoff", declined: boolean, qualified: boolean): { ok: boolean; note: string } {
+function decisionCheck(s: Scenario, action: "reply" | "handoff" | "book", declined: boolean, qualified: boolean, slots: string[]): { ok: boolean; note: string } {
   const notes: string[] = [];
   let ok = true;
   if (s.expect !== "either" && s.expect !== action) {
     ok = false;
-    notes.push(s.expect === "handoff" ? "deveria passar pro corretor" : "deveria responder");
+    notes.push(s.expect === "handoff" ? "deveria passar pro corretor" : s.expect === "book" ? "deveria marcar a reuniao" : "deveria responder");
   }
   if (action === "reply" && s.declined !== undefined && s.declined !== declined) {
     ok = false;
     notes.push(s.declined ? "deveria encerrar (recusa)" : "marcou recusa sem ser recusa");
+  }
+  if (action === "reply" && s.proposes !== undefined && s.proposes !== slots.length > 0) {
+    ok = false;
+    notes.push(s.proposes ? "deveria oferecer horarios livres" : "ofereceu horarios cedo demais");
+  }
+  if (action === "book" && s.bookAt && new Date(slots[0]).getTime() !== new Date(s.bookAt).getTime()) {
+    ok = false;
+    notes.push(`marcou ${slots[0]}, esperado ${s.bookAt}`);
   }
   if (action === "reply" && s.qualified === true && !qualified) notes.push("não marcou como qualificado");
   return { ok, note: notes.join("; ") };
@@ -93,12 +105,21 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
   if (!s) return { scenarioId, model, ok: false, error: "cenário não existe" };
   const started = Date.now();
   try {
-    const d = await decideResponse({ instructions: EVAL_INSTRUCTIONS, lead: s.lead, history: s.history }, { model });
+    const d = await decideResponse(
+      {
+        instructions: EVAL_INSTRUCTIONS,
+        lead: s.lead,
+        history: s.history,
+        ...(s.calendar ? { now: EVAL_NOW, calendar: calendarContextFrom(EVAL_BUSY, EVAL_NOW, EVAL_RULES) } : {}),
+      },
+      { model },
+    );
     const ms = Date.now() - started;
     const declined = d.action === "reply" && d.declined;
     const qualified = d.action === "reply" && d.qualified;
-    const dc = decisionCheck(s, d.action, declined, qualified);
-    const out = d.action === "reply" ? { action: d.action, message: d.message } : { action: d.action, reason: d.reason };
+    const slots = d.action === "reply" ? d.proposedSlots.map(slotIso) : d.action === "book" ? [slotIso(d.slotStart)] : [];
+    const dc = decisionCheck(s, d.action, declined, qualified, slots);
+    const out = d.action === "handoff" ? { action: d.action, reason: d.reason } : { action: d.action, message: d.message };
     let judgeResult: EvalResult["judge"];
     let judgeError: string | undefined;
     if (judgeModel) {
@@ -117,6 +138,7 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
       analysis: d.analysis,
       qualified,
       declined,
+      slots,
       attempts: d.attempts,
       checkIssues: d.checkIssues,
       decisionOk: dc.ok,

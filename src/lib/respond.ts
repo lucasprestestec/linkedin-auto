@@ -4,7 +4,9 @@ import { decideResponse } from "@/lib/agent";
 import { messagesSentToday } from "@/lib/limits";
 import { instructionsFor } from "@/lib/campaigns";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
-import { sendOnChannel } from "@/lib/channels";
+import { deliver, supersedeDrafts } from "@/lib/outbox";
+import { loadCalendarContext } from "@/lib/scheduling";
+import { formatSlot, slotIso } from "@/lib/slots";
 import type { Lead } from "@prisma/client";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
@@ -12,6 +14,15 @@ import type { Lead } from "@prisma/client";
 // marcar NEEDS_HUMAN com o motivo certo.
 export async function handleIncomingMessage(lead: Lead, identityId: string | null) {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+
+  // O lead escreveu: qualquer mensagem que esperava aprovação ficou velha.
+  await supersedeDrafts(lead.id);
+
+  // Reunião já marcada: remarcar, cancelar ou qualquer assunto novo é com o corretor.
+  if (lead.status === "MEETING_SCHEDULED") {
+    await markNeedsHuman(lead.id, "Escreveu depois de a reunião ser marcada");
+    return;
+  }
 
   const [history, campaign] = await Promise.all([
     prisma.message.findMany({
@@ -42,6 +53,10 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     return;
   }
 
+  // Google Agenda conectado: a secretária vê os horários livres e pode marcar. Se ele
+  // falhar agora, segue sem agenda (proposta de horário vai pro corretor, como antes).
+  const calendar = await loadCalendarContext(settings);
+
   let decision;
   try {
     decision = await decideResponse({
@@ -49,6 +64,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
       history,
       channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },
+      calendar: calendar ?? undefined,
     });
     // Fica nos logs da Vercel: por que o agente fez o que fez.
     console.log(
@@ -66,11 +82,35 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   }
 
   try {
-    await sendOnChannel(lead, channel, decision.message, { identityId });
-    await prisma.lead.update({
-      where: { id: lead.id },
-      // Recusou: encerra (sem follow-up). Quer avançar: qualificado.
-      data: { status: decision.declined ? "LOST" : decision.qualified ? "QUALIFIED" : "CONVERSATION_OPEN", needsHumanReason: null, nextStep: null, nextStepAt: null },
+    // O lead escolheu um horário livre: marca no Google Agenda junto com a confirmação.
+    // O evento só é criado quando a mensagem sai (aprovada, no modo piloto).
+    if (decision.action === "book") {
+      await deliver(lead, channel, decision.message, {
+        identityId,
+        kind: "REPLY",
+        reason: `${decision.analysis} · Marca na sua agenda: ${formatSlot(decision.slotStart)}`,
+        approval: settings.approvalMode,
+        booking: { startIso: slotIso(decision.slotStart), minutes: settings.meetingMinutes },
+        effects: { followUpsSent: 0 },
+      });
+      return;
+    }
+
+    // Ofereceu horários: qualificado, e o lembrete de 2 dias passa a valer.
+    const proposed = decision.proposedSlots.length > 0 && !decision.declined;
+    await deliver(lead, channel, decision.message, {
+      identityId,
+      kind: "REPLY",
+      reason: decision.analysis,
+      approval: settings.approvalMode,
+      // Recusou: encerra (sem follow-up). Quer avançar (ou recebeu horários): qualificado.
+      effects: {
+        status: decision.declined ? "LOST" : decision.qualified || proposed ? "QUALIFIED" : "CONVERSATION_OPEN",
+        needsHumanReason: null,
+        nextStep: proposed ? "Sugeri horários de reunião; aguardando o lead escolher." : null,
+        nextStepAt: null,
+        ...(proposed ? { slotsProposedAt: new Date() } : {}),
+      },
     });
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);

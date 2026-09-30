@@ -7,13 +7,13 @@ import { useShell } from "./ShellContext";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { needYouCount } = useShell();
+  const { needYouCount, draftCount } = useShell();
 
   return (
     <nav className="nav" aria-label="Navegação principal">
       {NAV_ITEMS.filter((item) => !("desktopOnly" in item && item.desktopOnly)).map(({ href, label, Icon, badge }) => {
         const active = isActive(pathname, href);
-        const count = badge === "attention" ? needYouCount : 0;
+        const count = badge === "attention" ? needYouCount : badge === "drafts" ? draftCount : 0;
         return (
           <Link key={href} href={href} className="nav-item" aria-current={active ? "page" : undefined}>
             <span className="nav-icon">

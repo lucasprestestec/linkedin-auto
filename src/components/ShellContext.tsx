@@ -8,6 +8,7 @@ const ShellContext = createContext<ShellData>({
   automationPaused: true,
   needYou: [],
   needYouCount: 0,
+  draftCount: 0,
 });
 
 export const ShellProvider = ShellContext.Provider;

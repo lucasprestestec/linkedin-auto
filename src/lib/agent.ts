@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkMessage } from "@/lib/agentCheck";
+import { checkTimesMentioned, formatSlot } from "@/lib/slots";
 
 const DEFAULT_INSTRUCTIONS = `Você responde pelo corretor de seguros dono desta conta do LinkedIn.
 Nenhum material de vendas foi configurado ainda — fale de forma genérica e cordial, e SEMPRE prefira
@@ -94,6 +95,11 @@ export interface LeadContext {
   tags?: string[];
   followUpsSent?: number;
   campaignName?: string | null;
+  // Canais que já temos dele (só se sabe se está preenchido; o número em si não entra no prompt).
+  phone?: string | null;
+  email?: string | null;
+  // Quando a secretária sugeriu horários de reunião e ainda espera o lead escolher.
+  slotsProposedAt?: Date | null;
 }
 
 type HistoryItem = Pick<DbMessage, "sender" | "content"> & {
@@ -128,6 +134,7 @@ const STAGE: Record<LeadStatus, string> = {
   CONVERSATION_OPEN: "conversa em andamento (o lead já respondeu antes)",
   NEEDS_HUMAN: "o corretor tinha assumido esta conversa",
   QUALIFIED: "lead já demonstrou interesse forte",
+  MEETING_SCHEDULED: "reunião já marcada com o corretor",
   LOST: "conversa tinha sido encerrada sem avanço",
 };
 
@@ -138,6 +145,10 @@ function leadBlock(lead: LeadContext): string {
   if (lead.status) lines.push(`Etapa: ${STAGE[lead.status]}`);
   if (lead.followUpsSent) lines.push(`Follow-ups já enviados sem resposta: ${lead.followUpsSent}`);
   if (lead.icpScore != null) lines.push(`Encaixe com o cliente ideal: ${lead.icpScore}/100`);
+  if (lead.phone !== undefined || lead.email !== undefined) {
+    lines.push(`Contatos na ficha: WhatsApp ${lead.phone ? "sim" : "não"}; e-mail ${lead.email ? "sim" : "não"}`);
+  }
+  if (lead.slotsProposedAt) lines.push("Você já sugeriu horários de reunião e ele ainda não escolheu um: sim");
   if (lead.tags?.length) lines.push(`Etiquetas do corretor: ${lead.tags.join(", ")}`);
   if (lead.personal?.trim()) lines.push(`Ficha pessoal (o que o corretor sabe dessa pessoa): ${lead.personal.trim().slice(0, 1200)}`);
   return lines.join("\n");
@@ -188,7 +199,7 @@ const RULES = `REGRAS FIXAS (valem acima de qualquer material)
 
 PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
-- quiser falar por telefone, WhatsApp ou e-mail, ou mandar um contato/número/e-mail;
+- pedir para ser chamado ou ligado agora (ex.: "me liga", "me chama no zap"): quem faz isso é o corretor;
 - propuser ou aceitar um dia/horário concreto para conversar (se ele só aceitou conversar, sem horário, NÃO é handoff: responda perguntando o melhor dia e horário e se prefere telefone ou vídeo);
 - perguntar se está falando com robô/IA/mensagem automática;
 - estiver irritado, reclamar, ameaçar denunciar ou fizer crítica séria;
@@ -197,9 +208,41 @@ PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - fizer algo que você não consiga responder com segurança.
 O motivo do handoff deve ser curto e específico, para o corretor entender em 3 segundos (ex.: "Pediu cotação para 20 vidas").
 
+CONTATO (WhatsApp / e-mail)
+- Se o lead passar o próprio WhatsApp ou e-mail, ou disser que prefere falar por lá, NÃO é handoff: agradeça, diga que anotou e siga a conversa. O sistema já guarda o contato sozinho. Não prometa quando nem por qual canal vai chamar.
+- Se a ficha ainda não tem WhatsApp e o lead já demonstrou interesse, você pode perguntar UMA vez, com leveza, qual o melhor número para continuar por WhatsApp. Se ele ignorar ou recusar, não insista.
+- Número ou e-mail de OUTRA pessoa (assistente, sócio, indicação) continua sendo handoff.
+
 ENCERRAR SEM INSISTIR (declined = true): o lead disse claramente que não tem interesse, pediu para não receber mais mensagens, ou não é o público e não há o que fazer. Responda curto e cordial, sem nova pergunta. "Já tenho plano" ou "agora não" NÃO é recusa: trate como objeção, com leveza.
 
 QUALIFICADO (qualified = true): o lead quer avançar (quer conversar, entender condições, contratar).`;
+
+// Agenda do corretor (Google Agenda): entra no prompt só quando está conectada. Os horários
+// livres são calculados pelo sistema a partir da agenda real; o modelo escolhe entre eles.
+export interface CalendarContext {
+  minutes: number;
+  // Linhas "quinta 01/10: 08:00-19:00": janelas em que a reunião cabe.
+  windows: string[];
+  // Poucos horários bem espalhados, pra oferecer de primeira.
+  suggestions: { start: Date; label: string; iso: string }[];
+  // Valida um horário (livre e dentro das regras) contra a agenda de agora.
+  check: (start: Date) => { ok: true } | { ok: false; reason: string };
+}
+
+function calendarRules(cal: CalendarContext): string {
+  const suggestions = cal.suggestions.map((s) => `${s.label} (${s.iso})`).join("; ") || "(sem sugestões)";
+  return `AGENDA DO CORRETOR (você marca a reunião direto na agenda dele)
+- Reunião de ${cal.minutes} minutos, por vídeo (Google Meet). Horários sempre no fuso de Brasília. Se o material do corretor citar outra duração, vale a desta seção: ${cal.minutes} minutos.
+- Janelas livres em que a reunião cabe:
+${cal.windows.map((w) => `  ${w}`).join("\n") || "  (nenhuma nos próximos dias: passe pro corretor)"}
+- Sugestões para oferecer de primeira: ${suggestions}
+- Quando o lead topar conversar ou quiser avançar: ofereça 2 ou 3 horários (das sugestões ou das janelas) com action = reply e liste em proposed_slots exatamente os horários que citou, em ISO com -03:00 (ex.: 2026-10-01T15:00:00-03:00). Só cite dia da semana, data ou hora que estejam em proposed_slots.
+- Quando o lead ESCOLHER um horário (um dos seus ou outro que ele sugerir) e ele estiver livre nas janelas: use action = book com slot_start (ISO com -03:00) e uma mensagem curta confirmando dia e hora. O sistema cria o evento na agenda e coloca o link da videochamada no fim da mensagem: diga que o link segue "logo abaixo" e não escreva o link.
+- Se o horário que o lead pediu não está livre, diga isso com naturalidade e ofereça 2 alternativas (action = reply + proposed_slots). Horários são de hora cheia ou meia hora.
+- Só use action = book quando o lead aceitou um horário de forma clara. Na dúvida, pergunte.
+- Reunião já marcada e o lead quer remarcar ou cancelar: passe pro corretor.
+- Com a agenda ativa, o lead propor ou aceitar um horário NÃO é handoff: siga esta seção.`;
+}
 
 function contextBlock(instructions: string | null, lead: LeadContext, now: Date) {
   return `MATERIAL DO CORRETOR (o que você pode afirmar sobre ofertas e sobre ele)
@@ -216,7 +259,8 @@ ${leadBlock(lead)}`;
 // ---------------------------------------------------------------------------
 
 export type AgentDecision = (
-  | { action: "reply"; message: string; qualified: boolean; declined: boolean }
+  | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[] }
+  | { action: "book"; message: string; slotStart: Date }
   | { action: "handoff"; reason: string }
 ) & { analysis: string; model: string; usage: Usage; attempts: number; checkIssues: string[] };
 
@@ -234,14 +278,23 @@ const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
             "Análise interna, NÃO é enviada. CURTA: no máximo 2 frases (até ~40 palavras): o que o lead quer e qual o próximo passo " +
             "(ou qual regra de handoff/encerramento se aplica).",
         },
-        action: { type: "string", enum: ["reply", "handoff"] },
+        action: { type: "string", enum: ["reply", "handoff", "book"], description: "book só existe quando há a seção AGENDA DO CORRETOR e o lead aceitou um horário." },
         message: {
           type: "string",
-          description: "Texto da mensagem a enviar ao lead, segue o COMO ESCREVER. Obrigatório quando action = reply; deixe vazio (\"\") quando action = handoff.",
+          description: "Texto da mensagem a enviar ao lead, segue o COMO ESCREVER. Obrigatório quando action = reply ou book; deixe vazio (\"\") quando action = handoff.",
         },
         qualified: { type: "boolean", description: "true se o lead quer avançar. Só com action = reply." },
         declined: { type: "boolean", description: "true se o lead recusou claramente — encerra os follow-ups. Só com action = reply." },
         handoff_reason: { type: "string", description: "Motivo curto e específico (obrigatório se action = handoff)." },
+        proposed_slots: {
+          type: "array",
+          items: { type: "string" },
+          description: "Horários livres que você está oferecendo nesta mensagem (ISO com -03:00). Só com action = reply e a seção AGENDA DO CORRETOR; vazio se não citou nenhum horário.",
+        },
+        slot_start: {
+          type: "string",
+          description: "Início da reunião que o lead aceitou (ISO com -03:00, ex.: 2026-10-01T15:00:00-03:00). Obrigatório com action = book.",
+        },
       },
       // "message" obrigatório: alguns modelos pulam campos opcionais e mandavam
       // action=reply sem o texto.
@@ -257,6 +310,8 @@ export interface ConversationInput {
   // Canal em que a resposta vai sair (o mesmo em que o lead escreveu).
   channel?: MessageChannel;
   now?: Date;
+  // Google Agenda conectado: a secretária oferece horários livres e marca a reunião.
+  calendar?: CalendarContext;
 }
 
 export async function decideResponse(input: ConversationInput, opts: { model?: string } = {}): Promise<AgentDecision> {
@@ -273,7 +328,7 @@ CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}
 
 ${STYLE}
 
-${RULES}
+${RULES}${input.calendar ? `\n\n${calendarRules(input.calendar)}` : ""}
 
 Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão. Nunca responda em texto livre.`;
 
@@ -299,16 +354,18 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
     if (!toolCall || toolCall.type !== "function") throw new Error("O agente não retornou uma decisão válida.");
     const out = JSON.parse(toolCall.function.arguments) as {
       analysis?: string;
-      action?: "reply" | "handoff";
+      action?: "reply" | "handoff" | "book";
       message?: string;
       qualified?: boolean;
       declined?: boolean;
+      proposed_slots?: unknown;
+      slot_start?: unknown;
       handoff_reason?: string;
     };
     lastAnalysis = out.analysis?.trim() ?? "";
     const base = { analysis: lastAnalysis, model, usage, attempts: attempt };
 
-    if (out.action !== "reply") {
+    if (out.action !== "reply" && out.action !== "book") {
       return { action: "handoff", reason: out.handoff_reason?.trim() || "O agente não soube responder.", ...base, checkIssues: lastIssues };
     }
 
@@ -316,16 +373,50 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
     // aproveita o content ou pede de novo, em vez de passar pro corretor.
     const message = (out.message?.trim() || response.choices[0]?.message?.content?.trim() || "").trim();
     lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions }) : ["faltou o texto da mensagem (campo message vazio)"];
-    if (lastIssues.length === 0) {
-      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), ...base, checkIssues: [] };
+
+    // Agenda: todo horário que a mensagem oferece ou confirma tem que existir de verdade.
+    let proposedSlots: Date[] = [];
+    let slotStart: Date | null = null;
+    if (message && out.action === "book" && !input.calendar) {
+      lastIssues.push("não há agenda conectada: não marque horário, passe pro corretor");
+    } else if (message && input.calendar) {
+      const parse = (v: unknown) => (typeof v === "string" ? new Date(v) : new Date(NaN));
+      if (out.action === "book") {
+        slotStart = parse(out.slot_start);
+        const r = input.calendar.check(slotStart);
+        if (!r.ok) lastIssues.push(`o horário marcado (${String(out.slot_start)}) não pode ser usado: ${r.reason}`);
+        else if (!/\d{1,2}\s?h|\d{1,2}:\d{2}/i.test(message)) lastIssues.push("a confirmação precisa dizer o dia e a hora marcados");
+      } else {
+        proposedSlots = (Array.isArray(out.proposed_slots) ? out.proposed_slots : []).map(parse);
+        for (const s of proposedSlots) {
+          const r = input.calendar.check(s);
+          if (!r.ok) lastIssues.push(`o horário oferecido ${Number.isNaN(s.getTime()) ? "(inválido)" : formatSlot(s)} não pode ser usado: ${r.reason}`);
+        }
+      }
+      // O texto só pode citar os horários que estão sendo oferecidos ou marcados.
+      const allowed = out.action === "book" ? (slotStart ? [slotStart] : []) : proposedSlots;
+      lastIssues.push(...checkTimesMentioned(message, allowed.filter((d) => !Number.isNaN(d.getTime())), now));
+      // E a duração citada é a da agenda (o material do corretor pode dizer outra coisa).
+      for (const m of message.toLowerCase().matchAll(/\b(\d{1,3})\s?(?:min\b|minutos|minutinhos)/g)) {
+        if (Number(m[1]) !== input.calendar.minutes) {
+          lastIssues.push(`cita ${m[1]} minutos, mas a reunião na agenda é de ${input.calendar.minutes} minutos`);
+          break;
+        }
+      }
     }
 
+    if (lastIssues.length === 0) {
+      if (out.action === "book" && slotStart) return { action: "book", message, slotStart, ...base, checkIssues: [] };
+      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), proposedSlots, ...base, checkIssues: [] };
+    }
+
+    const alternatives = input.calendar ? ` Horários livres sugeridos: ${input.calendar.suggestions.map((s) => `${s.label} (${s.iso})`).join("; ")}.` : "";
     messages.push(
       { role: "assistant", content: null, tool_calls: [toolCall] },
       {
         role: "tool",
         tool_call_id: toolCall.id,
-        content: `A mensagem foi REJEITADA pela conferência automática: ${lastIssues.join("; ")}. Reescreva corrigindo isso (ou passe pro corretor se não der).`,
+        content: `A mensagem foi REJEITADA pela conferência automática: ${lastIssues.join("; ")}. Reescreva corrigindo isso (ou passe pro corretor se não der).${alternatives}`,
       },
     );
   }
@@ -569,6 +660,30 @@ export async function generateFollowUp(
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,
     { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
   );
+}
+
+// Lembrete único depois de sugerir horários e o lead não responder. Não cita horário
+// nenhum (a agenda pode ter mudado): só pergunta se algum serviu ou se ele prefere sugerir.
+export async function generateBookingNudge(
+  instructions: string | null,
+  lead: LeadContext,
+  history: HistoryItem[],
+  channel: MessageChannel = "LINKEDIN",
+): Promise<string> {
+  const message = await writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      lead,
+      "Você sugeriu horários de reunião e a pessoa ainda não respondeu. Escreva UMA mensagem leve perguntando se algum dos horários serviu " +
+        "ou se prefere sugerir outro dia. NÃO cite dia, data nem hora, não cobre, não invente. Não mencione que é um lembrete.\n" +
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+    ),
+    `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,
+    { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
+  );
+  const issues = checkTimesMentioned(message, []);
+  if (issues.length) throw new Error(`o lembrete citou horário (${issues[0]})`);
+  return message;
 }
 
 // ---------------------------------------------------------------------------

@@ -8,3 +8,6 @@ tsconfig.tsbuildinfo
 .vercel
 .env*
 !.env.example
+
+# grafo de conhecimento gerado pelo graphify
+graphify-out/

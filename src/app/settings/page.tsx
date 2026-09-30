@@ -11,6 +11,8 @@ import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
 import { DailySummaryToggle } from "./DailySummaryToggle";
+import { CalendarForm } from "./CalendarForm";
+import { googleConfigured } from "@/lib/gmail";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
 import { IconBan, IconBell, IconCalendar, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
@@ -124,6 +126,20 @@ export default async function SettingsPage() {
             </SettingItem>
             <SettingItem icon={<IconBan size={19} />} tone="urgent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
               <ExclusionListForm value={settings.exclusionList ?? ""} />
+            </SettingItem>
+            <SettingItem
+              icon={<IconCalendar size={19} />}
+              tone="brand"
+              title="Agenda de reuniões"
+              summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: a secretária passa a conversa pra você"}
+            >
+              <CalendarForm
+                minutes={settings.meetingMinutes}
+                googleEmail={settings.googleEmail}
+                calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
+                configured={googleConfigured()}
+                workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
+              />
             </SettingItem>
             <SettingItem
               icon={<IconCalendar size={19} />}

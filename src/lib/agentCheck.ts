@@ -59,6 +59,7 @@ export function checkMessage({ message, previousOutgoing, instructions }: CheckI
     }
   }
 
+
   const questions = (text.match(/\?/g) ?? []).length;
   if (questions > MAX_QUESTIONS) issues.push(`perguntas demais numa mensagem só (${questions})`);
 

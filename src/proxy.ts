@@ -12,6 +12,10 @@ export function proxy(request: NextRequest) {
     // Imagem de abertura dos e-mails: carregada pelo app de e-mail do cliente.
     pathname.startsWith("/api/o/") ||
     pathname === "/login" ||
+    // Páginas públicas exigidas pelo Google na tela de consentimento do OAuth.
+    pathname === "/sobre" ||
+    pathname === "/privacidade" ||
+    pathname === "/termos" ||
     pathname.startsWith("/_next")
   ) {
     return NextResponse.next();

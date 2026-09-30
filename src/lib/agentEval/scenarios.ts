@@ -1,10 +1,11 @@
 import type { LeadContext } from "@/lib/agent";
+import type { Busy, SlotRules } from "@/lib/slots";
 
 // Banco de testes do agente: situações reais e difíceis de conversa no LinkedIn.
 // Cada uma diz o que se espera (responder, passar pro corretor, ou tanto faz)
 // e o que um bom avaliador deve cobrar ("rubric").
 
-export type Expect = "reply" | "handoff" | "either";
+export type Expect = "reply" | "handoff" | "book" | "either";
 
 export interface Scenario {
   id: string;
@@ -16,6 +17,12 @@ export interface Scenario {
   // Deve (true) ou não deve (false) marcar recusa. undefined = tanto faz.
   declined?: boolean;
   qualified?: boolean;
+  // Google Agenda conectado neste cenario (agenda ficticia abaixo, data fixa).
+  calendar?: boolean;
+  // Deve (true) ou nao deve (false) oferecer horarios nesta resposta.
+  proposes?: boolean;
+  // Quando deve marcar: o horario esperado (ISO).
+  bookAt?: string;
   rubric: string;
 }
 
@@ -273,8 +280,10 @@ export const SCENARIOS: Scenario[] = [
     category: "handoff",
     lead: L("Camila", "Ribeiro", "Head de Marketing · Orbit"),
     history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Manda mais informações no meu e-mail: camila@orbit.com.br" }],
-    expect: "handoff",
-    rubric: "Handoff com o e-mail no motivo. Não repetir o e-mail na mensagem ao lead.",
+    expect: "either",
+    rubric:
+      "O lead passou o e-mail e pediu material. Ou responde agradecendo e seguindo a conversa (sem prometer material que não existe, sem repetir o e-mail), " +
+      "ou passa pro corretor mencionando o pedido. Nunca inventa conteúdo de proposta.",
   },
   {
     id: "h11",
@@ -468,7 +477,140 @@ export const SCENARIOS: Scenario[] = [
     qualified: true,
     rubric: "Explica o processo em 1-2 frases (olha o plano atual, mostra opções) e propõe a conversa de 15 min.",
   },
+  // --- contato (captura de WhatsApp/e-mail na conversa)
+  {
+    id: "c01",
+    title: "Passa o WhatsApp por conta própria",
+    category: "avanço",
+    lead: L("Renata", "Alves", "Gerente de RH · Alves & Filhos", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Temos interesse sim. Pode falar comigo pelo WhatsApp: 51 99999-1234" }],
+    expect: "reply",
+    rubric:
+      "NÃO é handoff. Agradece, diz que anotou e segue a conversa (ex.: pergunta sobre o benefício atual). " +
+      "Não repete o número, não promete quando nem por qual canal vai chamar, não confirma horário.",
+  },
+  {
+    id: "c02",
+    title: "Interesse sem WhatsApp na ficha",
+    category: "avanço",
+    lead: L("Bruno", "Martins", "Sócio · Martins Logística", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Interessante. Hoje temos um plano, mas está caro. Como funciona a comparação?" }],
+    expect: "reply",
+    rubric:
+      "Explica a comparação em 1-2 frases sem citar preço. Pode perguntar, uma única vez e com leveza, qual o melhor número de WhatsApp para continuar. " +
+      "No máximo 2 perguntas no total.",
+  },
+  {
+    id: "c03",
+    title: "Passa o contato da assistente",
+    category: "handoff",
+    lead: L("Fernanda", "Rocha", "Diretora Administrativa · Rocha Têxtil", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Isso é com a minha assistente, a Paula. Fala com ela: 51 98888-7777" }],
+    expect: "handoff",
+    rubric: "Handoff: o contato é de OUTRA pessoa. O motivo cita que indicou a assistente Paula e o número.",
+  },
+  {
+    id: "c04",
+    title: "Pede para ser chamado no WhatsApp",
+    category: "handoff",
+    lead: L("Thiago", "Nunes", "CEO · Nunes Tech", { phone: null, email: null }),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Me chama no zap agora, 51 97777-6666, prefiro resolver por lá" }],
+    expect: "handoff",
+    rubric: "Handoff: o lead pede contato imediato no WhatsApp, que é do corretor. Motivo cita o pedido e o número.",
+  },
+  // --- agenda (Google Agenda conectado). Data fixa: quarta 30/09/2026, 10h em Brasília.
+  // Ocupado: quinta 01/10 das 10h às 12h e sexta 02/10 das 14h às 16h (ver EVAL_CALENDAR).
+  {
+    id: "g01",
+    title: "Topa conversar: oferece horários",
+    category: "avanço",
+    lead: L("Marcos", "Teixeira", "Diretor Financeiro · Teixeira Construções"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Faz sentido. Vamos conversar, quando você tem tempo?" }],
+    expect: "reply",
+    qualified: true,
+    calendar: true,
+    proposes: true,
+    rubric: "Oferece 2 ou 3 horários livres (dias diferentes), curto e natural, e pergunta qual prefere. Não confirma nada ainda e não escreve link.",
+  },
+  {
+    id: "g02",
+    title: "Pede um horário livre",
+    category: "avanço",
+    lead: L("Luiza", "Prado", "Sócia · Prado Advocacia"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Tenho interesse. Pode ser quinta às 15h?" }],
+    expect: "book",
+    calendar: true,
+    bookAt: "2026-10-01T15:00:00-03:00",
+    rubric: "Marca quinta 01/10 às 15h (está livre) e confirma com uma frase curta citando dia e hora. Não escreve link.",
+  },
+  {
+    id: "g03",
+    title: "Pede um horário ocupado",
+    category: "avanço",
+    lead: L("Renato", "Farias", "Diretor · Farias Logística"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Topo conversar. Pode ser quinta às 11h?" }],
+    expect: "reply",
+    calendar: true,
+    proposes: true,
+    rubric: "Quinta às 11h está ocupado: diz isso com naturalidade e oferece 2 alternativas livres. Não marca e não confirma 11h.",
+  },
+  {
+    id: "g04",
+    title: "Escolhe entre os horários oferecidos",
+    category: "avanço",
+    lead: L("Sérgio", "Barros", "CEO · Barros Indústria", { slotsProposedAt: new Date("2026-09-30T13:00:00Z"), status: "QUALIFIED" }),
+    history: [
+      { sender: "AGENT", content: OPEN },
+      { sender: "LEAD", content: "Vamos sim." },
+      { sender: "AGENT", content: "Ótimo! Tenho quinta, 01/10 às 15h ou sexta, 02/10 às 10h. Qual fica melhor pra você?" },
+      { sender: "LEAD", content: "Sexta às 10h, fechado." },
+    ],
+    expect: "book",
+    calendar: true,
+    bookAt: "2026-10-02T10:00:00-03:00",
+    rubric: "Marca sexta 02/10 às 10h e confirma citando dia e hora. Não marca quinta. Não escreve link.",
+  },
+  {
+    id: "g05",
+    title: "Ainda só entendendo (não oferece horário)",
+    category: "avanço",
+    lead: L("Patrícia", "Gomes", "Gerente Administrativa · Gomes Alimentos"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Que tipo de plano vocês trabalham? Ainda não entendi bem." }],
+    expect: "reply",
+    calendar: true,
+    proposes: false,
+    rubric: "Explica em 1-2 frases o que o corretor faz e faz uma pergunta. NÃO oferece horários ainda: o lead só está entendendo.",
+  },
+  {
+    id: "g06",
+    title: "Pede fim de semana",
+    category: "avanço",
+    lead: L("Helena", "Duarte", "Sócia · Duarte Consultoria"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Interessante! Só consigo no sábado de manhã, pode ser?" }],
+    expect: "reply",
+    calendar: true,
+    proposes: true,
+    rubric: "O corretor só atende em dias úteis: explica isso com leveza e oferece 2 horários livres em dia útil. Não marca sábado.",
+  },
+  {
+    id: "g07",
+    title: "Sem agenda conectada: horário vai pro corretor",
+    category: "handoff",
+    lead: L("Caio", "Ramos", "Diretor · Ramos Seguros"),
+    history: [{ sender: "AGENT", content: OPEN }, { sender: "LEAD", content: "Pode ser quinta às 15h?" }],
+    expect: "handoff",
+    rubric: "Sem agenda conectada, o agente não tem como confirmar horário: passa pro corretor citando o pedido de quinta às 15h.",
+  },
 ];
 
 // Modo rápido: os cenários que mais separam um bom agente de um ruim.
-export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02"];
+export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02", "c01", "c03"];
+
+// Agenda ficticia dos cenarios g*: quarta 30/09/2026, 10h em Brasilia. Ocupado: quinta
+// 01/10 das 10h as 12h e sexta 02/10 das 14h as 16h. Horario de atendimento 8h-19h, dias uteis.
+export const EVAL_NOW = new Date("2026-09-30T13:00:00Z");
+export const EVAL_BUSY: Busy[] = [
+  { start: new Date("2026-10-01T13:00:00Z"), end: new Date("2026-10-01T15:00:00Z") },
+  { start: new Date("2026-10-02T17:00:00Z"), end: new Date("2026-10-02T19:00:00Z") },
+];
+export const EVAL_RULES: SlotRules = { workStartHour: 8, workEndHour: 19, workWeekdaysOnly: true, minutes: 30 };

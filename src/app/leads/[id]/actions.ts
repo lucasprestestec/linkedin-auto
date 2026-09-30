@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { activeIdentityIdOrNull } from "@/lib/identity";
 import { sendOnChannel } from "@/lib/channels";
+import { supersedeDrafts } from "@/lib/outbox";
 import type { MessageChannel } from "@prisma/client";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
@@ -81,7 +82,7 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
     const replied = await prisma.message.count({ where: { leadId, sender: "LEAD" } });
     await prisma.lead.update({
       where: { id: leadId },
-      data: { status: replied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null, followUpsSent: 0 },
+      data: { status: replied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null, followUpsSent: 0, meetingAt: null },
     });
   } else if (kind === "lost") {
     await prisma.lead.update({ where: { id: leadId }, data: { status: "LOST", needsHumanReason: null } });
@@ -89,6 +90,28 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
   return { ok: true, previous: lead.status };
+}
+
+// Reunião marcada (por você, ou pelo lead na sua agenda). A data é opcional: vem do
+// campo "datetime-local" (sem fuso), que tratamos como horário de Brasília.
+// Depois disso a secretária não escreve mais nesta conversa.
+export async function markMeeting(leadId: string, when: string | null) {
+  let meetingAt: Date | null = null;
+  if (when) {
+    // Formato exato do campo (AAAA-MM-DDTHH:MM): o parser de datas do JS aceita lixo demais.
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when.slice(0, 16))) return { error: "Data inválida." };
+    meetingAt = new Date(`${when.slice(0, 16)}:00-03:00`);
+    if (Number.isNaN(meetingAt.getTime())) return { error: "Data inválida." };
+  }
+  await supersedeDrafts(leadId);
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { status: "MEETING_SCHEDULED", meetingAt, needsHumanReason: null, nextStep: "Reunião marcada.", nextStepAt: null },
+  });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/conversations");
+  revalidatePath("/");
+  return { ok: true };
 }
 
 async function leadWithHistory(leadId: string) {
