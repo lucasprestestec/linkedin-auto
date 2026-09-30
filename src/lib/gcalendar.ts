@@ -44,6 +44,7 @@ interface GEvent {
   status?: string;
   summary?: string;
   transparency?: string;
+  eventType?: string;
   hangoutLink?: string;
   htmlLink?: string;
   start?: { dateTime?: string; date?: string };
@@ -82,6 +83,8 @@ export async function listEvents(from: Date, to: Date): Promise<CalendarEvent[]>
     const page = await calendarFetch<{ items?: GEvent[]; nextPageToken?: string }>(`/events?${q}`);
     for (const e of page.items ?? []) {
       if (e.status === "cancelled") continue;
+      // "Casa/Escritório" do Google é uma faixa no calendário deles, não um compromisso.
+      if (e.eventType === "workingLocation") continue;
       if (e.attendees?.some((a) => a.self && a.responseStatus === "declined")) continue;
       const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00-03:00` : null);
       const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T00:00:00-03:00` : null);
