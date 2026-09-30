@@ -5,6 +5,8 @@ import { messagesSentToday } from "@/lib/limits";
 import { instructionsFor } from "@/lib/campaigns";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
 import { deliver, supersedeDrafts } from "@/lib/outbox";
+import { loadCalendarContext } from "@/lib/scheduling";
+import { formatSlot, slotIso } from "@/lib/slots";
 import type { Lead } from "@prisma/client";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
@@ -51,7 +53,9 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     return;
   }
 
-  const bookingUrl = settings.bookingUrl?.trim() || null;
+  // Google Agenda conectado: a secretária vê os horários livres e pode marcar. Se ele
+  // falhar agora, segue sem agenda (proposta de horário vai pro corretor, como antes).
+  const calendar = await loadCalendarContext(settings);
 
   let decision;
   try {
@@ -60,7 +64,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
       history,
       channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },
-      bookingAvailable: Boolean(bookingUrl),
+      calendar: calendar ?? undefined,
     });
     // Fica nos logs da Vercel: por que o agente fez o que fez.
     console.log(
@@ -77,24 +81,35 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     return;
   }
 
-  // O modelo só marca "oferecer agenda"; o link em si é sempre o configurado, anexado aqui.
-  // Nunca duas vezes para o mesmo lead.
-  const offerBooking = decision.offerBooking && Boolean(bookingUrl) && !lead.bookingLinkSentAt && !decision.declined;
-  const message = offerBooking ? `${decision.message}\n\n${bookingUrl}` : decision.message;
-
   try {
-    await deliver(lead, channel, message, {
+    // O lead escolheu um horário livre: marca no Google Agenda junto com a confirmação.
+    // O evento só é criado quando a mensagem sai (aprovada, no modo piloto).
+    if (decision.action === "book") {
+      await deliver(lead, channel, decision.message, {
+        identityId,
+        kind: "REPLY",
+        reason: `${decision.analysis} · Marca na sua agenda: ${formatSlot(decision.slotStart)}`,
+        approval: settings.approvalMode,
+        booking: { startIso: slotIso(decision.slotStart), minutes: settings.meetingMinutes },
+        effects: { followUpsSent: 0 },
+      });
+      return;
+    }
+
+    // Ofereceu horários: qualificado, e o lembrete de 2 dias passa a valer.
+    const proposed = decision.proposedSlots.length > 0 && !decision.declined;
+    await deliver(lead, channel, decision.message, {
       identityId,
       kind: "REPLY",
-      reason: offerBooking ? `${decision.analysis} (com o link da agenda)` : decision.analysis,
+      reason: decision.analysis,
       approval: settings.approvalMode,
-      // Recusou: encerra (sem follow-up). Quer avançar (ou recebeu a agenda): qualificado.
+      // Recusou: encerra (sem follow-up). Quer avançar (ou recebeu horários): qualificado.
       effects: {
-        status: decision.declined ? "LOST" : decision.qualified || offerBooking ? "QUALIFIED" : "CONVERSATION_OPEN",
+        status: decision.declined ? "LOST" : decision.qualified || proposed ? "QUALIFIED" : "CONVERSATION_OPEN",
         needsHumanReason: null,
-        nextStep: offerBooking ? "Mandei o link da agenda; aguardando o lead marcar." : null,
+        nextStep: proposed ? "Sugeri horários de reunião; aguardando o lead escolher." : null,
         nextStepAt: null,
-        ...(offerBooking ? { bookingLinkSentAt: new Date() } : {}),
+        ...(proposed ? { slotsProposedAt: new Date() } : {}),
       },
     });
   } catch (err) {

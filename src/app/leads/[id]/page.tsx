@@ -261,6 +261,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </span>
         </dd>
       </div>
+      {lead.meetingLink && (
+        <div>
+          <dt>Reunião</dt>
+          <dd>
+            <a href={lead.meetingLink} target="_blank" rel="noreferrer" className="link">
+              Abrir a videochamada (Google Meet)
+            </a>
+          </dd>
+        </div>
+      )}
       {lead.nextStep && (
         <div>
           <dt>Próximo passo (secretária)</dt>

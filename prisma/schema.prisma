@@ -78,10 +78,14 @@ model Lead {
   // quando ela volta a olhar esse lead (ex.: decidiu esperar).
   nextStep          String?
   nextStepAt        DateTime?
-  // Reunião: quando foi marcada (data da reunião) e o link de agenda que a secretária mandou.
+  // Reunião: data marcada e, quando foi a secretária que marcou, o evento no Google
+  // Agenda (id, pra remarcar/cancelar) e o link da videochamada.
   meetingAt         DateTime?
-  bookingLinkSentAt DateTime?
-  // A secretária já perguntou "conseguiu ver um horário?" (uma vez só).
+  googleEventId     String?
+  meetingLink       String?
+  // Quando a secretária sugeriu horários e ainda espera o lead escolher.
+  slotsProposedAt   DateTime?
+  // Ela já perguntou "conseguiu ver um horário?" (uma vez só).
   bookingNudgedAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -161,6 +165,9 @@ model Draft {
   reason      String?
   // Atualizações do lead a aplicar quando a mensagem sair (JSON).
   effects     Json
+  // Reunião a marcar no Google Agenda quando a mensagem sair (início ISO + minutos).
+  // O evento só é criado no envio: rascunho descartado não deixa evento sobrando.
+  booking     Json?
   status      DraftStatus    @default(PENDING)
   // O corretor mudou o texto antes de aprovar (mede a confiança na IA).
   edited      Boolean        @default(false)
@@ -211,9 +218,11 @@ model Settings {
   automationPaused    Boolean @default(true)
   // Modo piloto: a secretária escreve, mas nada sai sem o seu OK (aba Aprovações).
   approvalMode        Boolean @default(true)
-  // Link de agenda do corretor (Calendly, Cal.com, Google...): a secretária o manda
-  // quando o lead topa conversar. Vazio = ela não agenda, passa pro corretor.
-  bookingUrl          String?
+  // Google Agenda: a conexão do Google já tinha e-mail; aqui, se o corretor também
+  // liberou a agenda (escopo calendar.events). Só então a secretária marca reunião.
+  googleCalendarEnabled Boolean @default(false)
+  // Duração da reunião que a secretária marca, em minutos.
+  meetingMinutes      Int     @default(30)
   // Como o corretor quer ser chamado no painel ("Boa noite, Lucas.").
   ownerName           String?
   dailyInviteLimit    Int     @default(18)

@@ -5,6 +5,9 @@ import { activeIdentityIdOrNull } from "@/lib/identity";
 import { markNeedsHuman } from "@/lib/handoff";
 import { sendPush } from "@/lib/push";
 import { isWithinWorkHours } from "@/lib/schedule";
+import { deleteMeeting, type CreatedMeeting } from "@/lib/gcalendar";
+import { bookMeeting, type BookingPlan } from "@/lib/scheduling";
+import { formatSlot } from "@/lib/slots";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
 // aprovação ligada (Settings.approvalMode) a mensagem vira um rascunho pro
@@ -39,13 +42,55 @@ export interface DeliverOptions {
   reason?: string | null;
   // Quem chama já sabe o modo (evita uma leitura por mensagem).
   approval?: boolean;
+  // Reunião a marcar no Google Agenda junto com a mensagem (a confirmação ao lead).
+  booking?: BookingPlan;
+}
+
+// O que efetivamente acontece ao "enviar": marca a reunião (se houver), manda a
+// mensagem e aplica as mudanças no lead. A reunião só é criada aqui, na hora do
+// envio: rascunho descartado ou vencido não deixa evento sobrando na agenda. Se a
+// mensagem não sair, o evento é apagado.
+async function sendNow(
+  lead: Lead,
+  channel: MessageChannel,
+  content: string,
+  opts: { identityId?: string | null; subject?: string; effects: LeadEffects; booking?: BookingPlan | null },
+): Promise<void> {
+  let text = content;
+  let effects = opts.effects;
+  let meeting: CreatedMeeting | null = null;
+
+  if (opts.booking) {
+    const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+    meeting = await bookMeeting(lead, opts.booking, settings);
+    // Sem e-mail na ficha o Google não manda convite: o link da videochamada vai na própria mensagem.
+    if (meeting.meetLink) text = `${content}\n\n${meeting.meetLink}`;
+    effects = {
+      ...effects,
+      status: "MEETING_SCHEDULED",
+      meetingAt: new Date(opts.booking.startIso),
+      googleEventId: meeting.id,
+      meetingLink: meeting.meetLink,
+      slotsProposedAt: null,
+      needsHumanReason: null,
+      nextStep: `Reunião marcada para ${formatSlot(new Date(opts.booking.startIso))}.`,
+      nextStepAt: null,
+    };
+  }
+
+  try {
+    await sendOnChannel(lead, channel, text, { identityId: opts.identityId, subject: opts.subject });
+  } catch (err) {
+    if (meeting) await deleteMeeting(meeting.id).catch((e) => console.error("Não consegui apagar a reunião após falha no envio", e));
+    throw err;
+  }
+  await prisma.lead.update({ where: { id: lead.id }, data: effects });
 }
 
 export async function deliver(lead: Lead, channel: MessageChannel, content: string, opts: DeliverOptions): Promise<"sent" | "queued"> {
   const approval = opts.approval ?? (await approvalModeOn());
   if (!approval) {
-    await sendOnChannel(lead, channel, content, { identityId: opts.identityId, subject: opts.subject });
-    await prisma.lead.update({ where: { id: lead.id }, data: opts.effects });
+    await sendNow(lead, channel, content, opts);
     return "sent";
   }
 
@@ -58,6 +103,7 @@ export async function deliver(lead: Lead, channel: MessageChannel, content: stri
       content,
       reason: opts.reason?.slice(0, 300) ?? null,
       effects: JSON.parse(JSON.stringify(opts.effects)) as Prisma.InputJsonValue,
+      ...(opts.booking ? { booking: opts.booking as unknown as Prisma.InputJsonValue } : {}),
     },
   });
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Um lead";
@@ -111,8 +157,12 @@ async function sendApproved(draft: Draft): Promise<SendResult> {
 
   try {
     const identityId = draft.channel === "LINKEDIN" ? await activeIdentityIdOrNull() : null;
-    await sendOnChannel(lead, draft.channel, draft.content, { identityId, subject: draft.subject ?? undefined });
-    await prisma.lead.update({ where: { id: lead.id }, data: draft.effects as LeadEffects });
+    await sendNow(lead, draft.channel, draft.content, {
+      identityId,
+      subject: draft.subject ?? undefined,
+      effects: draft.effects as LeadEffects,
+      booking: draft.booking as unknown as BookingPlan | null,
+    });
     await prisma.draft.update({ where: { id: draft.id }, data: { status: "SENT", decidedAt: new Date(), error: null } });
     return { ok: true };
   } catch (err) {

@@ -445,9 +445,9 @@ export async function emailChannelReady(settings: Settings): Promise<boolean> {
   return settings.emailChannelEnabled && (await emailEnabled());
 }
 
-// Mandou o link da agenda e o lead não marcou em 2 dias: uma pergunta leve, uma vez só.
-// Sai pelo canal da última mensagem (onde o link foi mandado). Depois disso a conversa
-// fica com o corretor, que vê "Qualificado" na lista.
+// Sugeriu horários de reunião e o lead não escolheu em 2 dias: uma pergunta leve, uma vez
+// só. Sai pelo canal da última mensagem (onde os horários foram oferecidos). Depois disso a
+// conversa fica com o corretor, que vê "Qualificado" na lista.
 const BOOKING_NUDGE_DELAY_MS = 2 * DAY_MS;
 
 async function sendBookingNudges(
@@ -462,10 +462,10 @@ async function sendBookingNudges(
       status: "QUALIFIED",
       meetingAt: null,
       bookingNudgedAt: null,
-      bookingLinkSentAt: { lt: new Date(Date.now() - BOOKING_NUDGE_DELAY_MS) },
+      slotsProposedAt: { lt: new Date(Date.now() - BOOKING_NUDGE_DELAY_MS) },
       AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER],
     },
-    orderBy: { bookingLinkSentAt: "asc" },
+    orderBy: { slotsProposedAt: "asc" },
   });
   const rules = parseExclusionList(settings.exclusionList);
   let sent = 0;
@@ -474,7 +474,7 @@ async function sendBookingNudges(
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
     const history = await prisma.message.findMany({ where: { leadId: lead.id }, orderBy: { deliveredAt: "asc" }, select: HISTORY_SELECT });
     const last = history.at(-1);
-    // O lead respondeu depois do link: a conversa andou, não cabe lembrete.
+    // O lead respondeu depois dos horários: a conversa andou, não cabe lembrete.
     if (!last || last.sender === "LEAD") continue;
     const channel = last.channel;
     if (!ready[channel] || budget[channel] <= 0) continue;
@@ -483,9 +483,9 @@ async function sendBookingNudges(
       await deliver(lead, channel, content, {
         identityId,
         kind: "FOLLOW_UP",
-        reason: "Mandei o link da agenda há 2 dias e ele não marcou; pergunta leve, uma vez só.",
+        reason: "Sugeri horários há 2 dias e ele não respondeu; pergunta leve, uma vez só.",
         approval: settings.approvalMode,
-        effects: { bookingNudgedAt: new Date(), nextStep: "Perguntei se conseguiu ver um horário na agenda." },
+        effects: { bookingNudgedAt: new Date(), nextStep: "Perguntei se algum dos horários serviu." },
       });
       spend(budget, channel);
       sent++;

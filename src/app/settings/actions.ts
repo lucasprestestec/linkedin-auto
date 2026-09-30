@@ -95,28 +95,12 @@ export async function updateOwnerName(_prevState: unknown, formData: FormData) {
   return { saved: true };
 }
 
-// Link da agenda: só http(s), sem espaços. Vazio = a secretária não agenda.
-export async function updateBookingUrl(raw: string): Promise<{ url?: string; error?: string }> {
-  const value = raw.trim();
-  if (!value) {
-    await prisma.settings.update({ where: { id: "singleton" }, data: { bookingUrl: null } });
-    revalidatePath("/settings");
-    return { url: "" };
-  }
-  let parsed: URL;
-  try {
-    parsed = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
-  } catch {
-    return { error: "Esse link não parece válido. Cole o endereço completo da sua agenda." };
-  }
-  if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname.includes(".") || /\s/.test(value)) {
-    return { error: "Esse link não parece válido. Cole o endereço completo da sua agenda." };
-  }
-  const url = parsed.toString();
-  if (url.length > 300) return { error: "Link longo demais." };
-  await prisma.settings.update({ where: { id: "singleton" }, data: { bookingUrl: url } });
+// Duração da reunião que a secretária marca na agenda.
+export async function updateMeetingMinutes(minutes: number) {
+  if (![15, 20, 30, 45, 60].includes(minutes)) return { error: "Duração fora do permitido." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { meetingMinutes: minutes } });
   revalidatePath("/settings");
-  return { url };
+  return { saved: true };
 }
 
 // Follow-up padrão da conta: vale pra toda conversa sem regra própria (nem da

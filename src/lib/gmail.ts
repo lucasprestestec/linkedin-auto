@@ -9,7 +9,13 @@ import { open, seal } from "@/lib/secretBox";
 //   Google Cloud, com a Gmail API ativada e o redirecionamento
 //   <APP_URL>/api/email/google/callback autorizado.
 
-const SCOPES = ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/gmail.readonly"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  // Google Agenda: ver os horários livres e criar a reuniao (com link do Meet).
+  "https://www.googleapis.com/auth/calendar.events",
+];
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 export function googleConfigured(): boolean {
@@ -45,7 +51,7 @@ async function tokenRequest(body: Record<string, string>) {
       ...body,
     }),
   });
-  const json = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string; error_description?: string };
+  const json = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string; error?: string; error_description?: string };
   if (!res.ok || !json.access_token) {
     const err = new Error(json.error_description || json.error || `Google respondeu ${res.status}`) as Error & { code?: string };
     err.code = json.error;
@@ -61,7 +67,11 @@ export async function connectGoogle(code: string, redirectUri: string): Promise<
   const profile = await gmailFetch<{ emailAddress: string; historyId: string }>("/profile", tokens.access_token!);
   await prisma.settings.update({
     where: { id: "singleton" },
-    data: { googleEmail: profile.emailAddress.toLowerCase(), googleRefreshToken: seal(tokens.refresh_token), googleHistoryId: profile.historyId },
+    data: { googleEmail: profile.emailAddress.toLowerCase(), googleRefreshToken: seal(tokens.refresh_token),
+      googleHistoryId: profile.historyId,
+      // O corretor pode desmarcar a agenda na tela do Google: so vale se o escopo veio.
+      googleCalendarEnabled: (tokens.scope ?? "").split(" ").includes(CALENDAR_SCOPE),
+    },
   });
   cached = null;
   return profile.emailAddress;
@@ -73,13 +83,13 @@ export async function disconnectGoogle() {
     // Revoga no Google também; se falhar, o corretor ainda pode remover em myaccount.google.com.
     await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(open(s.googleRefreshToken))}`, { method: "POST" }).catch(() => {});
   }
-  await prisma.settings.update({ where: { id: "singleton" }, data: { googleEmail: null, googleRefreshToken: null, googleHistoryId: null } });
+  await prisma.settings.update({ where: { id: "singleton" }, data: { googleEmail: null, googleRefreshToken: null, googleHistoryId: null, googleCalendarEnabled: false } });
   cached = null;
 }
 
 let cached: { token: string; expires: number } | null = null;
 
-async function accessToken(): Promise<string> {
+export async function googleAccessToken(): Promise<string> {
   if (cached && cached.expires > Date.now() + 60_000) return cached.token;
   const s = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { googleRefreshToken: true } });
   if (!s.googleRefreshToken) throw new Error("E-mail do Google não conectado.");
@@ -100,7 +110,7 @@ async function accessToken(): Promise<string> {
 async function gmailFetch<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     ...init,
-    headers: { authorization: `Bearer ${token ?? (await accessToken())}`, "content-type": "application/json", ...init?.headers },
+    headers: { authorization: `Bearer ${token ?? (await googleAccessToken())}`, "content-type": "application/json", ...init?.headers },
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
