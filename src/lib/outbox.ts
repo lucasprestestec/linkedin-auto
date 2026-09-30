@@ -204,7 +204,7 @@ export async function discardDraft(id: string): Promise<{ error?: string }> {
   if (!draft) return { error: "Mensagem não encontrada." };
   const done = await prisma.draft.updateMany({ where: { id, status: "PENDING" }, data: { status: "DISCARDED", decidedAt: new Date() } });
   if (done.count === 0) return { error: "Essa mensagem já foi tratada." };
-  await markNeedsHuman(draft.leadId, "Você descartou a mensagem da secretária — a conversa é sua");
+  await markNeedsHuman(draft.leadId, "Você descartou a mensagem do assistente — a conversa é sua");
   return {};
 }
 

@@ -1,7 +1,7 @@
 // Service worker: só recebe as notificações de "precisa de você" e abre o
 // lead ao tocar. Não faz cache de nada.
 self.addEventListener("push", (event) => {
-  let data = { title: "LinkedIn Leads", body: "Um lead precisa de você.", url: "/" };
+  let data = { title: "Central Dors", body: "Um lead precisa de você.", url: "/" };
   try {
     data = { ...data, ...event.data.json() };
   } catch {}

@@ -5,21 +5,24 @@ import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
 import { connectDeskcomm, disconnectDeskcomm, updateWhatsappChannel } from "./actions";
 
-// WhatsApp pelo Deskcomm: endereço + token de API. Conectado, mostra as regras
-// (liga/desliga e limite diário). A secretária só usa o WhatsApp com quem já
-// deu sinal de interesse.
+// WhatsApp pelo Deskcomm: chave de acesso (e o endereço, se o servidor não tem um
+// fixo). Conectado, mostra as regras (liga/desliga e limite diário). A
+// secretária só usa o WhatsApp com quem já deu sinal de interesse.
 export function WhatsappCard({
   host,
   channelId,
   enabled,
   dailyLimit,
   sentToday,
+  fixedAddress,
 }: {
   host: string | null;
   channelId: string | null;
   enabled: boolean;
   dailyLimit: number;
   sentToday: number;
+  // O servidor tem endereço único: o cliente não precisa informá-lo.
+  fixedAddress: boolean;
 }) {
   const connected = Boolean(host);
   const [form, setForm] = useState({ url: "", token: "", channelId: "" });
@@ -37,10 +40,10 @@ export function WhatsappCard({
       if (r.error) return setMessage({ ok: false, text: r.error });
       setMessage({
         ok: true,
-        text: r.channelDetected ? "WhatsApp conectado." : "Conectado, mas não achei o número de onde as conversas novas saem. Informe o ID do canal abaixo.",
+        text: r.channelDetected ? "WhatsApp conectado." : "WhatsApp conectado. O número é reconhecido sozinho quando a primeira conversa chegar.",
       });
       setForm({ url: "", token: "", channelId: "" });
-      setEditing(!r.channelDetected);
+      setEditing(false);
       setConfirming(false);
     });
   }
@@ -65,15 +68,15 @@ export function WhatsappCard({
           <small>
             {connected
               ? channelId
-                ? "A secretária usa o WhatsApp só com quem já deu sinal de interesse."
-                : "Falta o número de onde as conversas novas saem."
-              : "Opcional. A secretária só usa o WhatsApp com quem já respondeu ou abriu seus e-mails."}
+                ? "O assistente usa o WhatsApp só com quem já deu sinal de interesse."
+                : "O número é reconhecido sozinho quando a primeira conversa chegar."
+              : "Opcional. O assistente só usa o WhatsApp com quem já respondeu ou abriu seus e-mails."}
           </small>
         </div>
         {connected && !editing && !confirming && (
           <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn-line btn-sm" onClick={() => setEditing(true)}>
-              Trocar
+              {fixedAddress ? "Trocar chave" : "Trocar"}
             </button>
             <button type="button" className="btn-line btn-sm" onClick={() => setConfirming(true)}>
               Desconectar
@@ -87,7 +90,7 @@ export function WhatsappCard({
       {confirming && (
         <div className="note stack" style={{ gap: 10 }}>
           <p>
-            <b>Desconectar o WhatsApp?</b> A secretária para de enviar e ler mensagens por lá.
+            <b>Desconectar o WhatsApp?</b> O assistente para de enviar e ler mensagens por lá.
           </p>
           <div className="row" style={{ gap: 8 }}>
             <button
@@ -113,23 +116,24 @@ export function WhatsappCard({
 
       {(editing || !connected) && (
         <form className="form" onSubmit={connect}>
+          {!fixedAddress && (
+            <div>
+              <label className="label">
+                Endereço da conexão <Help>Fornecido pelo suporte na hora de configurar o WhatsApp.</Help>
+              </label>
+              <input
+                className="field"
+                inputMode="url"
+                placeholder={host ? "Deixe em branco para manter o atual" : "https://…"}
+                value={form.url}
+                onChange={(e) => setForm({ ...form, url: e.target.value })}
+                required={!connected}
+              />
+            </div>
+          )}
           <div>
             <label className="label">
-              Endereço da conexão <Help>Fornecido pelo suporte na hora de configurar o WhatsApp.</Help>
-            </label>
-            <input
-              className="field"
-              inputMode="url"
-              placeholder={host ? "Deixe em branco para manter o atual" : "https://…"}
-              value={form.url}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
-              required={!connected}
-            />
-          </div>
-          <div>
-            <label className="label">
-              Chave de acesso{" "}
-              <Help>Também fornecida pelo suporte.</Help>
+              Chave de acesso <Help>Fornecida pelo suporte na hora de configurar o WhatsApp.</Help>
             </label>
             <input
               className="field"
@@ -141,18 +145,22 @@ export function WhatsappCard({
               required={!connected}
             />
           </div>
-          <div>
-            <label className="label">
-              Número (opcional){" "}
-              <Help>É o número de onde as conversas novas saem. Se já existe alguma conversa, ele é encontrado sozinho.</Help>
-            </label>
-            <input
-              className="field"
-              placeholder={channelId ?? "Encontrado sozinho quando já há conversa"}
-              value={form.channelId}
-              onChange={(e) => setForm({ ...form, channelId: e.target.value })}
-            />
-          </div>
+          <details className="fold">
+            <summary>Opções avançadas</summary>
+            <div className="fold-body">
+              <div>
+                <label className="label">
+                  Identificador do número <Help>Só para o suporte. Normalmente o número é reconhecido sozinho quando a primeira conversa chega.</Help>
+                </label>
+                <input
+                  className="field"
+                  placeholder={channelId ?? "Reconhecido sozinho"}
+                  value={form.channelId}
+                  onChange={(e) => setForm({ ...form, channelId: e.target.value })}
+                />
+              </div>
+            </div>
+          </details>
           <div className="form-actions">
             <button type="submit" className="btn-solid" disabled={pending}>
               {pending ? "Conectando…" : connected ? "Salvar e testar" : "Conectar"}
@@ -171,7 +179,7 @@ export function WhatsappCard({
           <div className="setting">
             <span className="setting-text">
               <b>
-                Usar o WhatsApp <Help>Só com quem já respondeu ou abriu seus e-mails. Desligado, a secretária só responde quem escrever por lá.</Help>
+                Usar o WhatsApp <Help>Só com quem já respondeu ou abriu seus e-mails. Desligado, o assistente só responde quem escrever por lá.</Help>
               </b>
             </span>
             <button

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — Secretaria Comercial",
-  description: "Como a Secretaria Comercial trata dados pessoais e dados da sua conta Google.",
+  title: "Política de Privacidade — Central Dors",
+  description: "Como a Central Dors trata dados pessoais e dados da sua conta Google.",
 };
 
 
@@ -13,11 +13,11 @@ export default function PrivacyPage() {
   return (
     <main className="legal">
       <h1 style={{ fontSize: 30, marginBottom: 4 }}>Política de Privacidade</h1>
-      <p style={{ opacity: 0.7, marginTop: 0 }}>Secretaria Comercial · Última atualização: 29/09/2026</p>
+      <p style={{ opacity: 0.7, marginTop: 0 }}>Central Dors · Última atualização: 29/09/2026</p>
 
       <h2>1. Quem somos</h2>
       <p>
-        A Secretaria Comercial é um sistema operado por Lucas Prestes (LP Sistemas) que ajuda profissionais e empresas (os &ldquo;clientes&rdquo;) a conversar com seus
+        A Central Dors é um sistema operado por Lucas Prestes (LP Sistemas) que ajuda profissionais e empresas (os &ldquo;clientes&rdquo;) a conversar com seus
         contatos comerciais e marcar reuniões. Contato sobre privacidade: <a href="mailto:eu@lucasprestes.com">eu@lucasprestes.com</a>.
       </p>
 

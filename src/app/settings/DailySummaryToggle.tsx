@@ -13,7 +13,7 @@ export function DailySummaryToggle({ enabled, endHour, hasEmail, hasPush }: { en
   return (
     <div className="setting" style={{ padding: 0 }}>
       <p className="grow">
-        Às {endHour}h, quando o expediente acaba, a secretária manda um resumo do dia.{" "}
+        Às {endHour}h, quando o expediente acaba, o assistente manda um resumo do dia.{" "}
         <Help>Convites, mensagens, quem respondeu, quem abriu seus e-mails e quem precisa de você. Chega por {where}. Dia sem novidade não gera aviso.</Help>
       </p>
       <button

@@ -65,12 +65,12 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
     if (!(await activeIdentityIdOrNull())) return { error: "Conecte o LinkedIn em Canais pra enviar o convite." };
   }
   if (firstContact === "EMAIL") {
-    if (!e.email) return { error: "Pra a secretária se apresentar por e-mail, informe o e-mail." };
-    if (!(await emailEnabled())) return { error: "Conecte o e-mail em Canais pra a secretária mandar a primeira mensagem." };
+    if (!e.email) return { error: "Para o assistente se apresentar por e-mail, informe o e-mail." };
+    if (!(await emailEnabled())) return { error: "Conecte o e-mail em Canais para o assistente mandar a primeira mensagem." };
   }
   if (firstContact === "WHATSAPP") {
-    if (!p.phone) return { error: "Pra a secretária falar pelo WhatsApp, informe o número." };
-    if (!(await deskcommConfig())) return { error: "Conecte o WhatsApp em Canais pra a secretária mandar a primeira mensagem." };
+    if (!p.phone) return { error: "Para o assistente falar pelo WhatsApp, informe o número." };
+    if (!(await deskcommConfig())) return { error: "Conecte o WhatsApp em Canais para o assistente mandar a primeira mensagem." };
   }
 
   const channel: MessageChannel | null = firstContact === "EMAIL" || firstContact === "WHATSAPP" ? firstContact : null;
@@ -92,8 +92,8 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
         firstContact === "LINKEDIN"
           ? "Convite do LinkedIn a caminho."
           : channel
-            ? `A secretária vai se apresentar por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"} no próximo horário de trabalho.`
-            : "Você começa a conversa quando quiser; depois a secretária acompanha.",
+            ? `O assistente vai se apresentar por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"} no próximo horário de trabalho.`
+            : "Você começa a conversa quando quiser; depois o assistente acompanha.",
     },
   });
 

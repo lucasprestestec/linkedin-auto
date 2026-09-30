@@ -21,14 +21,14 @@ const body = Onest({
 });
 
 export const metadata: Metadata = {
-  title: "LinkedIn Leads",
-  description: "Conversas e leads do LinkedIn",
+  title: "Central Dors",
+  description: "Conversas, acompanhamento e reuniões com seus contatos, por LinkedIn, e-mail e WhatsApp.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Leads",
+    title: "Central Dors",
   },
 };
 

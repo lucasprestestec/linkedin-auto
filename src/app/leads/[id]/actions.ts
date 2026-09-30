@@ -94,7 +94,7 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
 
 // Reunião marcada (por você, ou pelo lead na sua agenda). A data é opcional: vem do
 // campo "datetime-local" (sem fuso), que tratamos como horário de Brasília.
-// Depois disso a secretária não escreve mais nesta conversa.
+// Depois disso o assistente não escreve mais nesta conversa.
 export async function markMeeting(leadId: string, when: string | null) {
   let meetingAt: Date | null = null;
   if (when) {
@@ -153,7 +153,7 @@ export async function updateLeadFollowUp(leadId: string, value: { count: number;
 }
 
 // Ficha pessoal: canais (e-mail, WhatsApp) e o que o corretor sabe da pessoa.
-// A secretária usa isso pra escolher o canal e personalizar as mensagens.
+// O assistente usa isso pra escolher o canal e personalizar as mensagens.
 export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string }) {
   const e = parseEmail(data.email);
   if ("error" in e) return { error: e.error };

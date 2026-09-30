@@ -36,7 +36,7 @@ export function WorkHoursForm({ start, end, weekdaysOnly }: { start: number; end
         <button type="button" role="switch" aria-checked={weekdays} aria-label="Só em dias úteis" className="switch" onClick={() => setWeekdays((w) => !w)} />
       </div>
       <p className="hint">
-        A secretária só manda mensagem {weekdays ? "de segunda a sexta" : "todos os dias"}, das {from}h às {to}h. Se uma pessoa escrever fora disso, a resposta sai
+        O assistente só manda mensagem {weekdays ? "de segunda a sexta" : "todos os dias"}, das {from}h às {to}h. Se uma pessoa escrever fora disso, a resposta sai
         quando o horário abrir.
       </p>
       {(dirty || state?.saved || state?.error) && (

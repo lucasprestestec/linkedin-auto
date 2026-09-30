@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Termos de Serviço — Secretaria Comercial",
-  description: "Condições de uso da Secretaria Comercial.",
+  title: "Termos de Serviço — Central Dors",
+  description: "Condições de uso da Central Dors.",
 };
 
 
@@ -11,11 +11,11 @@ export default function TermsPage() {
   return (
     <main className="legal">
       <h1 style={{ fontSize: 30, marginBottom: 4 }}>Termos de Serviço</h1>
-      <p style={{ opacity: 0.7, marginTop: 0 }}>Secretaria Comercial · Última atualização: 29/09/2026</p>
+      <p style={{ opacity: 0.7, marginTop: 0 }}>Central Dors · Última atualização: 29/09/2026</p>
 
       <h2>1. O serviço</h2>
       <p>
-        A Secretaria Comercial ajuda o cliente a conversar com seus contatos comerciais (LinkedIn, e-mail e WhatsApp), a fazer follow-up e a marcar reuniões
+        A Central Dors ajuda o cliente a conversar com seus contatos comerciais (LinkedIn, e-mail e WhatsApp), a fazer follow-up e a marcar reuniões
         na agenda do Google. O sistema é operado por Lucas Prestes (LP Sistemas).
       </p>
 

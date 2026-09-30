@@ -51,7 +51,7 @@ export async function syncWhatsapp(): Promise<{ checked: number; saved: number; 
     // está com ele, a secretária não entra por cima.
     const last = await prisma.message.findFirst({ where: { leadId: lead.id }, orderBy: { deliveredAt: "desc" }, select: { sender: true } });
     if (leadWrote && last?.sender !== "LEAD") {
-      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: 0, nextStep: "Você respondeu pelo WhatsApp; a secretária não interfere.", nextStepAt: null } });
+      await prisma.lead.update({ where: { id: lead.id }, data: { followUpsSent: 0, nextStep: "Você respondeu pelo WhatsApp; o assistente não interfere.", nextStepAt: null } });
       continue;
     }
     if (leadWrote) {

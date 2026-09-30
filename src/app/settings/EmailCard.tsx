@@ -44,7 +44,7 @@ export function EmailCard({
           </b>
           <small>
             {connected || fallbackAddress
-              ? "A secretária envia e lê e-mails por esta conta."
+              ? "O assistente envia e lê e-mails por esta conta."
               : expired
                 ? "O Google pediu para confirmar o acesso de novo."
                 : "Você entra pelo Google, sem passar senha."}
@@ -71,7 +71,7 @@ export function EmailCard({
       {googleAddress && confirming && (
         <div className="note stack" style={{ gap: 10 }}>
           <p>
-            <b>Desconectar o e-mail?</b> A secretária para de enviar e ler e-mails. As conversas continuam aqui.
+            <b>Desconectar o e-mail?</b> O assistente para de enviar e ler e-mails. As conversas continuam aqui.
           </p>
           <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn-line btn-sm btn-danger-line" disabled={pending} onClick={() => start(() => disconnectEmail())}>

@@ -29,7 +29,7 @@ export async function LinkedinCard({ settings, status, today }: { settings: Sett
             {connected
               ? today
               : settings.linkedinNeedsReconnect
-                ? `${settings.linkedinReconnectReason ?? "A sessão caiu"}. Reconecte para a secretária voltar a trabalhar.`
+                ? `${settings.linkedinReconnectReason ?? "A sessão caiu"}. Reconecte para o assistente voltar a trabalhar.`
                 : "Convites, primeira mensagem e conversas."}
           </small>
         </div>

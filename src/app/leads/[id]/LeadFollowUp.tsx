@@ -26,7 +26,7 @@ export function LeadFollowUp({
     <section className="sec">
       <h2 className="t-label">
         Acompanhamento
-        <Help>Se a pessoa não responder, a secretária manda novas mensagens depois de alguns dias. Aqui você muda isso só para esta conversa.</Help>
+        <Help>Se a pessoa não responder, o assistente manda novas mensagens depois de alguns dias. Aqui você muda isso só para esta conversa.</Help>
         {sent > 0 && <span className="faint" style={{ marginLeft: "auto" }}>{sent} enviada{sent > 1 ? "s" : ""}</span>}
       </h2>
       <FollowUpOverride custom={value} onChange={setValue} inheritedLabel={inheritedLabel} idPrefix={`fu-${leadId}`} />

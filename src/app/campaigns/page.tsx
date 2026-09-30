@@ -22,7 +22,7 @@ export default async function CampaignsPage() {
             Campanhas{" "}
             <Help>
               Cada campanha é um grupo de pessoas que você quer alcançar com uma oferta. É opcional: você também pode adicionar pessoas sem campanha. Use campanhas para separar
-              ofertas diferentes; a secretária usa a oferta de cada uma na conversa.
+              ofertas diferentes; o assistente usa a oferta de cada uma na conversa.
             </Help>
           </h1>
           <p className="t-sub">Grupos de pessoas com uma oferta.</p>

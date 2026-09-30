@@ -10,7 +10,7 @@ export interface FollowUpValue {
 
 export function followUpSummary({ count, days }: FollowUpValue): string {
   if (count === 0) return `Sem acompanhamento: se não responder em ${days} dia${days > 1 ? "s" : ""}, a conversa vai para "Sem resposta".`;
-  return `Se a pessoa não responder, a secretária manda até ${count} mensage${count > 1 ? "ns" : "m"}, uma a cada ${days} dia${
+  return `Se a pessoa não responder, o assistente manda até ${count} mensage${count > 1 ? "ns" : "m"}, uma a cada ${days} dia${
     days > 1 ? "s" : ""
   }. Depois disso, a conversa vai para "Sem resposta".`;
 }

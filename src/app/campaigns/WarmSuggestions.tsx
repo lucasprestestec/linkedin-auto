@@ -123,7 +123,7 @@ export function WarmSuggestions() {
           {excludedSummary(state.excluded) && <p className="hint" style={{ margin: 0 }}>{excludedSummary(state.excluded)}</p>}
           {state.scoring === "off" && (
             <p className="hint" style={{ margin: 0 }}>
-              Dica: descreva seu cliente ideal em <a href="/settings#alcance" className="btn-text">Conta</a> e a secretária dá uma nota de encaixe para cada pessoa.
+              Dica: descreva seu cliente ideal em <a href="/settings#alcance" className="btn-text">Conta</a> e o assistente dá uma nota de encaixe para cada pessoa.
             </p>
           )}
           {state.scoring === "error" && <p className="hint" style={{ margin: 0 }}>Não deu para calcular o encaixe agora; a lista segue sem nota.</p>}

@@ -50,7 +50,7 @@ export function ReplyForm({
     if (state && !state.error) document.getElementById("thread-end")?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [state]);
 
-  // Rascunho da secretária: preenche o campo pra você revisar. Nada é enviado sozinho.
+  // Rascunho do assistente: preenche o campo pra você revisar. Nada é enviado sozinho.
   function suggest() {
     setSuggestError(null);
     startSuggest(async () => {

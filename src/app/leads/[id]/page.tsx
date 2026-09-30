@@ -58,7 +58,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const events = [
     { when: lead.createdAt, text: "Entrou na sua lista" },
     lead.invitedAt && { when: lead.invitedAt, text: "Convite enviado" },
-    firstOut && { when: firstOut.deliveredAt, text: firstOut.sender === "AGENT" ? "A secretária abriu a conversa" : "Você abriu a conversa" },
+    firstOut && { when: firstOut.deliveredAt, text: firstOut.sender === "AGENT" ? "O assistente abriu a conversa" : "Você abriu a conversa" },
     firstIn && { when: firstIn.deliveredAt, text: `${firstName} respondeu pela primeira vez` },
     lead.followUpsSent > 0 && lastMsg && { when: lastMsg.deliveredAt, text: `${lead.followUpsSent} mensagem${lead.followUpsSent > 1 ? "s" : ""} de acompanhamento sem resposta` },
     lead.status === "NEEDS_HUMAN" && { when: lead.updatedAt, text: `Passou para você: ${readableReason(lead.needsHumanReason ?? "precisa de resposta")}` },
@@ -82,7 +82,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     <div className="thread">
       {lead.messages.length === 0 && (
         <p className="empty" style={{ textAlign: "center" }}>
-          {lead.status === "INVITE_SENT" ? "Nenhuma mensagem ainda. Quando o convite for aceito, a secretária abre a conversa." : "Conexão aceita. A secretária manda a primeira mensagem na próxima rodada."}
+          {lead.status === "INVITE_SENT" ? "Nenhuma mensagem ainda. Quando o convite for aceito, o assistente abre a conversa." : "Conexão aceita. O assistente manda a primeira mensagem na próxima rodada."}
         </p>
       )}
 
@@ -112,7 +112,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               )}
               <div className="bubble">{message.content}</div>
               <div className="msg-meta">
-                {message.sender === "AGENT" ? "Secretária · " : message.sender === "HUMAN" ? "Você · " : ""}
+                {message.sender === "AGENT" ? "Assistente · " : message.sender === "HUMAN" ? "Você · " : ""}
                 {clockTime(message.deliveredAt)}
               </div>
             </div>

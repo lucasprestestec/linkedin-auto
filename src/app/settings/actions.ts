@@ -95,7 +95,7 @@ export async function updateOwnerName(_prevState: unknown, formData: FormData) {
   return { saved: true };
 }
 
-// Duração da reunião que a secretária marca na agenda.
+// Duração da reunião que o assistente marca na agenda.
 export async function updateMeetingMinutes(minutes: number) {
   if (![15, 20, 30, 45, 60].includes(minutes)) return { error: "Duração fora do permitido." };
   await prisma.settings.update({ where: { id: "singleton" }, data: { meetingMinutes: minutes } });

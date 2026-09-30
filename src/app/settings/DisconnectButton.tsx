@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { disconnectLinkedin, linkedinDataCount } from "./actions";
 
-// Desconectar para a secretária. Se há pessoas e conversas vindas do LinkedIn,
+// Desconectar para o assistente. Se há pessoas e conversas vindas do LinkedIn,
 // pergunta se é pra apagar também (quem entrega a conta a outra pessoa não
 // deve deixar dados pra trás).
 export function DisconnectButton() {
@@ -36,7 +36,7 @@ export function DisconnectButton() {
   return (
     <div className="note stack" style={{ gap: 10 }}>
       <p>
-        <b>Desconectar o LinkedIn?</b> A secretária para até você conectar uma conta.
+        <b>Desconectar o LinkedIn?</b> O assistente para até você conectar uma conta.
         {count > 0 && (
           <>
             {" "}

@@ -63,7 +63,7 @@ export async function bookMeeting(lead: Pick<Lead, "firstName" | "lastName" | "e
 
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "contato";
   const details = [
-    "Marcada pela secretária a partir da conversa com o lead.",
+    "Marcada pelo assistente a partir da conversa com o lead.",
     lead.phone ? `WhatsApp: ${lead.phone}` : null,
     lead.email ? `E-mail: ${lead.email}` : null,
     lead.linkedinProfileUrl ? `LinkedIn: ${lead.linkedinProfileUrl}` : null,

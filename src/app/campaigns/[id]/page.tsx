@@ -73,7 +73,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
 
       <section className="sec">
         <div className="sec-head">
-          <h2 className="t-label">Como a secretária conduz</h2>
+          <h2 className="t-label">Como o assistente conduz</h2>
           <Link href={`/campaigns/${campaign.id}/edit`} className="btn-text">
             Alterar
           </Link>
@@ -106,7 +106,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
           )}
         </div>
         {people.length === 0 ? (
-          <p className="empty">Ninguém ainda. Quem você convidar aparece aqui, e a secretária conversa com a oferta desta campanha.</p>
+          <p className="empty">Ninguém ainda. Quem você convidar aparece aqui, e o assistente conversa com a oferta desta campanha.</p>
         ) : (
           <ul className="list">
             {people.map((c) => (

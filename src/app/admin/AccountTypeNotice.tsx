@@ -44,7 +44,7 @@ const ITEMS: { title: string; status: Status; yours: string; other: string }[] =
   {
     title: "Mensagens",
     status: "ok",
-    yours: "A secretária só conversa com quem já é conexão, o que funciona em qualquer conta.",
+    yours: "O assistente só conversa com quem já é conexão, o que funciona em qualquer conta.",
     other: "Mandar mensagem para quem não é conexão (InMail) exige Premium. O sistema não usa isso.",
   },
 ];

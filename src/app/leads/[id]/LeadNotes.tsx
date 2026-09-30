@@ -24,7 +24,7 @@ export function LeadNotes({ leadId, notes }: { leadId: string; notes: string; au
       <div className="sec-head">
         <h2 className="t-label">
           Anotações
-          <Help>Só você vê. A secretária não lê as anotações.</Help>
+          <Help>Só você vê. O assistente não lê as anotações.</Help>
         </h2>
         {!editing && (
           <button type="button" className="btn-text" onClick={() => setEditing(true)}>

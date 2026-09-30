@@ -59,7 +59,7 @@ export default async function SettingsPage() {
       <header className="p-head">
         <div>
           <h1 className="t-title">Conta</h1>
-          <p className="t-sub">Como a secretária deve trabalhar por você.</p>
+          <p className="t-sub">Como o assistente deve trabalhar por você.</p>
         </div>
       </header>
 
@@ -85,7 +85,7 @@ export default async function SettingsPage() {
           </SettingItem>
           <SettingItem
             title="Agenda de reuniões"
-            summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: a secretária passa a conversa para você"}
+            summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: o assistente passa a conversa para você"}
           >
             <CalendarForm
               minutes={settings.meetingMinutes}
@@ -117,7 +117,7 @@ export default async function SettingsPage() {
             <Link href="/prospect" className="item">
               <span className="item-main">
                 <span className="item-title">Prospectar</span>
-                <span className="item-sub">Adicionar pessoas para a secretária abordar</span>
+                <span className="item-sub">Adicionar pessoas para o assistente abordar</span>
               </span>
             </Link>
           </li>

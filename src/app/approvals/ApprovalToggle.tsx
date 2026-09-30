@@ -3,7 +3,7 @@
 import { useOptimistic, useTransition } from "react";
 import { setApprovalMode } from "./actions";
 
-// Liga/desliga "aprovar antes de enviar". Desligado, a secretária envia sozinha.
+// Liga/desliga "aprovar antes de enviar". Desligado, o assistente envia sozinha.
 export function ApprovalToggle({ on }: { on: boolean }) {
   const [optimistic, setOptimistic] = useOptimistic(on);
   const [, startTransition] = useTransition();

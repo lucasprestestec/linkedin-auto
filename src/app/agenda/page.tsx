@@ -20,8 +20,8 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
           <h1 className="t-title">Agenda</h1>
           <p className="t-sub">
             {data.connected && data.googleEmail
-              ? `Agenda da conta Google conectada (${data.googleEmail}). As reuniões que a secretária marcar entram aqui.`
-              : "Sua agenda do Google: o que já está marcado e os horários que a secretária pode oferecer."}
+              ? `Agenda da conta Google conectada (${data.googleEmail}). As reuniões que o assistente marcar entram aqui.`
+              : "Sua agenda do Google: o que já está marcado e os horários que o assistente pode oferecer."}
           </p>
         </div>
       </header>
@@ -31,7 +31,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
           <p>
             {data.needsReconnect
               ? "O Google está conectado, mas sem a permissão da agenda. Reconecte e marque a permissão de agenda."
-              : "Conecte o seu Google para ver a agenda aqui e para a secretária marcar as reuniões."}
+              : "Conecte o seu Google para ver a agenda aqui e para o assistente marcar as reuniões."}
           </p>
           {data.configured ? (
             <div>
