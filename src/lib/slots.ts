@@ -119,6 +119,14 @@ export interface DayWindows {
   label: string;
   // "08:00-10:00", "14:00-19:00": onde cabe uma reunião.
   windows: string[];
+  // As mesmas janelas em minutos desde a meia-noite (pra desenhar na grade da semana).
+  ranges: { startMin: number; endMin: number }[];
+}
+
+// Minutos desde a meia-noite, em Brasília.
+export function minutesOfDay(date: Date): number {
+  const l = local(date);
+  return l.h * 60 + l.min;
 }
 
 // Janelas livres separadas por dia. A janela vai do primeiro início ao fim da última
@@ -134,6 +142,7 @@ export function windowsByDay(starts: Date[], rules: Pick<SlotRules, "minutes" | 
   for (const [k, list] of byDay) {
     const l = local(list[0]);
     const windows: string[] = [];
+    const ranges: { startMin: number; endMin: number }[] = [];
     let from = list[0];
     let prev = list[0];
     const close = () => {
@@ -141,6 +150,7 @@ export function windowsByDay(starts: Date[], rules: Pick<SlotRules, "minutes" | 
       const a = local(from);
       const b = local(end);
       windows.push(`${pad(a.h)}:${pad(a.min)}-${pad(b.h)}:${pad(b.min)}`);
+      ranges.push({ startMin: a.h * 60 + a.min, endMin: b.h * 60 + b.min });
     };
     for (const s of list.slice(1)) {
       if (s.getTime() - prev.getTime() !== step * MIN_MS) {
@@ -150,7 +160,7 @@ export function windowsByDay(starts: Date[], rules: Pick<SlotRules, "minutes" | 
       prev = s;
     }
     close();
-    out.push({ key: k, label: `${WEEKDAYS[l.weekday]}, ${pad(l.d)}/${pad(l.m + 1)}`, windows });
+    out.push({ key: k, label: `${WEEKDAYS[l.weekday]}, ${pad(l.d)}/${pad(l.m + 1)}`, windows, ranges });
   }
   return out;
 }
