@@ -61,7 +61,7 @@ export function WhatsappCard({
     <div className="stack" aria-label="WhatsApp">
       <div className="setting" style={{ padding: 0 }}>
         <div className="setting-text">
-          <b>{connected ? `Conectado · ${host}` : "Não conectado"}</b>
+          <b>{connected ? "Conectado" : "Não conectado"}</b>
           <small>
             {connected
               ? channelId
@@ -114,11 +114,13 @@ export function WhatsappCard({
       {(editing || !connected) && (
         <form className="form" onSubmit={connect}>
           <div>
-            <label className="label">Endereço do Deskcomm</label>
+            <label className="label">
+              Endereço da conexão <Help>Fornecido pelo suporte na hora de configurar o WhatsApp.</Help>
+            </label>
             <input
               className="field"
               inputMode="url"
-              placeholder={host ? `Atual: ${host}` : "https://seu-deskcomm.com.br"}
+              placeholder={host ? "Deixe em branco para manter o atual" : "https://…"}
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
               required={!connected}
@@ -127,16 +129,13 @@ export function WhatsappCard({
           <div>
             <label className="label">
               Chave de acesso{" "}
-              <Help>
-                No Deskcomm: Configurações, API tokens, novo token com &ldquo;Agentes de IA podem LER o CRM (MCP)&rdquo;, &ldquo;…AGIR no CRM (MCP)&rdquo; e
-                &ldquo;Tratar o token como gerente&rdquo;.
-              </Help>
+              <Help>Também fornecida pelo suporte.</Help>
             </label>
             <input
               className="field"
               type="password"
               autoComplete="off"
-              placeholder={connected ? "Deixe em branco para manter a atual" : "dsk_..."}
+              placeholder={connected ? "Deixe em branco para manter a atual" : "Cole a chave"}
               value={form.token}
               onChange={(e) => setForm({ ...form, token: e.target.value })}
               required={!connected}
@@ -145,7 +144,7 @@ export function WhatsappCard({
           <div>
             <label className="label">
               Número (opcional){" "}
-              <Help>É o ID do canal de onde as conversas novas saem. Se já existe alguma conversa no Deskcomm, ele é encontrado sozinho.</Help>
+              <Help>É o número de onde as conversas novas saem. Se já existe alguma conversa, ele é encontrado sozinho.</Help>
             </label>
             <input
               className="field"
@@ -195,8 +194,7 @@ export function WhatsappCard({
             </div>
           )}
           <p className="hint">
-            Hoje: {sentToday} de {rules.dailyLimit} mensagens.{" "}
-            <Help>No Deskcomm, deixe a IA automática desligada nesse número: quem responde é a secretária daqui.</Help>
+            Hoje: {sentToday} de {rules.dailyLimit} mensagens.
           </p>
         </div>
       )}

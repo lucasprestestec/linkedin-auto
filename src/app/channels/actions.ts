@@ -31,14 +31,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function connectDeskcomm(input: { url: string; token: string; channelId?: string }) {
   const current = await currentConfig();
   const url = input.url.trim() ? normalizeDeskcommUrl(input.url) : (current?.url ?? null);
-  if (!url) return { error: "Endereço inválido. Ex.: https://xxxx.trycloudflare.com" };
+  if (!url) return { error: "Endereço inválido." };
   const token = input.token.trim() || current?.token;
-  if (!token) return { error: "Cole o token de API do Deskcomm (começa com dsk_)." };
+  if (!token) return { error: "Cole a chave de acesso do WhatsApp." };
   const manual = input.channelId?.trim() || null;
   if (manual && !UUID.test(manual)) return { error: "O ID do canal tem o formato 8-4-4-4-12 (ex.: 3f2a…)." };
   try {
     const found = await inspectDeskcomm({ url, token });
-    if (found.missingTools.length) return { error: `O token não dá acesso a: ${found.missingTools.join(", ")}. Marque os escopos de MCP (ler e agir) e "gerente".` };
+    if (found.missingTools.length) return { error: "A chave não tem todas as permissões necessárias. Fale com o suporte para gerar uma nova." };
     const channelId = manual ?? found.channelId ?? current?.channelId ?? null;
     await saveDeskcommConnection(url, token, channelId);
     revalidatePath("/channels");
