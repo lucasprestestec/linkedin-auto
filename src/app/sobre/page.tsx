@@ -18,7 +18,7 @@ export default function AboutPage() {
       <h2>O que ela faz</h2>
       <ul>
         <li>Conversa com os seus contatos e leads por LinkedIn, e-mail e WhatsApp, em nome do profissional.</li>
-        <li>Faz follow-up de quem parou de responder e passa a conversa para você quando é a hora.</li>
+        <li>Acompanha quem parou de responder e passa a conversa para você quando é a hora.</li>
         <li>Combina o dia e a hora da reunião com o lead e a coloca direto na sua agenda, com link de videochamada.</li>
         <li>Você aprova as mensagens antes de saírem (modo piloto) ou deixa o assistente enviar sozinho.</li>
       </ul>

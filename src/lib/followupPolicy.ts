@@ -23,9 +23,9 @@ export function followUpRuleFor(
   return { maxCount: account.followUpMaxCount, delayHours: account.followUpDelayHours, source: "account" };
 }
 
-// "2 follow-ups a cada 3 dias" / "Sem follow-up"
+// "2 mensagens de acompanhamento a cada 3 dias" / "Sem acompanhamento"
 export function describeRule(maxCount: number, delayHours: number): string {
-  if (maxCount === 0) return "Sem follow-up";
+  if (maxCount === 0) return "Sem acompanhamento";
   const days = Math.round(delayHours / 24);
-  return `${maxCount} follow-up${maxCount > 1 ? "s" : ""} a cada ${days} dia${days > 1 ? "s" : ""}`;
+  return `${maxCount} mensage${maxCount > 1 ? "ns" : "m"} de acompanhamento a cada ${days} dia${days > 1 ? "s" : ""}`;
 }
