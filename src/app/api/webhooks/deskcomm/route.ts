@@ -23,7 +23,14 @@ export async function POST(request: Request) {
   const ok =
     verifyDeskcommSignature(raw, { signature: request.headers.get("x-webhook-signature"), delivery: request.headers.get("x-webhook-delivery") }, secret) ||
     secretMatches(new URL(request.url).searchParams.get("token"), secret);
-  if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!ok) {
+    // Só presença e tamanho (nunca os valores), pra achar senha faltando ou com espaço sobrando.
+    const given = new URL(request.url).searchParams.get("token");
+    console.warn(
+      `[deskcomm-webhook] recusado: variável ${secret ? `definida (${secret.length} caracteres)` : "NÃO definida"}, senha no endereço ${given ? `presente (${given.length} caracteres)` : "ausente"}, assinatura ${request.headers.get("x-webhook-signature") ? "presente" : "ausente"}`,
+    );
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   const conversationId = conversationIdOf(raw);
   if (!conversationId) return NextResponse.json({ ignored: true });
