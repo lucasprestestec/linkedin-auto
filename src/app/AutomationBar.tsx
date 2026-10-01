@@ -14,7 +14,7 @@ export function AutomationBar({ paused, connected, today }: { paused: boolean; c
     <div className="h-auto">
       <div>
         <b>{!connected ? "Assistente parado" : on ? "Assistente ligado" : "Assistente pausado"}</b>
-        <small>{!connected ? "Conecte o LinkedIn para começar." : on ? today : "Nada é enviado enquanto estiver pausada."}</small>
+        <small>{!connected ? "Conecte o LinkedIn ou o WhatsApp para começar." : on ? today : "Nada é enviado enquanto estiver pausada."}</small>
       </div>
       {connected ? (
         <button
