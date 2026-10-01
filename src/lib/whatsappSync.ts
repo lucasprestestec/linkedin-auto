@@ -10,10 +10,12 @@ import { planInbound, type InboundPlan } from "@/lib/whatsappMedia";
 // secretária abriu (só as conhecidas — o resto da caixa do CRM não é dela).
 // O que o corretor respondeu direto no Deskcomm entra como "você".
 // Áudio, foto e vídeo do lead viram texto (transcrição/descrição) pra secretária entender.
-// Devolve os leads que escreveram, pra secretária responder.
-export async function syncWhatsapp(): Promise<{ checked: number; saved: number; leads: Lead[] }> {
-  const tracked = await prisma.lead.findMany({ where: { whatsappConversationId: { not: null } } });
-  if (!tracked.length) return { checked: 0, saved: 0, leads: [] };
+// Devolve os leads que escreveram, pra secretária responder. Com `only`, lê só aquela conversa
+// (o aviso instantâneo do Deskcomm); `waiting` conta conversas com mídia ainda sendo guardada.
+export async function syncWhatsapp(only?: string): Promise<{ checked: number; saved: number; leads: Lead[]; waiting: number }> {
+  const tracked = await prisma.lead.findMany({ where: { whatsappConversationId: only ?? { not: null } } });
+  if (!tracked.length) return { checked: 0, saved: 0, leads: [], waiting: 0 };
+  let waiting = 0;
   const byConversation = new Map(tracked.map((l) => [l.whatsappConversationId!, l]));
   const updates = await fetchWhatsappUpdates(new Map(tracked.map((l) => [l.whatsappConversationId!, l.whatsappLastAt])));
 
@@ -38,7 +40,10 @@ export async function syncWhatsapp(): Promise<{ checked: number; saved: number; 
 
     // Mídia do lead que o Deskcomm ainda está guardando: não mexe nesta conversa agora e NÃO avança a
     // leitura (na próxima rodada ela já estará pronta e tudo é tratado junto, na ordem).
-    if ([...plans.values()].some((p) => p.action === "wait")) continue;
+    if ([...plans.values()].some((p) => p.action === "wait")) {
+      waiting++;
+      continue;
+    }
 
     let leadWrote = false;
     let unsupported: string | null = null;
@@ -109,5 +114,5 @@ export async function syncWhatsapp(): Promise<{ checked: number; saved: number; 
       wrote.set(lead.id, updated);
     }
   }
-  return { checked: updates.length, saved, leads: [...wrote.values()] };
+  return { checked: updates.length, saved, leads: [...wrote.values()], waiting };
 }
