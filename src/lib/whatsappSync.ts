@@ -39,6 +39,8 @@ export async function syncWhatsapp(only?: string): Promise<{ checked: number; sa
     // Só o que ainda não vimos: nem gravado antes, nem anterior à última leitura.
     const fresh: { m: WhatsappHistoryMessage; at: Date; inbound: boolean }[] = [];
     for (const m of u.messages) {
+      // Mensagem nossa que o WhatsApp recusou (ex.: número em modo de teste) NÃO saiu: não pode virar "você enviou".
+      if (m.direction !== "inbound" && m.status === "failed") continue;
       const exists = await prisma.message.findUnique({ where: { whatsappMessageId: m.id }, select: { id: true } });
       if (exists) continue;
       const at = m.sent_at ? new Date(m.sent_at) : new Date();

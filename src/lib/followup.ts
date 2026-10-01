@@ -505,6 +505,8 @@ export async function runProactive(identityId: string | null): Promise<Proactive
 
   // Mesmas travas do handleIncomingMessage: pausado, nada acontece sozinho.
   if (settings.automationPaused) return { ...result, skipped: "automação pausada" };
+  // O assistente se apresenta pelo nome cadastrado: sem ele, não abre conversa nem faz follow-up.
+  if (!settings.ownerName?.trim()) return { ...result, skipped: "falta cadastrar o nome do corretor" };
   // Fora do horário de trabalho nada sai; o que ficou devido sai na próxima janela.
   if (!isWithinWorkHours(settings)) return { ...result, skipped: "fora do horário de trabalho" };
 

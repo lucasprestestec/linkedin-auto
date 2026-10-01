@@ -44,6 +44,7 @@ export default async function HomePage() {
     .sort((a, b) => Number(b.status === "NEEDS_HUMAN") - Number(a.status === "NEEDS_HUMAN") || b.whenTs - a.whenTs);
 
   const steps = [
+    { done: Boolean(settings.ownerName?.trim()), label: "Cadastrar o seu nome (o assistente se apresenta com ele)", href: "/settings" },
     { done: linkedinOk, label: "Conectar o LinkedIn", href: "/channels" },
     { done: Boolean(settings.targetAudience?.trim()), label: "Dizer quem você quer alcançar", href: "/settings#alcance" },
     { done: conversations.length > 0, label: "Adicionar as primeiras pessoas", href: "/prospect" },
@@ -176,6 +177,7 @@ export default async function HomePage() {
         <AutomationBar
           paused={settings.automationPaused}
           connected={linkedinOk || whatsappOk}
+          hasName={Boolean(settings.ownerName?.trim())}
           today={`${sentToday} mensage${sentToday !== 1 ? "ns" : "m"} hoje`}
         />
       </section>

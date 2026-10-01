@@ -45,6 +45,12 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     return;
   }
 
+  // O assistente escreve como o corretor e se apresenta pelo nome cadastrado: sem ele, não responde.
+  if (!settings.ownerName?.trim()) {
+    await markNeedsHuman(lead.id, "Falta cadastrar o seu nome em Conta → Seu nome: é com ele que o assistente se apresenta");
+    return;
+  }
+
   if (isExcluded({ ...lead, headline: lead.jobTitle }, parseExclusionList(settings.exclusionList))) {
     await markNeedsHuman(lead.id, "Está na lista de exclusão — a IA não responde");
     return;
