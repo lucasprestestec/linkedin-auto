@@ -176,6 +176,8 @@ model Draft {
   // Texto que a secretária escreveu, guardado quando o corretor edita (o content passa
   // a ser o texto dele). A diferença entre os dois mostra o jeito que ele prefere.
   originalContent String?    @db.Text
+  // Sai como mensagem de voz (com a voz do corretor): o content é o que será falado.
+  asAudio     Boolean        @default(false)
   error       String?
   createdAt   DateTime       @default(now())
   decidedAt   DateTime?
@@ -207,6 +209,22 @@ model AgentFeedback {
   @@index([createdAt])
 }
 
+// Áudio gerado pra enviar por WhatsApp. O WhatsApp (Deskcomm) busca o arquivo por um endereço
+// público; o id é um código longo e impossível de adivinhar, e o arquivo some depois do prazo.
+// draftId + textHash deixam reaproveitar o áudio já ouvido na aprovação.
+model OutgoingAudio {
+  id        String   @id
+  bytes     Bytes
+  mime      String
+  draftId   String?
+  textHash  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@index([draftId])
+}
+
 // Inscrição de Web Push (um por navegador/aparelho do corretor).
 model PushSubscription {
   id        String   @id @default(cuid())
@@ -231,6 +249,10 @@ model Message {
   emailThreadId String?
   // WhatsApp (Deskcomm): id da mensagem lá — evita gravar duas vezes.
   whatsappMessageId String? @unique
+  // Mensagem de áudio, foto ou vídeo: "audio" | "image" | "video". Recebida: o content é o
+  // texto que o sistema tirou da mídia (transcrição/descrição). Enviada: o content é o
+  // texto falado no áudio.
+  mediaKind String?
   // Rastreio de abertura dos e-mails enviados (imagem invisível). Sinal fraco:
   // alguns apps abrem sozinhos (Apple Mail), outros bloqueiam imagens (Outlook).
   openToken    String?   @unique
@@ -264,6 +286,9 @@ model Settings {
   // "Meu jeito de escrever": tratamento, emojis, tamanho, regras e exemplos de
   // mensagens do corretor (JSON, ver src/lib/writingStyle.ts).
   writingStyle        Json?
+  // Mensagens de voz: voz clonada do corretor, consentimento e quando mandar áudio
+  // (JSON, ver src/lib/voice/settings.ts).
+  voiceSettings       Json?
   // Modelo do Nous usado nas conversas (escolhido no admin depois do banco de
   // testes). Vazio = NOUS_MODEL do ambiente.
   agentModel          String?

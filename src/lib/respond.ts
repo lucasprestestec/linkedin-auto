@@ -8,6 +8,9 @@ import { deliver, supersedeDrafts } from "@/lib/outbox";
 import { loadCalendarContext } from "@/lib/scheduling";
 import { formatSlot, slotIso } from "@/lib/slots";
 import type { Lead } from "@prisma/client";
+import { decideAudio, parseVoiceSettings } from "@/lib/voice/settings";
+import { fishConfigured } from "@/lib/voice/fish";
+import { publicBaseUrl } from "@/lib/voice/outgoingAudio";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
 // Decide: responder automaticamente (no MESMO canal em que ele escreveu), ou
@@ -28,7 +31,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     prisma.message.findMany({
       where: { leadId: lead.id },
       orderBy: { deliveredAt: "asc" },
-      select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true },
+      select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true, mediaKind: true },
     }),
     lead.campaignId ? prisma.campaign.findUnique({ where: { id: lead.campaignId }, select: { name: true } }) : null,
   ]);
@@ -57,6 +60,16 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   // falhar agora, segue sem agenda (proposta de horário vai pro corretor, como antes).
   const calendar = await loadCalendarContext(settings);
 
+  // Mensagem de voz: depende da escolha do usuario (so texto / quando o lead manda audio / sempre),
+  // de a voz estar criada e autorizada e do servico de voz configurado.
+  const lastInbound = [...history].reverse().find((m) => m.sender === "LEAD");
+  const wantsAudio = decideAudio({
+    settings: parseVoiceSettings(settings.voiceSettings),
+    channel,
+    inboundKind: lastInbound?.mediaKind,
+    serviceReady: fishConfigured() && Boolean(publicBaseUrl()),
+  });
+
   let decision;
   try {
     decision = await decideResponse({
@@ -65,6 +78,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
       channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },
       calendar: calendar ?? undefined,
+      asAudio: wantsAudio,
     });
     // Fica nos logs da Vercel: por que o agente fez o que fez.
     console.log(
@@ -103,6 +117,8 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
       kind: "REPLY",
       reason: decision.analysis,
       approval: settings.approvalMode,
+      // So vai em audio se o texto cabe numa mensagem de voz (curto, sem link nem numero longo).
+      asAudio: wantsAudio && decision.audioOk,
       // Recusou: encerra (sem follow-up). Quer avançar (ou recebeu horários): qualificado.
       effects: {
         status: decision.declined ? "LOST" : decision.qualified || proposed ? "QUALIFIED" : "CONVERSATION_OPEN",

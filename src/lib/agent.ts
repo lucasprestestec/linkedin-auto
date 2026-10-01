@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { checkMessage } from "@/lib/agentCheck";
 import { detectAutomatedMessage } from "@/lib/autoMessage";
 import { renderStyleBlock } from "@/lib/writingStyle";
+import { speechIssues } from "@/lib/voice/speech";
 import { loadWritingStyle } from "@/lib/writingStyleDb";
 import { checkTimesMentioned, formatSlot } from "@/lib/slots";
 
@@ -133,6 +134,12 @@ const CHANNEL_STYLE: Record<MessageChannel, string> = {
   WHATSAPP: "WhatsApp: bem curto e informal, como mensagem entre pessoas. Sem assinatura.",
 };
 
+// Quando a resposta vai ser FALADA (mensagem de voz com a voz do corretor): escreve-se pra ouvir, não pra ler.
+export const AUDIO_STYLE =
+  "MENSAGEM DE VOZ: este texto será FALADO em voz alta, com a voz do corretor, como um áudio de WhatsApp. Escreva como se fala numa conversa: " +
+  "frases curtas e naturais, até uns 60 palavras no total, sem emojis, sem links, sem listas, sem abreviações de chat (escreva \"você\", não \"vc\") " +
+  "e sem números longos. Sem saudação formal e sem assinatura.";
+
 const TIME_ZONE = "America/Sao_Paulo";
 
 function nowLabel(now = new Date()) {
@@ -214,6 +221,11 @@ QUEM RESPONDEU PODE NÃO SER UMA PESSOA
 - Menu de atendimento ("digite 1 para..."), resposta automática de férias/ausência, protocolo de atendimento, FAQ com link, pedido de CPF/CNPJ para seguir, "prove que você é humano" ou assistente de IA de terceiros NÃO são conversa. Nunca escolha opção, responda pergunta deles, faça pitch nem pergunte nada: use action = handoff e diga no motivo, em poucas palavras, o que é (ex.: "Caiu num menu automático da empresa", "Resposta automática de férias até 15/10").
 - Outro vendedor (ou robô de vendas) oferecendo produto a você: não demonstre interesse e não faça pergunta nova. Encerre em uma frase cordial (action = reply, declined = true) ou passe pro corretor.
 
+ÁUDIO, FOTO E VÍDEO DO LEAD
+- Mensagens que começam com [Áudio], [Foto] ou [Vídeo] foram convertidas em texto por um sistema automático (a transcrição ou a descrição do que ele mandou) e podem ter erro em nomes e números. Responda ao conteúdo como quem ouviu ou viu (ex.: "ouvi seu áudio", "vi a foto"), sem falar em transcrição nem em sistema.
+- Se um número, valor ou nome importante parecer duvidoso ou aparecer como [inaudível], confirme com ele antes de assumir (ex.: "só pra confirmar: são 32 pessoas?").
+- Foto ou vídeo de documento pessoal, cartão ou dado sensível: não comente os números; peça pra ele tratar isso direto com o corretor.
+
 PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
 - pedir para ser chamado ou ligado agora (ex.: "me liga", "me chama no zap"): quem faz isso é o corretor;
@@ -276,7 +288,8 @@ ${leadBlock(lead)}`;
 // ---------------------------------------------------------------------------
 
 export type AgentDecision = (
-  | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[] }
+  // audioOk: o texto cabe numa mensagem de voz (curto, sem link nem numero longo).
+  | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[]; audioOk: boolean }
   | { action: "book"; message: string; slotStart: Date }
   // silent: passou pro corretor sem acordá-lo por push (era uma mensagem automática, não uma pessoa).
   | { action: "handoff"; reason: string; silent?: boolean }
@@ -333,6 +346,8 @@ export interface ConversationInput {
   // "Jeito do corretor" já montado (ver writingStyle.ts). Sem este campo, lê das configurações;
   // null = sem estilo (o banco de testes usa, pra não depender do banco de dados).
   style?: string | null;
+  // A resposta vai ser FALADA (mensagem de voz): escreve pra ouvir.
+  asAudio?: boolean;
 }
 
 // Começo do bloco de regras fixas: o estilo do corretor entra sempre antes dele.
@@ -380,7 +395,7 @@ export async function decideResponse(
 
 ${contextBlock(input.instructions, input.lead, now)}
 
-CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}
+CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${input.asAudio ? AUDIO_STYLE : CHANNEL_STYLE[channel]}
 
 ${STYLE}
 
@@ -465,7 +480,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
 
     if (lastIssues.length === 0) {
       if (out.action === "book" && slotStart) return { action: "book", message, slotStart, ...base, checkIssues: [] };
-      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), proposedSlots, ...base, checkIssues: [] };
+      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), proposedSlots, audioOk: speechIssues(message).length === 0, ...base, checkIssues: [] };
     }
 
     const alternatives = input.calendar ? ` Horários livres sugeridos: ${input.calendar.suggestions.map((s) => `${s.label} (${s.iso})`).join("; ")}.` : "";

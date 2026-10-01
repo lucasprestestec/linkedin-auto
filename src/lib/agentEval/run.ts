@@ -84,6 +84,8 @@ export interface EvalResult {
   decisionOk?: boolean;
   decisionNote?: string;
   judge?: { naturalness: number; competence: number; invented: boolean; brokeRule: boolean; comment: string };
+  // A resposta cabe numa mensagem de voz (curta, sem link nem número longo).
+  audioOk?: boolean;
   usage?: Usage;
   ms?: number;
 }
@@ -180,6 +182,8 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
         channel: s.channel,
         // O banco de testes mede o agente sem o estilo de nenhum corretor (e sem tocar no banco de dados).
         style: evalStyle(),
+        // EVAL_AUDIO=1: a resposta vai ser falada (mede se o agente escreve bem pra voz).
+        asAudio: process.env.EVAL_AUDIO === "1",
         ...(s.calendar ? { now: EVAL_NOW, calendar: calendarContextFrom(EVAL_BUSY, EVAL_NOW, EVAL_RULES) } : {}),
       },
       { model, complete: io.complete, skipAutoFilter: process.env.EVAL_NO_FILTER === "1" },
@@ -209,6 +213,7 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
       qualified,
       declined,
       slots,
+      audioOk: d.action === "reply" ? d.audioOk : undefined,
       attempts: d.attempts,
       checkIssues: d.checkIssues,
       decisionOk: dc.ok,

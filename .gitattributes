@@ -1,0 +1,2 @@
+# O patch do Deskcomm nao pode ter o fim de linha convertido (git apply)
+docs/deskcomm/*.patch -text

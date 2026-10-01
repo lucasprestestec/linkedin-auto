@@ -214,6 +214,24 @@ export async function sendWhatsapp(input: { conversationId: string | null; phone
   });
 }
 
+// Manda uma MENSAGEM DE VOZ numa conversa que já existe (áudio, foto e vídeo só vão em conversa
+// aberta). O Deskcomm baixa o arquivo pelo endereço público e converte pro formato do WhatsApp.
+export async function sendWhatsappAudio(input: { conversationId: string; mediaUrl: string; mime: string; idempotencyKey: string }): Promise<SentWhatsapp> {
+  const cfg = await deskcommConfig();
+  if (!cfg) throw new DeskcommError("WhatsApp não conectado.");
+  return withClient(cfg, async (client) => {
+    const r = await client.call<{ message_id: string; status?: string; sent_at?: string | null }>("crm_send_whatsapp_message", {
+      conversation_id: input.conversationId,
+      type: "audio",
+      media_url: input.mediaUrl,
+      media_mime: input.mime,
+      idempotency_key: input.idempotencyKey,
+    });
+    if (r.status === "failed") throw new WhatsappNotSentError(input.conversationId);
+    return { conversationId: input.conversationId, messageId: r.message_id, sentAt: r.sent_at ? new Date(r.sent_at) : new Date() };
+  });
+}
+
 export interface WhatsappHistoryMessage {
   id: string;
   direction: "inbound" | "outbound" | string;
@@ -221,6 +239,13 @@ export interface WhatsappHistoryMessage {
   body: string | null;
   sent_via?: string | null;
   sent_at: string | null;
+  // Mídia (áudio, foto, vídeo). O Deskcomm entrega um link temporário do arquivo quando já o guardou
+  // (media_status "ready"); "pending" = ainda guardando, tente de novo; ausente/"none" = sem mídia ou
+  // uma versão do Deskcomm que ainda não entrega o arquivo.
+  media_mime?: string | null;
+  media_size_bytes?: number | null;
+  media_status?: "none" | "pending" | "ready" | string;
+  media_signed_url?: string | null;
 }
 
 // Conversas que tiveram mensagem nova desde `since` (entre as conhecidas) e

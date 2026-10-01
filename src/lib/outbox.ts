@@ -8,6 +8,7 @@ import { isWithinWorkHours } from "@/lib/schedule";
 import { deleteMeeting, type CreatedMeeting } from "@/lib/gcalendar";
 import { bookMeeting, type BookingPlan } from "@/lib/scheduling";
 import { formatSlot } from "@/lib/slots";
+import { sendAudioMessage } from "@/lib/voice/send";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
 // aprovação ligada (Settings.approvalMode) a mensagem vira um rascunho pro
@@ -44,6 +45,8 @@ export interface DeliverOptions {
   approval?: boolean;
   // Reunião a marcar no Google Agenda junto com a mensagem (a confirmação ao lead).
   booking?: BookingPlan;
+  // Sai como mensagem de voz (WhatsApp). Se o áudio falhar, sai o texto.
+  asAudio?: boolean;
 }
 
 // O que efetivamente acontece ao "enviar": marca a reunião (se houver), manda a
@@ -54,7 +57,7 @@ async function sendNow(
   lead: Lead,
   channel: MessageChannel,
   content: string,
-  opts: { identityId?: string | null; subject?: string; effects: LeadEffects; booking?: BookingPlan | null },
+  opts: { identityId?: string | null; subject?: string; effects: LeadEffects; booking?: BookingPlan | null; asAudio?: boolean; draftId?: string },
 ): Promise<void> {
   let text = content;
   let effects = opts.effects;
@@ -79,7 +82,18 @@ async function sendNow(
   }
 
   try {
-    await sendOnChannel(lead, channel, text, { identityId: opts.identityId, subject: opts.subject });
+    let sentAsAudio = false;
+    // Mensagem de voz só no WhatsApp e nunca junto com reunião (o link precisa ir escrito). Qualquer
+    // falha no caminho do áudio (voz, serviço, endereço, WhatsApp) cai pro texto: a resposta sempre sai.
+    if (opts.asAudio && channel === "WHATSAPP" && !opts.booking) {
+      try {
+        await sendAudioMessage(lead, text, { draftId: opts.draftId });
+        sentAsAudio = true;
+      } catch (err) {
+        console.error(`[voz] áudio não saiu (lead=${lead.id}); mandando em texto:`, err instanceof Error ? err.message : err);
+      }
+    }
+    if (!sentAsAudio) await sendOnChannel(lead, channel, text, { identityId: opts.identityId, subject: opts.subject });
   } catch (err) {
     if (meeting) await deleteMeeting(meeting.id).catch((e) => console.error("Não consegui apagar a reunião após falha no envio", e));
     throw err;
@@ -101,6 +115,7 @@ export async function deliver(lead: Lead, channel: MessageChannel, content: stri
       channel,
       subject: opts.subject ?? null,
       content,
+      asAudio: Boolean(opts.asAudio) && channel === "WHATSAPP" && !opts.booking,
       reason: opts.reason?.slice(0, 300) ?? null,
       effects: JSON.parse(JSON.stringify(opts.effects)) as Prisma.InputJsonValue,
       ...(opts.booking ? { booking: opts.booking as unknown as Prisma.InputJsonValue } : {}),
@@ -162,6 +177,8 @@ async function sendApproved(draft: Draft): Promise<SendResult> {
       subject: draft.subject ?? undefined,
       effects: draft.effects as LeadEffects,
       booking: draft.booking as unknown as BookingPlan | null,
+      asAudio: draft.asAudio,
+      draftId: draft.id,
     });
     await prisma.draft.update({ where: { id: draft.id }, data: { status: "SENT", decidedAt: new Date(), error: null } });
     return { ok: true };
