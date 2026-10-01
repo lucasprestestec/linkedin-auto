@@ -8,6 +8,7 @@ import { MobileHeader } from "@/components/MobileHeader";
 import { Avatar } from "@/components/Avatar";
 import { IconCalendar, IconFlame, IconMessages, IconUserPlus } from "@/components/Icons";
 import { dailyReport } from "@/lib/dailyReport";
+import { deskcommConfigOf } from "@/lib/deskcomm";
 import { AutomationBar } from "./AutomationBar";
 import { linkedinDataCount } from "./settings/actions";
 
@@ -32,6 +33,8 @@ export default async function HomePage() {
 
   const name = firstNameOf(settings.ownerName);
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
+  // O assistente pode rodar só com WhatsApp: o botão de ligar não pode depender do LinkedIn.
+  const whatsappOk = Boolean(deskcommConfigOf(settings));
   const leftover = settings.linkedinIdentityId ? 0 : await linkedinDataCount();
   const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
 
@@ -172,7 +175,7 @@ export default async function HomePage() {
       <section className="sec">
         <AutomationBar
           paused={settings.automationPaused}
-          connected={linkedinOk}
+          connected={linkedinOk || whatsappOk}
           today={`${sentToday} mensage${sentToday !== 1 ? "ns" : "m"} hoje`}
         />
       </section>
