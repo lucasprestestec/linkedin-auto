@@ -57,27 +57,41 @@ export default function PrivacyPage() {
         por nós, somente para gerar a resposta daquela conversa. Esse conteúdo não é usado para publicidade nem vendido. Você pode manter o modo de aprovação
         ligado para revisar cada mensagem antes do envio.
       </p>
+      <p>
+        Quando uma pessoa envia um áudio, uma foto ou um vídeo pelo WhatsApp, o arquivo é enviado ao provedor de inteligência artificial apenas para ser
+        convertido em texto (transcrição ou descrição), e o que guardamos na conversa é esse texto, não o arquivo. Não repetimos números de documentos
+        pessoais que apareçam em imagens.
+      </p>
 
-      <h2>5. Com quem compartilhamos</h2>
+      <h2>5. Mensagens de voz e a sua voz</h2>
+      <p>
+        Se você ativar as mensagens de voz, grava a sua própria voz na tela &ldquo;Minha voz&rdquo;, depois de confirmar que a voz é sua e autorizar o uso. A
+        gravação é enviada ao serviço de voz (Fish Audio) somente para criar uma voz digital, e o assistente passa a poder enviar áudios com ela, em seu
+        nome, nas conversas de WhatsApp que você permitir. Você escolhe quando o assistente responde em áudio e pode apagar a voz a qualquer momento: ela é
+        removida do serviço e das configurações. Os áudios gerados ficam disponíveis por um endereço temporário para o WhatsApp baixá-los e são apagados
+        em até 24 horas.
+      </p>
+
+      <h2>6. Com quem compartilhamos</h2>
       <p>
         Apenas com prestadores necessários para o funcionamento: hospedagem e banco de dados (Vercel e Neon), provedor de inteligência artificial, serviço de
         automação do LinkedIn e o CRM/WhatsApp que você conectar. Não vendemos dados pessoais.
       </p>
 
-      <h2>6. Segurança e retenção</h2>
+      <h2>7. Segurança e retenção</h2>
       <p>
         O token do Google é guardado criptografado. O acesso ao painel exige senha. Mantemos os dados enquanto a conta do cliente estiver ativa e os apagamos
         em até 30 dias após o encerramento ou a pedido. Ao desconectar o Google no sistema, revogamos a autorização e apagamos o token.
       </p>
 
-      <h2>7. Seus direitos (LGPD)</h2>
+      <h2>8. Seus direitos (LGPD)</h2>
       <p>
         Você (cliente ou contato) pode pedir acesso, correção, portabilidade ou exclusão dos seus dados, e revogar consentimentos, escrevendo para{" "}
         <a href="mailto:eu@lucasprestes.com">eu@lucasprestes.com</a>. Os contatos comerciais são tratados pelo cliente que os prospecta (controlador); nós
         atuamos como operadores, seguindo as instruções dele.
       </p>
 
-      <h2>8. Alterações</h2>
+      <h2>9. Alterações</h2>
       <p>Podemos atualizar esta política; a data no topo indica a versão vigente.</p>
 
       <p style={{ marginTop: 32 }}>

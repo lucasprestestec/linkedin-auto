@@ -5,6 +5,9 @@ import { relativeTime } from "@/lib/format";
 import { approvalStats } from "@/lib/outbox";
 import { ApprovalCard, type ApprovalItem } from "./ApprovalCard";
 import { ApprovalToggle } from "./ApprovalToggle";
+import { hasVoice, parseVoiceSettings } from "@/lib/voice/settings";
+import { fishConfigured } from "@/lib/voice/fish";
+import { publicBaseUrl } from "@/lib/voice/outgoingAudio";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +25,14 @@ const TRUST_MIN_RATE = 0.9;
 
 export default async function ApprovalsPage() {
   const [settings, pending, waiting, stats] = await Promise.all([
-    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { approvalMode: true, workStartHour: true, workEndHour: true } }),
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { approvalMode: true, workStartHour: true, workEndHour: true, voiceSettings: true } }),
     prisma.draft.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, include: { lead: { select: { firstName: true, lastName: true, jobTitle: true } } } }),
     prisma.draft.count({ where: { status: "APPROVED" } }),
     approvalStats(),
   ]);
+
+  // Voz criada e autorizada, serviço de voz configurado e endereço público do sistema definido.
+  const audioReady = hasVoice(parseVoiceSettings(settings.voiceSettings)) && fishConfigured() && Boolean(publicBaseUrl());
 
   const items: ApprovalItem[] = pending.map((d) => ({
     id: d.id,
@@ -39,6 +45,8 @@ export default async function ApprovalsPage() {
     subject: d.subject,
     content: d.content,
     reason: d.reason,
+    asAudio: d.asAudio,
+    canAudio: d.channel === "WHATSAPP" && audioReady,
     when: relativeTime(d.createdAt),
   }));
 

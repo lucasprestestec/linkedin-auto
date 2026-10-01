@@ -17,6 +17,9 @@ import { describeRule } from "@/lib/followupPolicy";
 import { parseWritingStyle, summarizeStyle } from "@/lib/writingStyle";
 import { loadSuggestions } from "@/lib/styleSuggestions";
 import { StyleOverview } from "./StyleOverview";
+import { VoiceOverview } from "./VoiceOverview";
+import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
+import { fishConfigured } from "@/lib/voice/fish";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,7 @@ export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const email = await emailConnection();
   const style = parseWritingStyle(settings.writingStyle);
+  const voice = parseVoiceSettings(settings.voiceSettings);
   // As sugestões são um extra: se falharem, a tela abre do mesmo jeito.
   const suggestions = await loadSuggestions(style).catch(() => []);
 
@@ -124,6 +128,9 @@ export default async function SettingsPage() {
             summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
           >
             <StyleOverview style={style} suggestions={suggestions} />
+          </SettingItem>
+          <SettingItem id="voz" title="Mensagens de voz" summary={summarizeVoice(voice)}>
+            <VoiceOverview voice={voice} configured={fishConfigured()} />
           </SettingItem>
         </div>
       </section>

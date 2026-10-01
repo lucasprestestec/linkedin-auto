@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { FeedbackPanel } from "@/components/FeedbackPanel";
 import { DRAFT_REASON_KEYS } from "@/lib/writingStyle";
-import { approve, discard, markDraftFeedback } from "./actions";
+import { approve, discard, markDraftFeedback, previewDraftAudio, setDraftAudio } from "./actions";
 
 export interface ApprovalItem {
   id: string;
@@ -18,6 +18,9 @@ export interface ApprovalItem {
   subject: string | null;
   content: string;
   reason: string | null;
+  asAudio: boolean;
+  // A voz do usuario esta pronta e o servico de voz no ar: da pra mandar este rascunho em audio.
+  canAudio: boolean;
   when: string;
 }
 
@@ -28,6 +31,8 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [audio, setAudio] = useState(item.asAudio);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || "Contato";
   const changed = text.trim() !== item.content.trim();
 
@@ -36,6 +41,26 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
       const r = await approve(item.id, text);
       if ("error" in r) setNotice({ tone: "error", text: r.error });
       else setNotice({ tone: "ok", text: r.status === "waiting" ? "Aprovada. Sai quando o horário de trabalho abrir." : "Enviada." });
+    });
+  }
+
+  function listen() {
+    setNotice(null);
+    startTransition(async () => {
+      const r = await previewDraftAudio(item.id, text);
+      if (r.error) setNotice({ tone: "error", text: r.error });
+      else setAudioUrl(r.url ?? null);
+    });
+  }
+
+  function switchAudio(on: boolean) {
+    startTransition(async () => {
+      const r = await setDraftAudio(item.id, on);
+      if (r.error) setNotice({ tone: "error", text: r.error });
+      else {
+        setAudio(on);
+        setAudioUrl(null);
+      }
     });
   }
 
@@ -75,6 +100,32 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
         aria-label={`Mensagem para ${name}`}
       />
       {item.reason && <p className="hint" style={{ margin: 0 }}>Por que o assistente escreveu isso: {item.reason}</p>}
+
+      {item.channel === "WhatsApp" && (audio || item.canAudio) && (
+        <div className="note stack" style={{ gap: 8 }}>
+          {audio ? (
+            <>
+              <b className="small">Vai sair como mensagem de voz, com a sua voz. O texto acima é o que será falado.</b>
+              <div className="row wrap" style={{ gap: 8 }}>
+                <button type="button" className="btn-line btn-sm" onClick={listen} disabled={pending || !text.trim()}>
+                  {pending ? "Gerando…" : audioUrl ? "Gerar de novo" : "Ouvir antes de enviar"}
+                </button>
+                <button type="button" className="btn-text" onClick={() => switchAudio(false)} disabled={pending}>
+                  Enviar como texto
+                </button>
+              </div>
+              {audioUrl && <audio controls src={audioUrl} style={{ width: "100%" }} />}
+            </>
+          ) : (
+            <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
+              <span className="small">Vai sair em texto.</span>
+              <button type="button" className="btn-text" onClick={() => switchAudio(true)} disabled={pending}>
+                Enviar como áudio
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {notice && (
         <p className={notice.tone === "error" ? "field-error" : "ok-text"} role="status">

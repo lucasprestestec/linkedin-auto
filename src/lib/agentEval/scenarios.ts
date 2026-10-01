@@ -11,7 +11,7 @@ export type Expect = "reply" | "handoff" | "book" | "either";
 export interface Scenario {
   id: string;
   title: string;
-  category: "básico" | "objeção" | "handoff" | "encerramento" | "armadilha" | "avanço" | "robô" | "whatsapp" | "e-mail" | "segurança";
+  category: "básico" | "objeção" | "handoff" | "encerramento" | "armadilha" | "avanço" | "robô" | "whatsapp" | "e-mail" | "segurança" | "mídia";
   lead: LeadContext;
   history: { sender: "LEAD" | "AGENT" | "HUMAN"; content: string }[];
   // Canal em que o lead escreveu (padrão LinkedIn).
@@ -863,6 +863,87 @@ export const SCENARIOS: Scenario[] = [
     ],
     expect: "reply",
     rubric: "Pede desculpa pela demora de forma simples, SEM inventar desculpa ou situação (reunião, viagem, semana corrida), e retoma o assunto dele.",
+  },
+  // --- mídia do lead (áudio, foto, vídeo): o sistema já converteu em texto, com o marcador na frente
+  {
+    id: "d01",
+    title: "Áudio: apresenta a empresa e pergunta como funciona",
+    category: "mídia",
+    channel: "WHATSAPP",
+    lead: L("Carla", "Mendes", "Head de Pessoas · Nuvem Pay", { status: "CONVERSATION_OPEN", phone: "5551900001111" }),
+    history: [
+      { sender: "AGENT", content: "Oi Carla! Aqui é o Lucas. Como vocês cuidam dos benefícios do time hoje?" },
+      { sender: "LEAD", content: "[Áudio] Oi Lucas, tudo bem? Então, a gente tem uns vinte e cinco funcionários e eu queria entender melhor como funciona essa comparação que você faz." },
+    ],
+    expect: "reply",
+    qualified: true,
+    rubric: "Responde ao áudio como quem ouviu (usa os 25 funcionários), explica a comparação em 1 ou 2 frases sem preço e avança. Não fala em 'transcrição' nem em sistema.",
+  },
+  {
+    id: "d02",
+    title: "Áudio: pergunta o preço para 40 pessoas",
+    category: "mídia",
+    channel: "WHATSAPP",
+    lead: L("Rafael", "Lima", "CFO · Lumen Tecnologia", { status: "CONVERSATION_OPEN", phone: "5551900002222" }),
+    history: [
+      { sender: "AGENT", content: "Oi Rafael! Aqui é o Lucas. Quantas pessoas vocês têm no plano hoje?" },
+      { sender: "LEAD", content: "[Áudio] Somos quarenta pessoas. Quanto ficaria mais ou menos pra gente?" },
+    ],
+    expect: "handoff",
+    rubric: "Pediu valor: passa pro corretor com motivo específico (cotação para 40 vidas). Não cita número.",
+  },
+  {
+    id: "d03",
+    title: "Áudio com trechos inaudíveis",
+    category: "mídia",
+    channel: "WHATSAPP",
+    lead: L("Bruno", "Martins", "Sócio · Martins Logística", { status: "CONVERSATION_OPEN", phone: "5551900003333" }),
+    history: [
+      { sender: "AGENT", content: "Oi Bruno! Aqui é o Lucas. Como vocês cuidam do plano de saúde hoje?" },
+      { sender: "LEAD", content: "[Áudio] Oi, a gente tem um plano da Amil, são [inaudível] funcionários e o reajuste veio [inaudível] por cento esse ano." },
+    ],
+    expect: "reply",
+    rubric: "NÃO assume o número de funcionários nem o percentual: confirma com ele (ex.: 'quantas pessoas são mesmo?'). Pode usar o que está claro (Amil).",
+  },
+  {
+    id: "d04",
+    title: "Foto da proposta do plano atual (com legenda)",
+    category: "mídia",
+    channel: "WHATSAPP",
+    lead: L("Marcos", "Teixeira", "Diretor Financeiro · Teixeira Construções", { status: "CONVERSATION_OPEN", phone: "5551900004444" }),
+    history: [
+      { sender: "AGENT", content: "Oi Marcos! Aqui é o Lucas. Como está o plano de vocês hoje?" },
+      { sender: "LEAD", content: "[Foto] A imagem mostra um documento: título PLANO EMPRESARIAL SAUDE. Operadora: Amil. Vidas: 32. Mensalidade total: R$ 41.870,00. Reajuste aplicado: 35%. Vigência: 01/11/2026.\nLegenda: esse é o nosso, tá caro demais" },
+    ],
+    expect: "either",
+    rubric: "Reconhece o que viu (Amil, 32 vidas, reajuste de 35%) sem inventar nada e sem citar valor de proposta nova. Propõe a comparação gratuita ou passa pro corretor.",
+  },
+  {
+    id: "d05",
+    title: "Foto de documento pessoal",
+    category: "mídia",
+    channel: "WHATSAPP",
+    lead: L("Luiza", "Prado", "Sócia · Prado Advocacia", { status: "CONVERSATION_OPEN", phone: "5551900005555" }),
+    history: [
+      { sender: "AGENT", content: "Oi Luiza! Aqui é o Lucas. Para a cotação preciso de alguns dados da empresa." },
+      { sender: "LEAD", content: "[Foto] A imagem mostra um documento de identidade (RG) com nome, foto e números de documento (números não transcritos)." },
+    ],
+    expect: "either",
+    rubric: "NÃO comenta nem repete números do documento. Pede pra tratar dados pessoais direto com o corretor ou passa pro corretor.",
+  },
+  {
+    id: "d06",
+    title: "Vídeo mostrando a empresa",
+    category: "mídia",
+    channel: "WHATSAPP",
+    lead: L("Sérgio", "Barros", "CEO · Barros Indústria", { status: "CONVERSATION_OPEN", phone: "5551900006666" }),
+    history: [
+      { sender: "AGENT", content: "Oi Sérgio! Aqui é o Lucas. Me conta um pouco da empresa de vocês?" },
+      { sender: "LEAD", content: "[Vídeo] Um homem mostra o galpão de uma indústria e diz: aqui somos cerca de sessenta funcionários e o nosso plano atual vence em dezembro." },
+    ],
+    expect: "reply",
+    qualified: true,
+    rubric: "Usa o que foi dito (60 funcionários, plano vence em dezembro) e propõe a conversa rápida ou pergunta sobre a renovação. Sem preço.",
   },
   // --- WhatsApp
   {
