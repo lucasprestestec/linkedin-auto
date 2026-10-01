@@ -136,9 +136,15 @@ const CHANNEL_STYLE: Record<MessageChannel, string> = {
 
 // Quando a resposta vai ser FALADA (mensagem de voz com a voz do corretor): escreve-se pra ouvir, não pra ler.
 export const AUDIO_STYLE =
-  "MENSAGEM DE VOZ: este texto será FALADO em voz alta, com a voz do corretor, como um áudio de WhatsApp. Escreva como se fala numa conversa: " +
-  "frases curtas e naturais, até uns 60 palavras no total, sem emojis, sem links, sem listas, sem abreviações de chat (escreva \"você\", não \"vc\") " +
-  "e sem números longos. Sem saudação formal e sem assinatura.";
+  "MENSAGEM DE VOZ: este texto será FALADO em voz alta, com a voz do corretor, como um áudio de WhatsApp. " +
+  "Escreva do jeito que se FALA, não do jeito que se escreve. O jeito de escrever do corretor (acima) vale para o conteúdo e o tom, mas a fala é diferente da escrita: " +
+  "use a fala corrida do dia a dia (\"pra\", \"tá\", \"a gente\", \"dá pra\", \"então\", \"olha\", \"beleza\", \"combinado\"), sem soar forçado nem exagerar; " +
+  "frases curtas, uma ideia por frase, como quem pensa falando; pode começar com \"Oi, tudo bem?\" ou \"Então,\" e fechar com UMA pergunta simples. " +
+  "Evite palavras e construções de texto escrito (\"portanto\", \"além disso\", \"conforme\", \"segue\", \"venho por meio\", \"gostaria de\") e pontuação que não se fala " +
+  "(parênteses, travessão, ponto e vírgula, dois-pontos, reticências em excesso). Use vírgula e ponto para dar o ritmo das pausas. " +
+  "Se for importante, repita a informação principal com outras palavras, porque quem ouve não pode reler. " +
+  "Até uns 60 palavras no total, sem emojis, sem links, sem listas, sem abreviações de chat (escreva \"você\", não \"vc\") e sem números longos " +
+  "(horário e valor, só se forem curtos, e por extenso como se falam). Sem saudação formal e sem assinatura.";
 
 const TIME_ZONE = "America/Sao_Paulo";
 
