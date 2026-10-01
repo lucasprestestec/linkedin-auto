@@ -91,7 +91,7 @@ export async function synthesize(text: string, voiceId: string): Promise<{ bytes
       res = await call("/v1/tts", {
         method: "POST",
         headers: { "content-type": "application/json", model: models[i] },
-        body: JSON.stringify({ text, reference_id: voiceId, format: "mp3", mp3_bitrate: 64, normalize: true, latency: "normal" }),
+        body: JSON.stringify({ text, reference_id: voiceId, format: "mp3", mp3_bitrate: 128, normalize: true, latency: "normal" }),
       });
     } catch (err) {
       // Sem saldo no modelo pago: segue pelo gratuito (mesmo modelo, sem garantia de disponibilidade).
