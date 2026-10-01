@@ -140,12 +140,40 @@ const restore = () => (globalThis.fetch = realFetch);
     assert.equal(r.bytes.length, 2000);
     assert.equal(calls[0].url, "https://api.fish.audio/v1/tts");
     const h = calls[0].init.headers as Record<string, string>;
-    assert.equal(h.model, "s2.1-pro");
+    assert.equal(h.model, "s2.1-pro-free", "sem configuração, usa o modelo gratuito");
     assert.equal(h.authorization, "Bearer chave-de-teste");
     const body = JSON.parse(String(calls[0].init.body));
     assert.equal(body.text, "Oi, tudo bem?");
     assert.equal(body.reference_id, "voz-123");
     assert.equal(body.format, "mp3");
+  });
+
+  await t("fish: modelo pago como primeira opção; sem saldo nele, cai pro gratuito", async () => {
+    process.env.FISH_AUDIO_MODEL = "s2.1-pro";
+    const used: string[] = [];
+    mockFetch((_url, init) => {
+      const model = (init.headers as Record<string, string>).model;
+      used.push(model);
+      return model === "s2.1-pro" ? new Response("{}", { status: 402 }) : new Response(new Uint8Array(2000), { status: 200 });
+    });
+    const r = await synthesize("Oi", "v");
+    assert.deepEqual(used, ["s2.1-pro", "s2.1-pro-free"]);
+    assert.equal(r.bytes.length, 2000);
+    // com saldo no pago, o gratuito nem é chamado
+    used.length = 0;
+    mockFetch((_url, init) => (used.push((init.headers as Record<string, string>).model), new Response(new Uint8Array(2000), { status: 200 })));
+    await synthesize("Oi", "v");
+    assert.deepEqual(used, ["s2.1-pro"]);
+    // sem saldo também no gratuito: o erro aparece (com o status)
+    mockFetch(() => new Response("{}", { status: 402 }));
+    await assert.rejects(synthesize("Oi", "v"), (e) => e instanceof VoiceError && e.status === 402 && /sem saldo na API/.test(e.message));
+    // outros erros do pago não escondem: não cai pro gratuito
+    used.length = 0;
+    mockFetch((_url, init) => (used.push((init.headers as Record<string, string>).model), new Response("x", { status: 500 })));
+    await assert.rejects(synthesize("Oi", "v"), /respondeu 500/);
+    assert.deepEqual(used, ["s2.1-pro"]);
+    delete process.env.FISH_AUDIO_MODEL;
+    restore();
   });
 
   await t("fish: apagar usa DELETE /model/{id}", async () => {
