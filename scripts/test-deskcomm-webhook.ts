@@ -1,6 +1,7 @@
 // Teste do aviso instantâneo do Deskcomm (assinatura e leitura do corpo), sem rede: npx tsx scripts/test-deskcomm-webhook.ts
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { publicMediaUrl } from "../src/lib/whatsappMedia";
 import { contactPhoneOf, conversationIdOf, samePhone, verifyDeskcommSignature } from "../src/lib/deskcommWebhook";
 
 const SECRET = "segredo-de-teste-com-16-ou-mais";
@@ -52,6 +53,18 @@ check("lê o telefone do contato no aviso", () => {
   assert.equal(contactPhoneOf(JSON.stringify({ data: { contact: { phone_number: "+5515998300680" } } })), "+5515998300680");
   assert.equal(contactPhoneOf(JSON.stringify({ data: {} })), null);
   assert.equal(contactPhoneOf("lixo"), null);
+});
+
+check("link do arquivo: troca só o endereço", () => {
+  const url = "http://localhost:54321/storage/v1/object/sign/media/a.ogg?token=abc.def";
+  assert.equal(publicMediaUrl(url, "https://x-y.trycloudflare.com"), "https://x-y.trycloudflare.com/storage/v1/object/sign/media/a.ogg?token=abc.def");
+  assert.equal(publicMediaUrl(url, "https://x-y.trycloudflare.com/"), "https://x-y.trycloudflare.com/storage/v1/object/sign/media/a.ogg?token=abc.def");
+});
+check("link do arquivo: sem base ou base inválida mantém o link", () => {
+  const url = "http://localhost:54321/storage/v1/object/sign/media/a.ogg?token=abc";
+  assert.equal(publicMediaUrl(url, ""), url);
+  assert.equal(publicMediaUrl(url, undefined), url);
+  assert.equal(publicMediaUrl(url, "não é url"), url);
 });
 
 process.exit(failed ? 1 : 0);

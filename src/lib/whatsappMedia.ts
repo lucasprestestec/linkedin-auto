@@ -17,6 +17,21 @@ export type InboundPlan =
 
 const LABEL: Record<MediaKind, string> = { audio: "um áudio", image: "uma foto", video: "um vídeo" };
 
+// O link do arquivo vem com o endereço que o Deskcomm usa por dentro (ex.: http://localhost:54321). Se esse
+// endereço não é alcançável de fora, DESKCOMM_MEDIA_BASE_URL diz o público; troca só o começo (endereço),
+// mantendo o caminho e a assinatura do link.
+export function publicMediaUrl(url: string, base: string | undefined = process.env.DESKCOMM_MEDIA_BASE_URL): string {
+  const b = base?.trim();
+  if (!b) return url;
+  try {
+    const from = new URL(url);
+    const to = new URL(b);
+    return `${to.origin}${from.pathname}${from.search}`;
+  } catch {
+    return url;
+  }
+}
+
 export function planInbound(m: WhatsappHistoryMessage, now: Date = new Date()): InboundPlan {
   const text = m.body?.trim() ?? "";
   const kind = mediaKindOf(m.type, m.media_mime);
@@ -27,7 +42,7 @@ export function planInbound(m: WhatsappHistoryMessage, now: Date = new Date()): 
   }
 
   if (m.media_signed_url) {
-    return { action: "media", kind, url: m.media_signed_url, mime: m.media_mime ?? null, caption: text || null };
+    return { action: "media", kind, url: publicMediaUrl(m.media_signed_url), mime: m.media_mime ?? null, caption: text || null };
   }
 
   const sentAt = m.sent_at ? new Date(m.sent_at) : now;
