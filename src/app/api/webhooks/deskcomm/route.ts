@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { secretMatches } from "@/lib/auth";
 import { conversationIdOf, verifyDeskcommSignature } from "@/lib/deskcommWebhook";
 import { syncWhatsapp } from "@/lib/whatsappSync";
 import { handleIncomingMessage } from "@/lib/respond";
@@ -16,11 +17,12 @@ const MEDIA_RETRY_MS = 8_000;
 
 export async function POST(request: Request) {
   const raw = await request.text();
-  const ok = verifyDeskcommSignature(
-    raw,
-    { signature: request.headers.get("x-webhook-signature"), delivery: request.headers.get("x-webhook-delivery") },
-    process.env.DESKCOMM_WEBHOOK_SECRET,
-  );
+  // Dois jeitos de provar que o aviso é do Deskcomm: a assinatura (preferido) ou a mesma senha no endereço
+  // (?token=...), pra instalação que ainda não consegue guardar o segredo da assinatura (sem a chave de cifra).
+  const secret = process.env.DESKCOMM_WEBHOOK_SECRET;
+  const ok =
+    verifyDeskcommSignature(raw, { signature: request.headers.get("x-webhook-signature"), delivery: request.headers.get("x-webhook-delivery") }, secret) ||
+    secretMatches(new URL(request.url).searchParams.get("token"), secret);
   if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const conversationId = conversationIdOf(raw);
