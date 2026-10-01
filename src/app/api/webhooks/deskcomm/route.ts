@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       const identityId = await activeIdentityIdOrNull();
       for (let attempt = 0; attempt <= MEDIA_RETRIES; attempt++) {
         const r = await syncWhatsapp(conversationId);
+        console.log(`[deskcomm-webhook] conversa ${conversationId}: lidas ${r.checked}, salvas ${r.saved}, esperando mídia ${r.waiting}, responder agora ${canReplyNow}`);
         if (canReplyNow) for (const lead of r.leads) await handleIncomingMessage(lead, identityId);
         if (!r.waiting) return;
         await new Promise((resolve) => setTimeout(resolve, MEDIA_RETRY_MS));
