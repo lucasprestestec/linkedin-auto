@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { FeedbackPanel } from "@/components/FeedbackPanel";
 import { HANDOFF_REASON_KEYS } from "@/lib/writingStyle";
-import { markHandoffFeedback, summarizeLead } from "./actions";
+import { leadAction, markHandoffFeedback, summarizeLead } from "./actions";
 
 // Aviso no fim da conversa quando ela passou pra você. "Assumir" leva ao campo de
 // resposta; "Ver resumo" pede um resumo à IA só quando clicado.
@@ -40,6 +40,9 @@ export function HandoffCard({ leadId, firstName, reason, when }: { leadId: strin
           }
         >
           {pending ? "Resumindo…" : "Ver resumo"}
+        </button>
+        <button type="button" className="btn-line btn-sm" disabled={pending} onClick={() => startTransition(async () => void (await leadAction(leadId, "handback")))}>
+          Devolver ao assistente
         </button>
         {!feedbackOpen && (
           <button type="button" className="btn-text" onClick={() => setFeedbackOpen(true)}>

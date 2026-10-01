@@ -123,11 +123,13 @@ async function leadWithHistory(leadId: string) {
   });
 }
 
-// "Não precisava passar pra mim": ensina o assistente a responder esse tipo de conversa sozinho.
+// "Não precisava passar pra mim": ensina o assistente a responder esse tipo de conversa sozinho
+// e já devolve a conversa a ele (senão o aviso ficava lá e a automação continuava pausada).
 export async function markHandoffFeedback(leadId: string, reasons: string[], note: string): Promise<{ error?: string }> {
   await requireSession();
   const result = await recordFeedback({ leadId, reasons, note });
   revalidatePath("/settings");
+  if (!result.error) await leadAction(leadId, "handback");
   return result;
 }
 
