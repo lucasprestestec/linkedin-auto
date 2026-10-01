@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     try {
       const r = await syncWhatsapp();
       whatsapp = { checked: r.checked, saved: r.saved };
+      console.log(`[poll] WhatsApp: conversas com novidade ${r.checked}, mensagens salvas ${r.saved}, esperando mídia ${r.waiting}`);
       if (canReplyNow) for (const lead of r.leads) await handleIncomingMessage(lead, identityId);
     } catch (err) {
       console.error("Falha ao ler o WhatsApp (Deskcomm)", err);
