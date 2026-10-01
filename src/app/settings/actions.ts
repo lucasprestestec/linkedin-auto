@@ -90,7 +90,9 @@ export async function sendTestPush() {
 
 export async function updateOwnerName(_prevState: unknown, formData: FormData) {
   const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 60);
-  await prisma.settings.update({ where: { id: "singleton" }, data: { ownerName: ownerName || null } });
+  // Obrigatório: o assistente se apresenta com esse nome. Nome em branco não apaga o que já existe.
+  if (!ownerName) return { error: "Escreva o seu nome. É assim que o assistente vai se apresentar nas conversas." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { ownerName } });
   revalidatePath("/", "layout");
   return { saved: true };
 }

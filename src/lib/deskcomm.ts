@@ -238,6 +238,8 @@ export interface WhatsappHistoryMessage {
   type: string;
   body: string | null;
   sent_via?: string | null;
+  // Estado da entrega (sending, sent, delivered, read, failed). "failed" = o WhatsApp recusou: não saiu.
+  status?: string | null;
   sent_at: string | null;
   // Mídia (áudio, foto, vídeo). O Deskcomm entrega um link temporário do arquivo quando já o guardou
   // (media_status "ready"); "pending" = ainda guardando, tente de novo; ausente/"none" = sem mídia ou

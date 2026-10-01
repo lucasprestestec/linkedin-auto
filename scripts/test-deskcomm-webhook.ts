@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { publicMediaUrl } from "../src/lib/whatsappMedia";
+import { identityBlock } from "../src/lib/campaigns";
 import { contactPhoneOf, conversationIdOf, samePhone, verifyDeskcommSignature } from "../src/lib/deskcommWebhook";
 
 const SECRET = "segredo-de-teste-com-16-ou-mais";
@@ -65,6 +66,17 @@ check("link do arquivo: sem base ou base inválida mantém o link", () => {
   assert.equal(publicMediaUrl(url, ""), url);
   assert.equal(publicMediaUrl(url, undefined), url);
   assert.equal(publicMediaUrl(url, "não é url"), url);
+});
+
+check("identidade: usa o nome cadastrado e proíbe inventar o resto", () => {
+  const b = identityBlock("  Lucas Almeida ") ?? "";
+  assert.match(b, /Lucas Almeida/);
+  assert.match(b, /Não invente sobrenome, empresa, cargo/);
+});
+check("identidade: sem nome não há bloco", () => {
+  assert.equal(identityBlock(""), null);
+  assert.equal(identityBlock("   "), null);
+  assert.equal(identityBlock(null), null);
 });
 
 process.exit(failed ? 1 : 0);

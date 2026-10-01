@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { initials } from "@/lib/format";
 import { updateOwnerName } from "./actions";
 
-// Nome do corretor: aparece na saudação ("Bom dia, Lucas") e no menu.
+// Nome do corretor. Obrigatório: é o nome com que o assistente se apresenta aos leads (e também aparece
+// na saudação e no menu). Sem ele o assistente não liga nem responde.
 export function OwnerNameForm({ value }: { value: string }) {
   const [state, formAction, pending] = useActionState(updateOwnerName, undefined);
   const [name, setName] = useState(value);
@@ -19,7 +20,7 @@ export function OwnerNameForm({ value }: { value: string }) {
         </span>
         <div className="grow">
           <label htmlFor="owner-name" className="label">
-            Seu nome
+            Seu nome (obrigatório)
           </label>
           <input
             id="owner-name"
@@ -30,9 +31,19 @@ export function OwnerNameForm({ value }: { value: string }) {
             placeholder="Ex.: Lucas Almeida"
             autoComplete="name"
             maxLength={60}
+            required
+            aria-describedby="owner-name-hint"
           />
         </div>
       </div>
+      <p id="owner-name-hint" className="hint" style={{ margin: "8px 0 0" }}>
+        <b>É assim que o assistente vai se apresentar</b> nas conversas (&ldquo;Aqui é {name.trim() || "o seu nome"}…&rdquo;) e é o nome que ele responde se perguntarem quem está falando. Escreva como você quer ser chamado pelos clientes. Sem esse nome o assistente não liga.
+      </p>
+      {state && "error" in state && state.error && (
+        <p className="field-error" role="alert">
+          {state.error}
+        </p>
+      )}
       {(dirty || state?.saved) && (
         <div className="form-actions">
           {dirty ? (
