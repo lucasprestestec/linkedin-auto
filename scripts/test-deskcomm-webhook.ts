@@ -1,7 +1,7 @@
 // Teste do aviso instantâneo do Deskcomm (assinatura e leitura do corpo), sem rede: npx tsx scripts/test-deskcomm-webhook.ts
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { conversationIdOf, verifyDeskcommSignature } from "../src/lib/deskcommWebhook";
+import { contactPhoneOf, conversationIdOf, samePhone, verifyDeskcommSignature } from "../src/lib/deskcommWebhook";
 
 const SECRET = "segredo-de-teste-com-16-ou-mais";
 const body = JSON.stringify({ event: "message.received", data: { message_id: "m1", conversation_id: "c1" } });
@@ -37,6 +37,21 @@ check("ignora outros eventos", () => assert.equal(conversationIdOf(JSON.stringif
 check("ignora corpo inválido ou sem conversa", () => {
   assert.equal(conversationIdOf("não é json"), null);
   assert.equal(conversationIdOf(JSON.stringify({ event: "message.received", data: {} })), null);
+});
+
+check("telefone: mesmo número em formatos diferentes", () => {
+  assert.equal(samePhone("(15) 99830-0680", "+5515998300680"), true);
+  assert.equal(samePhone("5515998300680", "15998300680"), true);
+});
+check("telefone: números diferentes ou curtos não casam", () => {
+  assert.equal(samePhone("(15) 99830-0680", "+5515991462239"), false);
+  assert.equal(samePhone("0680", "+5515998300680"), false);
+  assert.equal(samePhone(null, "+5515998300680"), false);
+});
+check("lê o telefone do contato no aviso", () => {
+  assert.equal(contactPhoneOf(JSON.stringify({ data: { contact: { phone_number: "+5515998300680" } } })), "+5515998300680");
+  assert.equal(contactPhoneOf(JSON.stringify({ data: {} })), null);
+  assert.equal(contactPhoneOf("lixo"), null);
 });
 
 process.exit(failed ? 1 : 0);

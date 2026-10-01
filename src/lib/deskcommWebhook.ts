@@ -23,6 +23,26 @@ export function verifyDeskcommSignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// Só os dígitos de um telefone; compara pelo final (com ou sem +55 / DDD), exigindo pelo menos 10 dígitos.
+export function samePhone(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = (a ?? "").replace(/\D/g, "");
+  const y = (b ?? "").replace(/\D/g, "");
+  if (x.length < 10 || y.length < 10) return false;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  return long.endsWith(short);
+}
+
+// Telefone do contato no aviso (data.contact.phone_number), se o Deskcomm mandou.
+export function contactPhoneOf(rawBody: string): string | null {
+  try {
+    const body = JSON.parse(rawBody) as { data?: { contact?: { phone_number?: unknown } } };
+    const p = body.data?.contact?.phone_number;
+    return typeof p === "string" && p ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 // Id da conversa dentro do aviso "message.received" (envelope {event, data: {conversation_id, ...}}).
 export function conversationIdOf(rawBody: string): string | null {
   try {
