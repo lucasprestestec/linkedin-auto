@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { secretMatches } from "@/lib/auth";
-import { conversationIdOf, verifyDeskcommSignature } from "@/lib/deskcommWebhook";
+import { contactPhoneOf, conversationIdOf, samePhone, verifyDeskcommSignature } from "@/lib/deskcommWebhook";
 import { syncWhatsapp } from "@/lib/whatsappSync";
 import { handleIncomingMessage } from "@/lib/respond";
 import { activeIdentityIdOrNull } from "@/lib/identity";
@@ -36,7 +36,20 @@ export async function POST(request: Request) {
   if (!conversationId) return NextResponse.json({ ignored: true });
   // Só conversas que o assistente abriu: o resto da caixa do CRM não é dele.
   const known = await prisma.lead.count({ where: { whatsappConversationId: conversationId } });
-  if (!known) return NextResponse.json({ ignored: true });
+  if (!known) {
+    // Conversa nova pro Deskcomm (ex.: número reconectado) de alguém que o assistente já atendia por WhatsApp:
+    // acha pelo telefone e passa a acompanhar a conversa nova. Só se houver exatamente um contato assim.
+    const phone = contactPhoneOf(raw);
+    const candidates = phone
+      ? (await prisma.lead.findMany({ where: { whatsappConversationId: { not: null }, phone: { not: null } }, select: { id: true, phone: true } })).filter((l) => samePhone(l.phone, phone))
+      : [];
+    if (candidates.length !== 1) {
+      console.log(`[deskcomm-webhook] ignorado: conversa ${conversationId.slice(0, 8)} sem contato conhecido (telefone ${phone ? "recebido" : "ausente"}, ${candidates.length} candidato(s))`);
+      return NextResponse.json({ ignored: true });
+    }
+    await prisma.lead.update({ where: { id: candidates[0].id }, data: { whatsappConversationId: conversationId } });
+    console.log(`[deskcomm-webhook] conversa ${conversationId.slice(0, 8)} ligada ao contato ${candidates[0].id} pelo telefone`);
+  }
 
   // Responde logo (o Deskcomm só espera 10 s) e trabalha em seguida.
   after(async () => {
