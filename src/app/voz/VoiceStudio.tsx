@@ -7,6 +7,7 @@ import type { VoiceSettings } from "@/lib/voice/settings";
 import { deleteMyVoice, previewMyVoice } from "./actions";
 
 const MIN_SECONDS = 15;
+const IDEAL_SECONDS = 45;
 const MAX_SECONDS = 60;
 const RATE = 24000;
 
@@ -199,10 +200,19 @@ export function VoiceStudio({ ownerName, voice, configured }: { ownerName: strin
       </label>
 
       <div className="stack" style={{ gap: 8 }}>
-        <span className="label">Leia em voz alta, de forma natural (de {MIN_SECONDS} a {MAX_SECONDS} segundos):</span>
+        <div className="note stack" style={{ gap: 6 }}>
+          <b>Fale como você falaria com um cliente.</b>
+          <p className="small" style={{ margin: 0 }}>
+            A voz copia o seu <b>jeito de falar</b>: o ritmo, as pausas, o tom. Se você ler num tom de leitura, o assistente vai soar lendo. Fale solto, como num áudio de WhatsApp para um cliente.
+          </p>
+          <p className="small" style={{ margin: 0 }}>
+            <b>Quanto mais tempo, mais fiel fica.</b> O ideal é de {IDEAL_SECONDS} a {MAX_SECONDS} segundos (o mínimo é {MIN_SECONDS}). Mantenha o mesmo tom do começo ao fim e faça pequenas pausas entre as frases.
+          </p>
+        </div>
+        <span className="label">Use este texto só como apoio, sem ler palavra por palavra (de {MIN_SECONDS} a {MAX_SECONDS} segundos):</span>
         <blockquote style={{ margin: 0, padding: "12px 14px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", lineHeight: 1.5 }}>{readingText(ownerName)}</blockquote>
         <p className="hint" style={{ margin: 0 }}>
-          Dica: grave num lugar silencioso, perto do microfone, sem ninguém falando ao fundo.
+          Dica: grave num lugar silencioso, perto do microfone, sem ninguém falando ao fundo. Pode continuar com suas próprias palavras: conte o que você faz e como ajuda as pessoas.
         </p>
       </div>
 
@@ -217,9 +227,12 @@ export function VoiceStudio({ ownerName, voice, configured }: { ownerName: strin
       {phase === "recording" && (
         <div className="stack" style={{ gap: 8 }} role="status">
           <b>Gravando… {seconds}s</b>
+          <span className="small muted">
+            {seconds < MIN_SECONDS ? "Continue falando." : seconds < IDEAL_SECONDS ? `Bom. Se puder, continue até ${IDEAL_SECONDS}s: fica mais fiel.` : "Ótimo. Pode parar quando quiser."}
+          </span>
           <div>
             <button type="button" className="btn-solid" onClick={stop} disabled={seconds < MIN_SECONDS}>
-              {seconds < MIN_SECONDS ? `Continue lendo (mínimo ${MIN_SECONDS}s)` : "Parar"}
+              {seconds < MIN_SECONDS ? `Continue falando (mínimo ${MIN_SECONDS}s)` : "Parar"}
             </button>
           </div>
         </div>
