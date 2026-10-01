@@ -1,10 +1,22 @@
-import type { Lead } from "@prisma/client";
+import type { Lead, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fetchWhatsappUpdates, type WhatsappHistoryMessage } from "@/lib/deskcomm";
 import { markNeedsHuman } from "@/lib/handoff";
 import { captureContactsSafely } from "@/lib/contactCapture";
 import { formatMediaMessage, understandMedia } from "@/lib/mediaUnderstanding";
 import { planInbound, type InboundPlan } from "@/lib/whatsappMedia";
+
+// Grava a mensagem uma vez só. O aviso instantâneo e o cron podem ler a mesma conversa ao mesmo tempo; a
+// segunda gravação bate na trava de id duplicado (P2002) e não deve derrubar a leitura. Devolve se gravou.
+async function createOnce(data: Prisma.MessageUncheckedCreateInput): Promise<boolean> {
+  try {
+    await prisma.message.create({ data });
+    return true;
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2002") return false;
+    throw err;
+  }
+}
 
 // Traz do Deskcomm as mensagens novas das conversas de WhatsApp que a
 // secretária abriu (só as conhecidas — o resto da caixa do CRM não é dela).
@@ -52,34 +64,35 @@ export async function syncWhatsapp(only?: string): Promise<{ checked: number; sa
         // Corretor digitando direto no Deskcomm: só o que tem texto.
         const text = m.body?.trim();
         if (text) {
-          await prisma.message.create({ data: { leadId: lead.id, sender: "HUMAN", channel: "WHATSAPP", content: text, whatsappMessageId: m.id, deliveredAt: at } });
-          saved++;
+          if (await createOnce({ leadId: lead.id, sender: "HUMAN", channel: "WHATSAPP", content: text, whatsappMessageId: m.id, deliveredAt: at })) saved++;
         }
         continue;
       }
       const plan = plans.get(m.id)!;
       if (plan.action === "text") {
-        await prisma.message.create({ data: { leadId: lead.id, sender: "LEAD", channel: "WHATSAPP", content: plan.text, whatsappMessageId: m.id, deliveredAt: at } });
-        saved++;
-        leadWrote = true;
-        await captureContactsSafely(lead.id, plan.text);
+        // Se outra leitura (cron e aviso ao mesmo tempo) já gravou esta mensagem, ela também cuida da resposta.
+        if (await createOnce({ leadId: lead.id, sender: "LEAD", channel: "WHATSAPP", content: plan.text, whatsappMessageId: m.id, deliveredAt: at })) {
+          saved++;
+          leadWrote = true;
+          await captureContactsSafely(lead.id, plan.text);
+        }
       } else if (plan.action === "media") {
         const r = await understandMedia({ url: plan.url, kind: plan.kind, mime: plan.mime });
         if (r.ok) {
           // Nada de capturar telefone/e-mail daqui: número ouvido ou lido numa imagem pode vir errado.
-          await prisma.message.create({
-            data: {
-              leadId: lead.id,
-              sender: "LEAD",
-              channel: "WHATSAPP",
-              content: formatMediaMessage(plan.kind, r.text, plan.caption),
-              mediaKind: plan.kind,
-              whatsappMessageId: m.id,
-              deliveredAt: at,
-            },
+          const created = await createOnce({
+            leadId: lead.id,
+            sender: "LEAD",
+            channel: "WHATSAPP",
+            content: formatMediaMessage(plan.kind, r.text, plan.caption),
+            mediaKind: plan.kind,
+            whatsappMessageId: m.id,
+            deliveredAt: at,
           });
-          saved++;
-          leadWrote = true;
+          if (created) {
+            saved++;
+            leadWrote = true;
+          }
         } else {
           unsupported = `${plan.kind === "audio" ? "um áudio" : plan.kind === "image" ? "uma foto" : "um vídeo"} que não consegui entender (${r.reason})`;
         }
