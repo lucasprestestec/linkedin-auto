@@ -13,7 +13,9 @@ export type InboundPlan =
   // A mídia ainda não está pronta: não mexe nesta conversa agora.
   | { action: "wait" }
   // Não sabemos entender (figurinha, local, contato, documento) ou o Deskcomm não entregou o arquivo.
-  | { action: "unsupported"; label: string };
+  | { action: "unsupported"; label: string }
+  // Figurinha: não é conteúdo pra responder nem motivo pra chamar o corretor. Segue a conversa sem ela.
+  | { action: "ignore" };
 
 const LABEL: Record<MediaKind, string> = { audio: "um áudio", image: "uma foto", video: "um vídeo" };
 
@@ -38,6 +40,7 @@ export function planInbound(m: WhatsappHistoryMessage, now: Date = new Date()): 
 
   if (!kind) {
     if (text) return { action: "text", text };
+    if ((m.type ?? "").toLowerCase() === "sticker") return { action: "ignore" };
     return { action: "unsupported", label: "um arquivo" };
   }
 

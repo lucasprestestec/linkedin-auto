@@ -307,7 +307,7 @@ const restore = () => (globalThis.fetch = realFetch);
     assert.deepEqual(planInbound(msg({ type: "video" }), now), { action: "unsupported", label: "um vídeo" });
     assert.deepEqual(planInbound(msg({ type: "image" }), now), { action: "unsupported", label: "uma foto" });
     assert.deepEqual(planInbound(msg({ type: "image", body: "veja" }), now), { action: "text", text: "veja" }, "só a legenda");
-    assert.deepEqual(planInbound(msg({ type: "sticker", media_mime: "image/webp" }), now), { action: "unsupported", label: "um arquivo" });
+    assert.deepEqual(planInbound(msg({ type: "sticker", media_mime: "image/webp" }), now), { action: "ignore" });
     assert.deepEqual(planInbound(msg({ type: "location" }), now), { action: "unsupported", label: "um arquivo" });
     assert.deepEqual(planInbound(msg({ type: "contact", body: "Fulano" }), now), { action: "text", text: "Fulano" });
   });
