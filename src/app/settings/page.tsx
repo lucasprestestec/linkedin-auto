@@ -16,8 +16,7 @@ import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
 import { parseWritingStyle, summarizeStyle } from "@/lib/writingStyle";
 import { loadSuggestions } from "@/lib/styleSuggestions";
-import { WritingStyleForm } from "./WritingStyleForm";
-import { StyleSuggestions } from "./StyleSuggestions";
+import { StyleOverview } from "./StyleOverview";
 
 export const dynamic = "force-dynamic";
 
@@ -124,8 +123,7 @@ export default async function SettingsPage() {
             title="Meu jeito de escrever"
             summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
           >
-            <StyleSuggestions items={suggestions} />
-            <WritingStyleForm value={style} />
+            <StyleOverview style={style} suggestions={suggestions} />
           </SettingItem>
         </div>
       </section>
