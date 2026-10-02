@@ -2831,7 +2831,7 @@ textarea.field {
 @media (min-width: 1024px) {
   .kb {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     overflow-x: visible;
     scroll-snap-type: none;
     padding-bottom: 0;
