@@ -1893,3 +1893,78 @@ textarea.field {
   color: var(--accent-ink);
   text-decoration: none;
 }
+
+/* ---------- Ícone em quadradinho (grupos e itens da Conta) ---------- */
+
+.ico-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+}
+
+.tone-accent {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.tone-ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.tone-warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.tone-violet {
+  color: var(--violet);
+  background: var(--violet-soft);
+}
+
+.tone-neutral {
+  color: var(--text-2);
+  background: var(--surface-3);
+}
+
+/* Página com mais respiro entre os blocos (Conta). */
+.page-roomy {
+  gap: 22px;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.group-sub {
+  margin-top: 1px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.group-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Item de configuração com ícone à esquerda. */
+.si-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fold > summary {
+  padding: 16px 0;
+}
+
+.group-body > .fold:first-child > summary,
+.group-body > .item:first-child {
+  padding-top: 8px;
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ComponentType, SVGProps } from "react";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
 import { logout } from "../actions";
@@ -20,22 +21,83 @@ import { StyleOverview } from "./StyleOverview";
 import { VoiceOverview } from "./VoiceOverview";
 import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
 import { fishConfigured } from "@/lib/voice/fish";
+import { IconChip, type Tone } from "@/components/IconChip";
+import {
+  IconBan,
+  IconBell,
+  IconCalendar,
+  IconChevronRight,
+  IconClock,
+  IconDownload,
+  IconLayers,
+  IconMegaphone,
+  IconMic,
+  IconNote,
+  IconSparkles,
+  IconTarget,
+  IconUserSearch,
+  IconUsers,
+} from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
+type IconType = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
+
+// Bloco da Conta: título com ícone e uma frase do que tem dentro, para a página ser lida em partes.
+function Group({ id, Icon, tone, title, hint, children }: { id?: string; Icon: IconType; tone: Tone; title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="sec" style={{ scrollMarginTop: 90 }}>
+      <header className="group-head">
+        <IconChip Icon={Icon} tone={tone} size={40} />
+        <div>
+          <h2 className="t-label">{title}</h2>
+          <p className="group-sub">{hint}</p>
+        </div>
+      </header>
+      <div className="group-body">{children}</div>
+    </section>
+  );
+}
+
 // Uma linha que mostra o valor atual e abre para editar: a página inteira cabe
 // numa olhada e ninguém precisa rolar por formulários que não vai mexer.
-function SettingItem({ id, title, summary, children }: { id?: string; title: string; summary: string; children: React.ReactNode }) {
+function SettingItem({ id, Icon, tone = "neutral", title, summary, children }: { id?: string; Icon: IconType; tone?: Tone; title: string; summary: string; children: React.ReactNode }) {
   return (
     <details className="fold" id={id} style={{ scrollMarginTop: 90 }}>
       <summary>
-        <span className="setting-text">
-          <b>{title}</b>
-          <small>{summary}</small>
+        <span className="si-row">
+          <IconChip Icon={Icon} tone={tone} />
+          <span className="setting-text">
+            <b>{title}</b>
+            <small>{summary}</small>
+          </span>
         </span>
       </summary>
       <div className="fold-body">{children}</div>
     </details>
+  );
+}
+
+// Atalho para outra tela, com o mesmo ícone em quadradinho dos itens acima.
+function ShortcutItem({ href, download, Icon, title, sub }: { href: string; download?: boolean; Icon: IconType; title: string; sub: string }) {
+  const body = (
+    <>
+      <IconChip Icon={Icon} tone="neutral" />
+      <span className="item-main">
+        <span className="item-title">{title}</span>
+        <span className="item-sub">{sub}</span>
+      </span>
+      <IconChevronRight size={16} style={{ color: "var(--text-3)" }} />
+    </>
+  );
+  return download ? (
+    <a href={href} download className="item">
+      {body}
+    </a>
+  ) : (
+    <Link href={href} className="item">
+      {body}
+    </Link>
   );
 }
 
@@ -64,7 +126,7 @@ export default async function SettingsPage() {
   const suggestions = await loadSuggestions(style).catch(() => []);
 
   return (
-    <main className="page">
+    <main className="page page-roomy">
       <MobileHeader />
       <header className="p-head">
         <div>
@@ -75,108 +137,82 @@ export default async function SettingsPage() {
 
       <OwnerNameForm value={settings.ownerName ?? ""} />
 
-      <section id="alcance" className="sec" style={{ scrollMarginTop: 90 }}>
-        <h2 className="t-label">Sua abordagem</h2>
-        <div>
-          <SettingItem title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
-            <IdealClientForm value={settings.targetAudience ?? ""} />
-          </SettingItem>
-          <SettingItem
-            title="Acompanhamento"
-            summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
-          >
-            <FollowUpDefaultForm
-              count={Math.min(10, settings.followUpMaxCount)}
-              days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
-            />
-          </SettingItem>
-          <SettingItem title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
-            <ExclusionListForm value={settings.exclusionList ?? ""} />
-          </SettingItem>
-          <SettingItem
-            title="Agenda de reuniões"
-            summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: o assistente passa a conversa para você"}
-          >
-            <CalendarForm
-              minutes={settings.meetingMinutes}
-              googleEmail={settings.googleEmail}
-              calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
-              configured={googleConfigured()}
-              workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
-            />
-          </SettingItem>
-          <SettingItem
-            title="Resumo do dia"
-            summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
-          >
-            <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
-          </SettingItem>
-          {/* Sem as chaves de push no servidor, o bloco só mostraria um aviso técnico. */}
-          {pushPublicKey() && (
-            <SettingItem title="Avisos no celular" summary="Quando alguém precisar de você">
-              <NotificationsCard publicKey={pushPublicKey()} />
-            </SettingItem>
-          )}
-        </div>
-      </section>
+      <Group id="alcance" Icon={IconTarget} tone="accent" title="Prospecção" hint="Quem o assistente aborda e como ele acompanha">
+        <SettingItem Icon={IconUsers} tone="accent" title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
+          <IdealClientForm value={settings.targetAudience ?? ""} />
+        </SettingItem>
+        <SettingItem
+          Icon={IconClock}
+          tone="accent"
+          title="Acompanhamento"
+          summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
+        >
+          <FollowUpDefaultForm
+            count={Math.min(10, settings.followUpMaxCount)}
+            days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
+          />
+        </SettingItem>
+        <SettingItem Icon={IconBan} tone="accent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
+          <ExclusionListForm value={settings.exclusionList ?? ""} />
+        </SettingItem>
+      </Group>
 
-      <section id="jeito" className="sec" style={{ scrollMarginTop: 90 }}>
-        <h2 className="t-label">Como o assistente escreve</h2>
-        <div>
-          <SettingItem
-            title="Meu jeito de escrever"
-            summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
-          >
-            <StyleOverview style={style} suggestions={suggestions} />
+      <Group Icon={IconCalendar} tone="ok" title="Rotina e avisos" hint="Reuniões, resumo do dia e notificações">
+        <SettingItem
+          Icon={IconCalendar}
+          tone="ok"
+          title="Agenda de reuniões"
+          summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: o assistente passa a conversa para você"}
+        >
+          <CalendarForm
+            minutes={settings.meetingMinutes}
+            googleEmail={settings.googleEmail}
+            calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
+            configured={googleConfigured()}
+            workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
+          />
+        </SettingItem>
+        <SettingItem
+          Icon={IconNote}
+          tone="ok"
+          title="Resumo do dia"
+          summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
+        >
+          <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
+        </SettingItem>
+        {/* Sem as chaves de push no servidor, o bloco só mostraria um aviso técnico. */}
+        {pushPublicKey() && (
+          <SettingItem Icon={IconBell} tone="ok" title="Avisos no celular" summary="Quando alguém precisar de você">
+            <NotificationsCard publicKey={pushPublicKey()} />
           </SettingItem>
-          <SettingItem id="voz" title="Mensagens de voz" summary={summarizeVoice(voice)}>
-            <VoiceOverview voice={voice} configured={fishConfigured()} />
-          </SettingItem>
-        </div>
-      </section>
+        )}
+      </Group>
 
-      <section className="sec">
-        <h2 className="t-label">Mais</h2>
-        <ul className="list">
-          <li>
-            <Link href="/prospect" className="item">
-              <span className="item-main">
-                <span className="item-title">Prospectar</span>
-                <span className="item-sub">Adicionar pessoas para o assistente abordar</span>
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/campaigns" className="item">
-              <span className="item-main">
-                <span className="item-title">Campanhas</span>
-                <span className="item-sub">Grupos de pessoas com uma oferta</span>
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/channels" className="item">
-              <span className="item-main">
-                <span className="item-title">Canais</span>
-                <span className="item-sub">LinkedIn, e-mail e WhatsApp</span>
-              </span>
-            </Link>
-          </li>
-          <li>
-            <a href="/api/export/leads" download className="item">
-              <span className="item-main">
-                <span className="item-title">Baixar meus contatos</span>
-                <span className="item-sub">Planilha para Excel ou Google Planilhas</span>
-              </span>
-            </a>
-          </li>
-        </ul>
-        <form action={logout}>
-          <button type="submit" className="btn-line btn-danger-line">
+      <Group id="jeito" Icon={IconSparkles} tone="violet" title="Jeito do assistente" hint="Como ele escreve e como ele soa nos áudios">
+        <SettingItem
+          Icon={IconSparkles}
+          tone="violet"
+          title="Meu jeito de escrever"
+          summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
+        >
+          <StyleOverview style={style} suggestions={suggestions} />
+        </SettingItem>
+        <SettingItem id="voz" Icon={IconMic} tone="violet" title="Mensagens de voz" summary={summarizeVoice(voice)}>
+          <VoiceOverview voice={voice} configured={fishConfigured()} />
+        </SettingItem>
+      </Group>
+
+      <Group Icon={IconLayers} tone="neutral" title="Atalhos e dados" hint="Outras telas e a sua lista de contatos">
+        <ShortcutItem href="/prospect" Icon={IconUserSearch} title="Prospectar" sub="Adicionar pessoas para o assistente abordar" />
+        <ShortcutItem href="/campaigns" Icon={IconMegaphone} title="Campanhas" sub="Grupos de pessoas com uma oferta" />
+        <ShortcutItem href="/channels" Icon={IconLayers} title="Canais" sub="LinkedIn, e-mail e WhatsApp" />
+        <ShortcutItem href="/api/export/leads" download Icon={IconDownload} title="Baixar meus contatos" sub="Planilha para Excel ou Google Planilhas" />
+        <form action={logout} style={{ paddingTop: 12 }}>
+          <button type="submit" className="btn-line btn-danger-line btn-sm">
             Sair
           </button>
         </form>
-      </section>
+      </Group>
     </main>
   );
 }
