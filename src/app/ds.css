@@ -2284,6 +2284,11 @@ textarea.field {
   text-decoration: none;
 }
 
+.kb-card .item-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .kb-sub {
   white-space: normal;
   display: -webkit-box;

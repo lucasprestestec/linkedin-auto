@@ -63,11 +63,10 @@ export function ConversationCard({ c }: { c: ConvItem }) {
   return (
     <Link href={`/leads/${c.id}`} className="kb-card">
       <span className="cv-name">
-        <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={28} />
+        <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={24} />
         <span className="item-title">{fullName(c)}</span>
         {c.channel && <ChannelBadge channel={c.channel} size={18} />}
       </span>
-      <span className="item-sub kb-sub">{preview(c)}</span>
       <span className="kb-foot">
         <span className="cv-tags">
           {tags.map((t) => (
