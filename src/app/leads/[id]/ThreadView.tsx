@@ -73,7 +73,7 @@ export function ThreadView({ messages, leadFirst, leadLast, ownerName, children 
             <div key={m.id} style={{ display: "contents" }}>
               {showDay && <DaySep text={m.dayText} variant="li" />}
               <div className="li-msg">
-                <Avatar firstName={f} lastName={rest.at(-1) ?? null} size={36} />
+                <Avatar firstName={f} lastName={rest.at(-1) ?? null} size={36} variant={m.sender === "AGENT" ? "assistant" : undefined} />
                 <div className="li-body">
                   <div className="li-head">
                     <b>{name}</b>
