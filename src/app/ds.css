@@ -2913,6 +2913,10 @@ textarea.field {
   display: none;
 }
 
+.brand-short {
+  display: none;
+}
+
 .side-link {
   padding: 8px 10px;
   font-size: 13.5px;
@@ -2948,8 +2952,15 @@ textarea.field {
     gap: 14px;
   }
 
+  :root[data-side="collapsed"] .brand-full {
+    display: none;
+  }
+
+  :root[data-side="collapsed"] .brand-short {
+    display: inline;
+  }
+
   :root[data-side="collapsed"] .side .brand {
-    font-size: 15px;
     padding: 0;
     letter-spacing: 0;
   }

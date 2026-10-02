@@ -65,7 +65,6 @@ export function ConversationCard({ c }: { c: ConvItem }) {
       <span className="cv-name">
         <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={24} />
         <span className="item-title">{fullName(c)}</span>
-        {c.channel && <ChannelBadge channel={c.channel} size={18} />}
       </span>
       <span className="kb-foot">
         <span className="cv-tags">
@@ -75,7 +74,10 @@ export function ConversationCard({ c }: { c: ConvItem }) {
             </span>
           ))}
         </span>
-        <span className="item-meta">{c.when}</span>
+        <span className="row" style={{ gap: 6 }}>
+          {c.channel && <ChannelBadge channel={c.channel} size={16} />}
+          <span className="item-meta">{c.when}</span>
+        </span>
       </span>
     </Link>
   );
