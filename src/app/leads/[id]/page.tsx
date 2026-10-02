@@ -102,9 +102,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const counts: Record<ChannelKey, number> = { LINKEDIN: 0, WHATSAPP: 0, EMAIL: 0 };
   for (const m of lead.messages) counts[m.channel] += 1;
   // O seletor mostra os canais com mensagens e os canais por onde dá para enviar.
-  const available = ORDER.filter((c) => counts[c] > 0 || draftCounts[c] > 0 || replyChannels.includes(c));
   const draftCounts: Record<ChannelKey, number> = { LINKEDIN: 0, WHATSAPP: 0, EMAIL: 0 };
   for (const d of drafts) draftCounts[d.channelKey] += 1;
+  const available = ORDER.filter((c) => counts[c] > 0 || draftCounts[c] > 0 || replyChannels.includes(c));
   // Se há rascunho esperando, a conversa abre no canal dele; senão, no canal da última mensagem.
   const lastChannel = drafts[0]?.channelKey ?? lead.messages.at(-1)?.channel ?? lastLeadChannel;
 
