@@ -1,26 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { ChannelBadge, CHANNELS } from "@/components/ChannelBadge";
 import { sendReply, suggestLeadReply } from "./actions";
+import { useChannel } from "./ChannelContext";
 
-type Channel = "LINKEDIN" | "EMAIL" | "WHATSAPP";
-const LABEL: Record<Channel, string> = { LINKEDIN: "LinkedIn", EMAIL: "E-mail", WHATSAPP: "WhatsApp" };
-
-export function ReplyForm({
-  leadId,
-  firstName,
-  channels = ["LINKEDIN"],
-  defaultChannel = "LINKEDIN",
-}: {
-  leadId: string;
-  firstName: string;
-  profileUrl?: string | null;
-  // Canais possíveis com essa pessoa; começa no último em que ela escreveu.
-  channels?: Channel[];
-  defaultChannel?: Channel;
-}) {
+// A resposta sai pelo canal que está aberto na conversa (o seletor de cima); aqui só se mostra qual é.
+export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: string }) {
   const [value, setValue] = useState("");
-  const [channel, setChannel] = useState<Channel>(channels.includes(defaultChannel) ? defaultChannel : channels[0]);
+  const { channel, reply } = useChannel();
+  const canUseChannel = reply.includes(channel);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [suggesting, startSuggest] = useTransition();
   const [state, formAction, pending] = useActionState(
@@ -62,11 +51,11 @@ export function ReplyForm({
     });
   }
 
-  const canSend = value.trim() !== "" && !pending;
+  const canSend = value.trim() !== "" && !pending && canUseChannel;
   const error = state?.error ?? suggestError;
 
   return (
-    <form action={formAction} className="composer">
+    <form action={formAction} className={`composer composer-${channel.toLowerCase()}`}>
       <input type="hidden" name="channel" value={channel} />
       {error && <p className="field-error composer-meta">{error}</p>}
       <div className="composer-row">
@@ -86,24 +75,11 @@ export function ReplyForm({
         </button>
       </div>
       <div className="composer-meta">
-        {channels.length > 1 && (
-          <span className="row" style={{ gap: 12 }} role="radiogroup" aria-label="Enviar por">
-            {channels.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={channel === c}
-                className="btn-text"
-                style={{ color: channel === c ? "var(--text)" : "var(--text-3)", fontWeight: channel === c ? 600 : 400 }}
-                onClick={() => setChannel(c)}
-              >
-                {LABEL[c]}
-              </button>
-            ))}
-          </span>
-        )}
-        <button type="button" className="btn-text" style={{ marginLeft: "auto" }} onClick={suggest} disabled={suggesting}>
+        <span className="composer-via">
+          <ChannelBadge channel={channel} size={18} />
+          {canUseChannel ? `Enviando por ${CHANNELS[channel].label}` : `Envio por ${CHANNELS[channel].label} indisponível para esta pessoa`}
+        </span>
+        <button type="button" className="btn-text" style={{ marginLeft: "auto" }} onClick={suggest} disabled={suggesting || !canUseChannel}>
           {suggesting ? "Escrevendo…" : "Sugerir resposta"}
         </button>
       </div>
