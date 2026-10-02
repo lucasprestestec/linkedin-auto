@@ -28,7 +28,34 @@ async function edgesFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+// Ações que rodam de GRAÇA numa Engagement Identity (0 crédito). Qualquer outra ação consome crédito, e a conta
+// só tem a taxa por identidade (sem plano de créditos). Lista confirmada pelo suporte do Edges em 02/10/2026:
+// connect-profile (e async), message-profile (e async), extract-conversations, extract-messages,
+// extract-connections e follow-profile. As demais (aceitar/retirar convite, ver convites, arquivar, visitar perfil,
+// visitantes, seguidores) NÃO estão na lista: o suporte não as listou como incluídas, então são tratadas como pagas.
+// Com créditos comprados, EDGES_ALLOW_PAID_ACTIONS=1 desliga a trava.
+export const FREE_EDGES_ACTIONS: ReadonlySet<string> = new Set([
+  "linkedin-connect-profile",
+  "linkedin-message-profile",
+  "linkedin-extract-conversations",
+  "linkedin-extract-messages",
+  "linkedin-extract-connections",
+  "linkedin-follow-profile",
+]);
+
+export class EdgesPaidActionError extends Error {
+  constructor(public readonly slug: string) {
+    super(`A ação "${slug}" consome crédito do Edges e a conta só tem a taxa por identidade. Chamada bloqueada antes de sair do sistema.`);
+  }
+}
+
+export function assertFreeEdgesAction(slug: string, env: Record<string, string | undefined> = process.env): void {
+  if (env.EDGES_ALLOW_PAID_ACTIONS === "1") return;
+  if (!FREE_EDGES_ACTIONS.has(slug)) throw new EdgesPaidActionError(slug);
+}
+
 async function callAction<T>(actionSlug: string, payload: Record<string, unknown>): Promise<T> {
+  assertFreeEdgesAction(actionSlug);
   return edgesFetch<T>(`/actions/${actionSlug}/run/live`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -117,6 +144,7 @@ export async function scheduleConnectionInvites(
   candidates: { linkedin_profile_url: string; full_name?: string; job_title?: string; icp_score?: number; campaign_id?: string }[],
   callbackUrl: string,
 ) {
+  assertFreeEdgesAction("linkedin-connect-profile");
   return edgesFetch<EdgesAsyncRun>("/actions/linkedin-connect-profile/run/async", {
     method: "POST",
     body: JSON.stringify({
