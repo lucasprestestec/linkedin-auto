@@ -1,26 +1,12 @@
-import Link from "next/link";
-import { getConversationItems } from "@/lib/conversations";
-import { MobileHeader } from "@/components/MobileHeader";
-import { ConversationList } from "@/components/ConversationList";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
+// A tela Conversas agora é a tela principal. Endereços antigos (e links com ?status= ou ?q=) continuam funcionando.
 export default async function ConversationsPage({ searchParams }: PageProps<"/conversations">) {
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
-  const status = typeof params.status === "string" ? params.status : "";
-  const items = await getConversationItems();
-
-  return (
-    <main className="page">
-      <MobileHeader />
-      <header className="p-head">
-        <h1 className="t-title">Conversas</h1>
-        <Link href="/contacts/new" className="btn-line btn-sm">
-          Adicionar contato
-        </Link>
-      </header>
-      <ConversationList key={`${q}|${status}`} items={items} initialQuery={q} initialGroup={status} />
-    </main>
-  );
+  const next = new URLSearchParams();
+  for (const key of ["status", "q"] as const) {
+    const v = params[key];
+    if (typeof v === "string" && v) next.set(key, v);
+  }
+  redirect(next.size ? `/?${next.toString()}` : "/");
 }

@@ -1,10 +1,9 @@
-import { IconCalendar, IconCheck, IconHome, IconLayers, IconMegaphone, IconMessages, IconUser, IconUserSearch } from "./Icons";
+import { IconCalendar, IconCheck, IconLayers, IconMegaphone, IconMessages, IconUser, IconUserSearch } from "./Icons";
 
 // As telas do painel. No celular o menu de baixo mostra só as principais
 // (mobile: true); as outras abrem pela tela Conta. No computador aparecem todas.
 export const NAV_ITEMS = [
-  { href: "/", label: "Início", Icon: IconHome, mobile: true },
-  { href: "/conversations", label: "Conversas", Icon: IconMessages, badge: "attention" as const, mobile: true },
+  { href: "/", label: "Conversas", Icon: IconMessages, badge: "attention" as const, mobile: true },
   { href: "/prospect", label: "Prospectar", Icon: IconUserSearch, mobile: true },
   { href: "/approvals", label: "Aprovações", Icon: IconCheck, badge: "drafts" as const, mobile: true },
   { href: "/agenda", label: "Agenda", Icon: IconCalendar, mobile: true },
@@ -14,7 +13,7 @@ export const NAV_ITEMS = [
 ];
 
 export function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  if (href === "/conversations") return pathname.startsWith("/conversations") || pathname.startsWith("/leads/");
+  // A tela principal (Conversas) também vale para o chat de uma conversa aberta.
+  if (href === "/") return pathname === "/" || pathname.startsWith("/conversations") || pathname.startsWith("/leads/");
   return pathname.startsWith(href);
 }

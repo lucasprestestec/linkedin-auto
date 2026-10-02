@@ -1,4 +1,4 @@
-import type { LeadStatus, MessageSender } from "@prisma/client";
+import type { LeadStatus, MessageChannel, MessageSender } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readableReason, relativeTime, splitHeadline } from "@/lib/format";
 
@@ -12,6 +12,8 @@ export interface ConvItem {
   status: LeadStatus;
   needsHumanReason: string | null;
   lastMessage: { content: string; sender: MessageSender } | null;
+  // Canal da última mensagem (para o ícone na lista); vazio quando ainda não houve mensagem.
+  channel: MessageChannel | null;
   // A última mensagem é do lead: ninguém respondeu ainda.
   unanswered: boolean;
   replied: boolean;
@@ -45,6 +47,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
         status: l.status,
         needsHumanReason: l.needsHumanReason && readableReason(l.needsHumanReason),
         lastMessage: last ? { content: last.content, sender: last.sender } : null,
+        channel: last?.channel ?? null,
         unanswered: last?.sender === "LEAD",
         replied: l._count.messages > 0,
         tags: l.tags,

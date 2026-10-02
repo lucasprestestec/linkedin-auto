@@ -1968,3 +1968,323 @@ textarea.field {
 .group-body > .item:first-child {
   padding-top: 8px;
 }
+
+/* ==========================================================================
+   Tela principal (Conversas): topo compacto, faixa de números, lista por
+   situação com cores e quadro (kanban).
+   ========================================================================== */
+
+/* Pontinho de cor da situação. */
+.dot-b {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.b-danger {
+  background: var(--danger);
+}
+
+.b-accent {
+  background: var(--accent);
+}
+
+.b-ok {
+  background: var(--ok);
+}
+
+.b-neutral {
+  background: #b9bdcc;
+}
+
+.b-muted {
+  background: #d5d8e3;
+}
+
+/* Topo: título pequeno à esquerda e a cápsula do assistente à direita. */
+.cv-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.cv-title {
+  font-family: var(--font-head);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.auto-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px 8px 7px 12px;
+  background: var(--card);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+
+.auto-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.auto-text b {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.auto-text small {
+  display: none;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+@media (min-width: 640px) {
+  .auto-text small {
+    display: block;
+  }
+}
+
+/* Faixa fina de números (contados em linha, não em cartões). */
+.cv-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.cv-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cv-stat b {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cv-add {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(24, 30, 70, 0.06);
+}
+
+/* "Para começar": uma linha discreta que se abre. */
+.cv-setup {
+  padding: 8px 14px;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+
+.cv-setup > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.cv-setup > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cv-setup > summary::after {
+  content: "+";
+  float: right;
+  color: var(--text-3);
+}
+
+.cv-setup[open] > summary::after {
+  content: "\2212";
+}
+
+.cv-setup .h-steps {
+  margin-top: 10px;
+}
+
+/* Barra de busca + Lista | Quadro. */
+.cv-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cv-bar .search {
+  flex: 1;
+  min-width: 0;
+}
+
+.seg {
+  flex: none;
+  display: inline-flex;
+  padding: 3px;
+  background: var(--surface-3);
+  border-radius: 12px;
+}
+
+.seg > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.seg > button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(24, 30, 70, 0.1);
+}
+
+@media (max-width: 420px) {
+  .seg > button span {
+    display: none;
+  }
+}
+
+.tabs .dot-b {
+  margin-right: 6px;
+}
+
+/* Grupos coloridos por situação. */
+.cv-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.cv-group-head .count {
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+/* Linha de conversa. */
+.cv-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cv-name .item-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.cv-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Quadro (kanban): colunas lado a lado, com rolagem na horizontal. */
+.kb {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+}
+
+.kb-col {
+  flex: none;
+  width: 250px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface-3);
+  border-radius: 16px;
+}
+
+.kb-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(24, 30, 70, 0.08);
+  color: inherit;
+  text-decoration: none;
+}
+
+.kb-sub {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.kb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kb-empty {
+  padding: 10px 4px;
+  color: var(--text-3);
+  font-size: 12px;
+}
