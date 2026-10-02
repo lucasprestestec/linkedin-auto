@@ -2801,3 +2801,27 @@ textarea.field {
 .group-title span {
   color: var(--text);
 }
+
+/* ---------- Rosto: boneco 3D, foto real ou robozinho do assistente ---------- */
+
+.avatar-doll img {
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
+}
+
+.avatar-photo {
+  overflow: hidden;
+  background: var(--surface-3);
+}
+
+.avatar-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-bot {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
