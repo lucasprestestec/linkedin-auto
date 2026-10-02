@@ -1864,3 +1864,32 @@ textarea.field {
 .legal a {
   color: var(--accent-ink);
 }
+
+/* ---------- Selo de canal (LinkedIn, e-mail, WhatsApp) ---------- */
+
+.ch-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+}
+
+.ch-title {
+  gap: 10px;
+}
+
+/* Botão discreto (ação secundária, ex.: "Já entrei, atualizar"): texto pequeno com ícone, sem caixa. */
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.btn-quiet:hover {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
