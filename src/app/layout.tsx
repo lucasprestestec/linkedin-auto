@@ -5,6 +5,7 @@ import "./ds.css";
 import { AppShell } from "@/components/AppShell";
 import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
 import { getShellData } from "@/lib/shell";
+import { PREFS_SCRIPT } from "@/lib/prefs";
 
 // Uma fonte só em todo o sistema.
 const display = Big_Shoulders({
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f5f6fa",
+  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f5f6fa" }, { media: "(prefers-color-scheme: dark)", color: "#0e1016" }],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -45,7 +46,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const shell = authed ? await getShellData() : null;
 
   return (
-    <html lang="pt-BR" className={`${display.variable} ${body.variable}`}>
+    <html lang="pt-BR" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
+      </head>
       <body>
         <AppShell data={shell}>{children}</AppShell>
       </body>

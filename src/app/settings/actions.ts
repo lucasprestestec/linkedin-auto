@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
+import { createIdentity, deleteIdentity, extractConnections, getIdentity } from "@/lib/edges";
+import { linkedinProfileSlug } from "@/lib/linkedin";
 import { sendPush } from "@/lib/push";
 import { validFollowUp } from "@/lib/settings-ranges";
 import { disconnectGoogle } from "@/lib/gmail";
@@ -166,4 +167,36 @@ export async function disconnectEmail() {
 export async function updateDailySummary(enabled: boolean) {
   await prisma.settings.update({ where: { id: "singleton" }, data: { dailySummaryEnabled: enabled } });
   revalidatePath("/settings");
+}
+
+// Traz a foto de perfil de quem jÃ¡ estÃ¡ conectado no LinkedIn. Usa a lista de conexÃµes do Edges
+// (aÃ§Ã£o gratuita) e sÃ³ preenche quem ainda nÃ£o tem foto.
+export async function refreshLeadPhotos(): Promise<{ updated?: number; error?: string }> {
+  const settings = await prisma.settings.findUnique({ where: { id: "singleton" } });
+  if (!settings?.linkedinIdentityId) return { error: "Conecte o LinkedIn primeiro." };
+
+  let connections;
+  try {
+    connections = await extractConnections(settings.linkedinIdentityId);
+  } catch {
+    return { error: "NÃ£o consegui consultar o LinkedIn agora. Tente de novo em instantes." };
+  }
+
+  const photoBySlug = new Map<string, string>();
+  for (const c of connections) {
+    const slug = (c.linkedin_profile_url && linkedinProfileSlug(c.linkedin_profile_url)) || c.linkedin_profile_handle?.trim().toLowerCase();
+    if (slug && c.profile_image_url?.startsWith("https://")) photoBySlug.set(slug, c.profile_image_url);
+  }
+
+  const leads = await prisma.lead.findMany({ where: { avatarUrl: null, linkedinProfileUrl: { not: null } }, select: { id: true, linkedinProfileUrl: true } });
+  let updated = 0;
+  for (const lead of leads) {
+    const slug = linkedinProfileSlug(lead.linkedinProfileUrl);
+    const photo = slug ? photoBySlug.get(slug) : undefined;
+    if (!photo) continue;
+    await prisma.lead.update({ where: { id: lead.id }, data: { avatarUrl: photo } });
+    updated++;
+  }
+  revalidatePath("/", "layout");
+  return { updated };
 }

@@ -48,7 +48,7 @@
 
   --font-sans: var(--font-onest), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-head: var(--font-display), "Arial Narrow", Impact, sans-serif;
-  --side-w: 232px;
+  --side-w: 196px;
   --gutter: 16px;
   color-scheme: light;
 }
@@ -309,7 +309,7 @@ button:disabled {
     position: sticky;
     top: 0;
     height: 100dvh;
-    padding: 28px 16px 20px;
+    padding: 24px 10px 16px;
     background: var(--card);
   }
 
@@ -2863,4 +2863,213 @@ textarea.field {
   *::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* ==========================================================================
+   Barra lateral compacta (só ícones), botão de ícone e tema escuro.
+   ========================================================================== */
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.side-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.side-top .brand {
+  font-size: 22px;
+}
+
+.side-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.side-collapse {
+  display: none;
+}
+
+.side-link {
+  padding: 8px 10px;
+  font-size: 13.5px;
+}
+
+.side-foot {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.side-who {
+  padding: 0 6px;
+}
+
+@media (min-width: 1024px) {
+  .side-collapse {
+    display: inline-grid;
+  }
+
+  :root[data-side="collapsed"] {
+    --side-w: 64px;
+  }
+
+  :root[data-side="collapsed"] .side {
+    padding-inline: 8px;
+    align-items: center;
+  }
+
+  :root[data-side="collapsed"] .side-top {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  :root[data-side="collapsed"] .side .brand {
+    font-size: 15px;
+    padding: 0;
+    letter-spacing: 0;
+  }
+
+  :root[data-side="collapsed"] .side-nav {
+    align-items: center;
+  }
+
+  :root[data-side="collapsed"] .side-link {
+    position: relative;
+    justify-content: center;
+    width: 44px;
+    height: 40px;
+    padding: 0;
+  }
+
+  :root[data-side="collapsed"] .side-label,
+  :root[data-side="collapsed"] .side-who {
+    display: none;
+  }
+
+  :root[data-side="collapsed"] .side-count {
+    position: absolute;
+    top: 0;
+    right: -2px;
+    min-width: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 16px;
+  }
+
+  :root[data-side="collapsed"] .side-foot {
+    padding: 0;
+    align-items: center;
+  }
+
+  :root[data-side="collapsed"] .side-actions {
+    flex-direction: column;
+  }
+}
+
+/* Tema escuro. A escolha vem do botão (guardada no navegador) ou, sem escolha, do aparelho. */
+:root[data-theme="dark"] {
+  --bg: #0e1016;
+  --card: #171a23;
+  --surface: #171a23;
+  --surface-2: #1c202b;
+  --surface-3: #232838;
+  --border: #272c3a;
+  --border-strong: #363c50;
+  --text: #eceef5;
+  --text-2: #b4b9ca;
+  --text-3: #8f95aa;
+
+  --accent: #6f8bff;
+  --accent-ink: #9fb2ff;
+  --accent-soft: #212a52;
+  --ok: #3fbf82;
+  --ok-soft: #17352a;
+  --warn: #f0a030;
+  --warn-soft: #3a2c14;
+  --danger: #f06565;
+  --danger-soft: #3b1e22;
+  --violet: #a48cff;
+  --violet-soft: #2c2550;
+
+  --ch-linkedin: #5aa9ee;
+  --ch-linkedin-soft: #14283d;
+  --ch-linkedin-line: #1f3f61;
+  --ch-whatsapp: #4cc47a;
+  --ch-whatsapp-soft: #14301f;
+  --ch-whatsapp-line: #1f4a2e;
+  --ch-email: #f0786e;
+  --ch-email-soft: #38201e;
+  --ch-email-line: #5a2f2b;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] .note-danger {
+  color: #ffb4a8;
+}
+
+:root[data-theme="dark"] .btn-danger-line {
+  border-color: #5a2f33;
+}
+
+:root[data-theme="dark"] .b-neutral {
+  background: #5a6075;
+}
+
+:root[data-theme="dark"] .b-muted {
+  background: #3b4154;
+}
+
+:root[data-theme="dark"] .ap-inline-card {
+  border-color: #33407a;
+}
+
+:root[data-theme="dark"] .ap-inline-card .field,
+:root[data-theme="dark"] .th-linkedin,
+:root[data-theme="dark"] .em-msg {
+  background: var(--surface-2);
+}
+
+:root[data-theme="dark"] .th-whatsapp {
+  background: #0b141a;
+}
+
+:root[data-theme="dark"] .day-wa,
+:root[data-theme="dark"] .wa-bubble {
+  background: #202c33;
+  color: #e9edef;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .wa-msg.out .wa-bubble {
+  background: #005c4b;
+}
+
+:root[data-theme="dark"] .wa-meta {
+  color: #8696a0;
+}
+
+:root[data-theme="dark"] .wa-who {
+  color: #4cc47a;
 }
