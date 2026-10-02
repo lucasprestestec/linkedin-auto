@@ -2772,3 +2772,32 @@ textarea.field {
   color: var(--ch-email);
   background: var(--ch-email-soft);
 }
+
+/* Título de bloco com ícone solto (sem caixa), na cor do bloco. */
+.group-title {
+  gap: 8px;
+}
+
+.ink-accent {
+  color: var(--accent-ink);
+}
+
+.ink-ok {
+  color: var(--ok);
+}
+
+.ink-violet {
+  color: var(--violet);
+}
+
+.ink-warn {
+  color: var(--warn);
+}
+
+.ink-neutral {
+  color: var(--text-2);
+}
+
+.group-title span {
+  color: var(--text);
+}
