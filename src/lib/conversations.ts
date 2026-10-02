@@ -17,6 +17,8 @@ export interface ConvItem {
   // A última mensagem é do lead: ninguém respondeu ainda.
   unanswered: boolean;
   replied: boolean;
+  // Há uma mensagem do assistente esperando a sua aprovação.
+  hasDraft: boolean;
   tags: string[];
   campaignId: string | null;
   campaignName: string | null;
@@ -30,7 +32,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
     include: {
       messages: { orderBy: { deliveredAt: "desc" }, take: 1 },
       campaign: { select: { name: true } },
-      _count: { select: { messages: { where: { sender: "LEAD" } } } },
+      _count: { select: { messages: { where: { sender: "LEAD" } }, drafts: { where: { status: "PENDING" } } } },
     },
   });
   return leads
@@ -50,6 +52,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
         channel: last?.channel ?? null,
         unanswered: last?.sender === "LEAD",
         replied: l._count.messages > 0,
+        hasDraft: l._count.drafts > 0,
         tags: l.tags,
         campaignId: l.campaignId,
         campaignName: l.campaign?.name ?? null,

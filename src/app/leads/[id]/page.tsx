@@ -22,6 +22,9 @@ import { ConversationList } from "@/components/ConversationList";
 import { emailEnabled } from "@/lib/email";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { getConversationItems } from "@/lib/conversations";
+import { loadApprovalItems } from "@/lib/approvalItems";
+import { ChannelDrafts } from "./ChannelDrafts";
+import { OnChannel } from "./OnChannel";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +32,7 @@ const WHEN_FORMAT = { day: "2-digit", month: "2-digit", hour: "2-digit", minute:
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [lead, settings, campaigns, tagRows, conversations] = await Promise.all([
+  const [lead, settings, campaigns, tagRows, conversations, drafts] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
       include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
@@ -38,6 +41,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
     prisma.lead.findMany({ where: { tags: { isEmpty: false } }, select: { tags: true } }),
     getConversationItems(),
+    loadApprovalItems({ status: "PENDING", leadId: id }),
   ]);
 
   if (!lead) notFound();
@@ -98,8 +102,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const counts: Record<ChannelKey, number> = { LINKEDIN: 0, WHATSAPP: 0, EMAIL: 0 };
   for (const m of lead.messages) counts[m.channel] += 1;
   // O seletor mostra os canais com mensagens e os canais por onde dá para enviar.
-  const available = ORDER.filter((c) => counts[c] > 0 || replyChannels.includes(c));
-  const lastChannel = lead.messages.at(-1)?.channel ?? lastLeadChannel;
+  const available = ORDER.filter((c) => counts[c] > 0 || draftCounts[c] > 0 || replyChannels.includes(c));
+  const draftCounts: Record<ChannelKey, number> = { LINKEDIN: 0, WHATSAPP: 0, EMAIL: 0 };
+  for (const d of drafts) draftCounts[d.channelKey] += 1;
+  // Se há rascunho esperando, a conversa abre no canal dele; senão, no canal da última mensagem.
+  const lastChannel = drafts[0]?.channelKey ?? lead.messages.at(-1)?.channel ?? lastLeadChannel;
 
   const conversation = (
     <>
@@ -110,7 +117,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       )}
       <ThreadView messages={threadMessages} leadFirst={lead.firstName} leadLast={lead.lastName} ownerName={author === "você" ? "Você" : author}>
         {lead.status === "NEEDS_HUMAN" && (
-          <HandoffCard leadId={lead.id} firstName={firstName} reason={readableReason(lead.needsHumanReason ?? "A conversa precisa de você")} when={relativeTime(lead.updatedAt)} />
+          <OnChannel channel={lastLeadChannel}>
+            <HandoffCard leadId={lead.id} firstName={firstName} reason={readableReason(lead.needsHumanReason ?? "A conversa precisa de você")} when={relativeTime(lead.updatedAt)} />
+          </OnChannel>
         )}
       </ThreadView>
     </>
@@ -206,17 +215,24 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <div className="grow">
               <h1 className="truncate">{fullName}</h1>
               {lead.jobTitle && <p className="truncate">{company ? `${role} · ${company}` : lead.jobTitle}</p>}
+              <p className="chat-status">
+                <span className={`pill ${lead.status === "NEEDS_HUMAN" ? "pill-danger" : lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? "pill-ok" : ""}`}>{statusLabel}</span>
+                {lead.nextStep && <span className="truncate">Próximo passo: {lead.nextStep}</span>}
+              </p>
             </div>
             <DetailsToggle />
           </header>
 
-          <ChannelSwitcher counts={counts} />
+          <ChannelSwitcher counts={counts} drafts={draftCounts} />
 
           <LeadTabs
             chat={conversation}
             about={about}
             composer={
-              <ReplyForm key="composer" leadId={lead.id} firstName={firstName} />
+              <>
+                <ChannelDrafts items={drafts} />
+                <ReplyForm key="composer" leadId={lead.id} firstName={firstName} />
+              </>
             }
           />
         </div>

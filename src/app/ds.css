@@ -2566,3 +2566,90 @@ textarea.field {
 .composer-email .btn-solid {
   background: #d9453a;
 }
+
+/* ==========================================================================
+   Aprovar dentro da conversa: contexto do lead, rascunho compacto e linha de situação.
+   ========================================================================== */
+
+/* O que o lead escreveu, acima do rascunho (a que ele responde). */
+.ap-quote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface-2);
+  border-radius: 0 10px 10px 0;
+}
+
+.ap-quote-who {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ap-quote p {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.ap-quote p + p {
+  margin-top: 4px;
+}
+
+/* Rascunhos logo acima do campo de resposta. */
+.ap-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 18px 0;
+  background: var(--card);
+}
+
+.ap-inline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #c9d3f7;
+  border-radius: 14px;
+  background: var(--accent-soft);
+}
+
+.ap-inline-card .field {
+  background: #fff;
+}
+
+.ap-elsewhere {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Bolinha de rascunho no seletor de canal. */
+.ch-draft {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Situação da conversa, logo abaixo do nome. */
+.chat-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  min-width: 0;
+}
+
+.chat-status .truncate {
+  color: var(--text-2);
+  font-size: 12px;
+}
