@@ -1,3 +1,4 @@
+import { RefreshPhotosButton } from "./RefreshPhotosButton";
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
 import { prisma } from "@/lib/prisma";
@@ -182,6 +183,7 @@ export default async function SettingsPage() {
         <ShortcutItem href="/campaigns" title="Campanhas" sub="Grupos de pessoas com uma oferta" />
         <ShortcutItem href="/channels" title="Canais" sub="LinkedIn, e-mail e WhatsApp" />
         <ShortcutItem href="/api/export/leads" download title="Baixar meus contatos" sub="Planilha para Excel ou Google Planilhas" />
+        <RefreshPhotosButton />
         <form action={logout} style={{ paddingTop: 12 }}>
           <button type="submit" className="btn-line btn-danger-line btn-sm">
             Sair
