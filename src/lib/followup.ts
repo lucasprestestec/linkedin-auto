@@ -86,6 +86,8 @@ export async function detectAcceptedInvites(identityId: string, settings: Settin
         firstName: lead.firstName ?? connection.first_name ?? null,
         lastName: lead.lastName ?? connection.last_name ?? null,
         jobTitle: lead.jobTitle ?? connection.job_title ?? null,
+        // Foto real do perfil (só https); se não carregar, a tela mostra o bonequinho.
+        avatarUrl: lead.avatarUrl ?? (connection.profile_image_url?.startsWith("https://") ? connection.profile_image_url : null),
       },
     });
     accepted++;

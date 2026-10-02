@@ -31,7 +31,7 @@ export function ConversationRow({ c, active }: { c: ConvItem; active?: boolean }
   const tags = c.tags.slice(0, 2);
   return (
     <Link href={`/leads/${c.id}`} className="item cv-row" aria-current={active ? "page" : undefined}>
-      <Avatar firstName={c.firstName} lastName={c.lastName} size={40} />
+      <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={40} />
       <span className="item-main">
         <span className="cv-name">
           <span className="item-title">{fullName(c)}</span>
@@ -63,7 +63,7 @@ export function ConversationCard({ c }: { c: ConvItem }) {
   return (
     <Link href={`/leads/${c.id}`} className="kb-card">
       <span className="cv-name">
-        <Avatar firstName={c.firstName} lastName={c.lastName} size={28} />
+        <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={28} />
         <span className="item-title">{fullName(c)}</span>
         {c.channel && <ChannelBadge channel={c.channel} size={18} />}
       </span>

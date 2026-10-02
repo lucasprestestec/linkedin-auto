@@ -203,6 +203,7 @@ export interface EdgesConnection {
   linkedin_profile_handle?: string;
   linkedin_profile_url?: string;
   linkedin_profile_id?: number;
+  profile_image_url?: string;
 }
 
 export async function extractConnections(identityId: string): Promise<EdgesConnection[]> {

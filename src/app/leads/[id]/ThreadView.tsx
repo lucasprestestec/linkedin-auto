@@ -28,7 +28,7 @@ function DaySep({ text, variant }: { text: string; variant: "wa" | "li" | "em" }
 
 // A conversa do canal escolhido, no visual daquele app: WhatsApp (balões verdes), LinkedIn (lista com foto e nome)
 // e e-mail (um cartão por mensagem). Só aparecem as mensagens do canal aberto.
-export function ThreadView({ messages, leadFirst, leadLast, ownerName, children }: { messages: ThreadMessage[]; leadFirst: string | null; leadLast: string | null; ownerName: string; children?: React.ReactNode }) {
+export function ThreadView({ messages, leadFirst, leadLast, leadPhoto, ownerName, children }: { messages: ThreadMessage[]; leadFirst: string | null; leadLast: string | null; leadPhoto?: string | null; ownerName: string; children?: React.ReactNode }) {
   const { channel } = useChannel();
   const items = messages.filter((m) => m.channel === channel);
   const leadName = [leadFirst, leadLast].filter(Boolean).join(" ") || "Contato";
@@ -73,7 +73,7 @@ export function ThreadView({ messages, leadFirst, leadLast, ownerName, children 
             <div key={m.id} style={{ display: "contents" }}>
               {showDay && <DaySep text={m.dayText} variant="li" />}
               <div className="li-msg">
-                <Avatar firstName={f} lastName={rest.at(-1) ?? null} size={36} variant={m.sender === "AGENT" ? "assistant" : undefined} />
+                <Avatar firstName={f} lastName={rest.at(-1) ?? null} photoUrl={m.sender === "LEAD" ? leadPhoto : null} size={36} variant={m.sender === "AGENT" ? "assistant" : undefined} />
                 <div className="li-body">
                   <div className="li-head">
                     <b>{name}</b>

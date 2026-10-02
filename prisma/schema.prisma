@@ -37,6 +37,8 @@ model Lead {
   firstName         String?
   lastName          String?
   jobTitle          String?
+  // Foto de perfil do LinkedIn (endereço vindo do Edges); sem ela, aparece o bonequinho.
+  avatarUrl         String?
   status            LeadStatus @default(INVITE_SENT)
   linkedinThreadId  String?   @unique
   // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
