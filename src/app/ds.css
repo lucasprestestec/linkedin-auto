@@ -2287,6 +2287,8 @@ textarea.field {
 .kb-card .item-title {
   font-size: 13px;
   font-weight: 600;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .kb-sub {
