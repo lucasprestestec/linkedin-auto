@@ -21,23 +21,8 @@ import { StyleOverview } from "./StyleOverview";
 import { VoiceOverview } from "./VoiceOverview";
 import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
 import { fishConfigured } from "@/lib/voice/fish";
-import { IconChip, type Tone } from "@/components/IconChip";
-import {
-  IconBan,
-  IconBell,
-  IconCalendar,
-  IconChevronRight,
-  IconClock,
-  IconDownload,
-  IconLayers,
-  IconMegaphone,
-  IconMic,
-  IconNote,
-  IconSparkles,
-  IconTarget,
-  IconUserSearch,
-  IconUsers,
-} from "@/components/Icons";
+import type { Tone } from "@/components/IconChip";
+import { IconCalendar, IconChevronRight, IconLayers, IconSparkles, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +33,11 @@ function Group({ id, Icon, tone, title, hint, children }: { id?: string; Icon: I
   return (
     <section id={id} className="sec" style={{ scrollMarginTop: 90 }}>
       <header className="group-head">
-        <IconChip Icon={Icon} tone={tone} size={40} />
         <div>
-          <h2 className="t-label">{title}</h2>
+          <h2 className={`t-label group-title ink-${tone}`}>
+            <Icon size={20} />
+            <span>{title}</span>
+          </h2>
           <p className="group-sub">{hint}</p>
         </div>
       </header>
@@ -61,16 +48,13 @@ function Group({ id, Icon, tone, title, hint, children }: { id?: string; Icon: I
 
 // Uma linha que mostra o valor atual e abre para editar: a página inteira cabe
 // numa olhada e ninguém precisa rolar por formulários que não vai mexer.
-function SettingItem({ id, Icon, tone = "neutral", title, summary, children }: { id?: string; Icon: IconType; tone?: Tone; title: string; summary: string; children: React.ReactNode }) {
+function SettingItem({ id, title, summary, children }: { id?: string; title: string; summary: string; children: React.ReactNode }) {
   return (
     <details className="fold" id={id} style={{ scrollMarginTop: 90 }}>
       <summary>
-        <span className="si-row">
-          <IconChip Icon={Icon} tone={tone} />
-          <span className="setting-text">
-            <b>{title}</b>
-            <small>{summary}</small>
-          </span>
+        <span className="setting-text">
+          <b>{title}</b>
+          <small>{summary}</small>
         </span>
       </summary>
       <div className="fold-body">{children}</div>
@@ -79,10 +63,9 @@ function SettingItem({ id, Icon, tone = "neutral", title, summary, children }: {
 }
 
 // Atalho para outra tela, com o mesmo ícone em quadradinho dos itens acima.
-function ShortcutItem({ href, download, Icon, title, sub }: { href: string; download?: boolean; Icon: IconType; title: string; sub: string }) {
+function ShortcutItem({ href, download, title, sub }: { href: string; download?: boolean; title: string; sub: string }) {
   const body = (
     <>
-      <IconChip Icon={Icon} tone="neutral" />
       <span className="item-main">
         <span className="item-title">{title}</span>
         <span className="item-sub">{sub}</span>
@@ -138,12 +121,10 @@ export default async function SettingsPage() {
       <OwnerNameForm value={settings.ownerName ?? ""} />
 
       <Group id="alcance" Icon={IconTarget} tone="accent" title="Prospecção" hint="Quem o assistente aborda e como ele acompanha">
-        <SettingItem Icon={IconUsers} tone="accent" title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
+        <SettingItem title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
           <IdealClientForm value={settings.targetAudience ?? ""} />
         </SettingItem>
         <SettingItem
-          Icon={IconClock}
-          tone="accent"
           title="Acompanhamento"
           summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
         >
@@ -152,15 +133,13 @@ export default async function SettingsPage() {
             days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
           />
         </SettingItem>
-        <SettingItem Icon={IconBan} tone="accent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
+        <SettingItem title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
           <ExclusionListForm value={settings.exclusionList ?? ""} />
         </SettingItem>
       </Group>
 
       <Group Icon={IconCalendar} tone="ok" title="Rotina e avisos" hint="Reuniões, resumo do dia e notificações">
         <SettingItem
-          Icon={IconCalendar}
-          tone="ok"
           title="Agenda de reuniões"
           summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: o assistente passa a conversa para você"}
         >
@@ -173,8 +152,6 @@ export default async function SettingsPage() {
           />
         </SettingItem>
         <SettingItem
-          Icon={IconNote}
-          tone="ok"
           title="Resumo do dia"
           summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
         >
@@ -182,7 +159,7 @@ export default async function SettingsPage() {
         </SettingItem>
         {/* Sem as chaves de push no servidor, o bloco só mostraria um aviso técnico. */}
         {pushPublicKey() && (
-          <SettingItem Icon={IconBell} tone="ok" title="Avisos no celular" summary="Quando alguém precisar de você">
+          <SettingItem title="Avisos no celular" summary="Quando alguém precisar de você">
             <NotificationsCard publicKey={pushPublicKey()} />
           </SettingItem>
         )}
@@ -190,23 +167,21 @@ export default async function SettingsPage() {
 
       <Group id="jeito" Icon={IconSparkles} tone="violet" title="Jeito do assistente" hint="Como ele escreve e como ele soa nos áudios">
         <SettingItem
-          Icon={IconSparkles}
-          tone="violet"
           title="Meu jeito de escrever"
           summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
         >
           <StyleOverview style={style} suggestions={suggestions} />
         </SettingItem>
-        <SettingItem id="voz" Icon={IconMic} tone="violet" title="Mensagens de voz" summary={summarizeVoice(voice)}>
+        <SettingItem id="voz" title="Mensagens de voz" summary={summarizeVoice(voice)}>
           <VoiceOverview voice={voice} configured={fishConfigured()} />
         </SettingItem>
       </Group>
 
       <Group Icon={IconLayers} tone="neutral" title="Atalhos e dados" hint="Outras telas e a sua lista de contatos">
-        <ShortcutItem href="/prospect" Icon={IconUserSearch} title="Prospectar" sub="Adicionar pessoas para o assistente abordar" />
-        <ShortcutItem href="/campaigns" Icon={IconMegaphone} title="Campanhas" sub="Grupos de pessoas com uma oferta" />
-        <ShortcutItem href="/channels" Icon={IconLayers} title="Canais" sub="LinkedIn, e-mail e WhatsApp" />
-        <ShortcutItem href="/api/export/leads" download Icon={IconDownload} title="Baixar meus contatos" sub="Planilha para Excel ou Google Planilhas" />
+        <ShortcutItem href="/prospect" title="Prospectar" sub="Adicionar pessoas para o assistente abordar" />
+        <ShortcutItem href="/campaigns" title="Campanhas" sub="Grupos de pessoas com uma oferta" />
+        <ShortcutItem href="/channels" title="Canais" sub="LinkedIn, e-mail e WhatsApp" />
+        <ShortcutItem href="/api/export/leads" download title="Baixar meus contatos" sub="Planilha para Excel ou Google Planilhas" />
         <form action={logout} style={{ paddingTop: 12 }}>
           <button type="submit" className="btn-line btn-danger-line btn-sm">
             Sair
