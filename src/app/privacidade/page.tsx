@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           <strong>Dados do cliente:</strong> nome, e-mail da conta Google conectada, configurações do sistema e a autorização (token) que você concede ao Google.
         </li>
         <li>
-          <strong>Dados dos contatos (leads) do cliente:</strong> nome, cargo, link de perfil, e-mail e telefone quando informados, e o histórico de mensagens
+          <strong>Dados dos contatos (leads) do cliente:</strong> nome, cargo, link e foto de perfil do LinkedIn (o endereço da imagem), e-mail e telefone quando informados, e o histórico de mensagens
           trocadas por LinkedIn, e-mail e WhatsApp.
         </li>
         <li>

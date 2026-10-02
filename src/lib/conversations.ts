@@ -7,6 +7,7 @@ export interface ConvItem {
   id: string;
   firstName: string | null;
   lastName: string | null;
+  avatarUrl: string | null;
   role: string | null;
   company: string | null;
   status: LeadStatus;
@@ -44,6 +45,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
         id: l.id,
         firstName: l.firstName,
         lastName: l.lastName,
+        avatarUrl: l.avatarUrl,
         role,
         company,
         status: l.status,

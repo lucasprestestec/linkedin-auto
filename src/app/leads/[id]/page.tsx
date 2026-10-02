@@ -115,7 +115,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {lead.status === "INVITE_SENT" ? "Nenhuma mensagem ainda. Quando o convite for aceito, o assistente abre a conversa." : "Conexão aceita. O assistente manda a primeira mensagem na próxima rodada."}
         </p>
       )}
-      <ThreadView messages={threadMessages} leadFirst={lead.firstName} leadLast={lead.lastName} ownerName={author === "você" ? "Você" : author}>
+      <ThreadView messages={threadMessages} leadFirst={lead.firstName} leadLast={lead.lastName} leadPhoto={lead.avatarUrl} ownerName={author === "você" ? "Você" : author}>
         {lead.status === "NEEDS_HUMAN" && (
           <OnChannel channel={lastLeadChannel}>
             <HandoffCard leadId={lead.id} firstName={firstName} reason={readableReason(lead.needsHumanReason ?? "A conversa precisa de você")} when={relativeTime(lead.updatedAt)} />
