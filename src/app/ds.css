@@ -2244,7 +2244,8 @@ textarea.field {
   white-space: nowrap;
 }
 
-/* Quadro (kanban): colunas lado a lado, com rolagem na horizontal. */
+/* Quadro (kanban): no celular, colunas deslizando com o dedo; no desktop, todas as colunas cabem na tela
+   (se a tela for estreita, quebram em duas fileiras) e nunca aparece barra de rolagem. */
 .kb {
   display: flex;
   gap: 12px;
@@ -2824,4 +2825,42 @@ textarea.field {
 .avatar-bot {
   background: var(--violet-soft);
   color: var(--violet);
+}
+
+/* Desktop: o quadro mostra todas as colunas sem rolagem; cards mais compactos, quebrando em 2 fileiras se faltar espaÃ§o. */
+@media (min-width: 1024px) {
+  .kb {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    overflow-x: visible;
+    scroll-snap-type: none;
+    padding-bottom: 0;
+  }
+
+  .kb-col {
+    width: auto;
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .kb-card {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+
+  .kb-card .kb-sub {
+    -webkit-line-clamp: 1;
+    font-size: 12px;
+  }
+}
+
+/* Celular e tablet: tudo por toque, sem barras de rolagem visÃ­veis. */
+@media (max-width: 1023.98px) {
+  * {
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -39,18 +39,10 @@ check("usa só o primeiro nome quando vem composto", () => {
   assert.equal(genderOfFirstName("Maria Eduarda"), "mulher");
   assert.equal(genderOfFirstName("João Pedro"), "homem");
 });
-check("o mesmo nome sempre dá o mesmo boneco", () => {
-  assert.deepEqual(avatarFor("Catarina", "Prestes"), avatarFor("Catarina", "Prestes"));
-});
-check("o tom vai de 1 a 5 e o arquivo segue o padrão", () => {
-  const a = avatarFor("Lucas", "Prestes");
-  assert.ok(a.tone >= 1 && a.tone <= 5);
-  assert.match(a.src, /^\/avatars\/(mulher|homem|neutro)-[1-5]\.png$/);
-});
-check("há variedade de tons em 60 nomes", () => {
-  const letters = (i: number) => String.fromCharCode(97 + (i % 26)) + String.fromCharCode(97 + ((i * 7 + 3) % 26)) + String.fromCharCode(97 + ((i * 11 + 5) % 26));
-  const tons = new Set(Array.from({ length: 60 }, (_, i) => avatarFor(`Nome${letters(i)}`, `Sobre${letters(i + 13)}`).tone));
-  assert.equal(tons.size, 5);
+check("o boneco Ã© amarelo, sem variaÃ§Ã£o de tom", () => {
+  assert.equal(avatarFor("Lucas", "Prestes").src, "/avatars/homem.png");
+  assert.equal(avatarFor("Catarina", "Prestes").src, "/avatars/mulher.png");
+  assert.equal(avatarFor("Alex", null).src, "/avatars/neutro.png");
 });
 
 process.exit(failed ? 1 : 0);

@@ -1,5 +1,5 @@
-// Qual bonequinho 3D mostrar para uma pessoa quando não há foto: o gênero vem do primeiro nome e o tom de pele
-// é sorteado de forma fixa pelo nome completo (a mesma pessoa sempre tem o mesmo boneco). Nome ambíguo ou
+// Qual bonequinho 3D mostrar para uma pessoa quando não há foto: o gênero vem do primeiro nome e o boneco é
+// sempre amarelo (sem variação de tom de pele). Nome ambíguo ou
 // desconhecido vira o boneco neutro: é melhor errar para o neutro do que para o gênero errado.
 
 export type AvatarGender = "mulher" | "homem" | "neutro";
@@ -41,16 +41,8 @@ export function genderOfFirstName(firstName: string | null | undefined): AvatarG
   return "neutro";
 }
 
-function hash(s: string): number {
-  let h = 5381;
-  for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0;
-  return h;
-}
-
-// Caminho da imagem do bonequinho (public/avatars): gênero pelo primeiro nome, tom de pele (1 a 5) pelo nome completo.
-export function avatarFor(firstName: string | null | undefined, lastName: string | null | undefined): { src: string; gender: AvatarGender; tone: number } {
+// Caminho da imagem do bonequinho (public/avatars): sempre amarelo; sÃ³ o gÃªnero (pelo primeiro nome) muda o desenho.
+export function avatarFor(firstName: string | null | undefined, _lastName?: string | null): { src: string; gender: AvatarGender } {
   const gender = genderOfFirstName(firstName);
-  const full = strip(`${firstName ?? ""}${lastName ?? ""}`) || "contato";
-  const tone = (hash(full) % 5) + 1;
-  return { src: `/avatars/${gender}-${tone}.png`, gender, tone };
+  return { src: `/avatars/${gender}.png`, gender };
 }
