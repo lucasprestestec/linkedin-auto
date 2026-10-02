@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
+import { ChannelTitle } from "@/components/ChannelBadge";
 import { Help } from "@/components/Help";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
@@ -52,12 +53,12 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
       </header>
 
       <section className="sec">
-        <h2 className="t-label">LinkedIn</h2>
+        <ChannelTitle channel="LINKEDIN" />
         <LinkedinCard settings={settings} status={status} today={`Hoje: ${linkedinToday} de ${settings.dailyMessageLimit} mensagens`} />
       </section>
 
       <section className="sec">
-        <h2 className="t-label">E-mail</h2>
+        <ChannelTitle channel="EMAIL" />
         <EmailCard
           googleAddress={settings.googleEmail}
           expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
@@ -75,7 +76,7 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
       </section>
 
       <section className="sec">
-        <h2 className="t-label">WhatsApp</h2>
+        <ChannelTitle channel="WHATSAPP" />
         <WhatsappCard
           host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
           channelId={settings.deskcommChannelId}
