@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { clockTime, dayLabel, readableReason, relativeTime, sameDay, shortDate, splitHeadline } from "@/lib/format";
+import { clockTime, dayLabel, readableReason, relativeTime, shortDate, splitHeadline } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/status";
 import { ReplyForm } from "./ReplyForm";
+import { ChannelProvider } from "./ChannelContext";
+import { ChannelSwitcher } from "./ChannelSwitcher";
+import { ThreadView, type ThreadMessage } from "./ThreadView";
+import type { ChannelKey } from "@/components/ChannelBadge";
 import { LeadTabs } from "./LeadTabs";
 import { LeadTags } from "./LeadTags";
 import { LeadCampaign } from "./LeadCampaign";
@@ -78,53 +82,38 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const inherited = followUpRuleFor({ followUpMaxCount: null, followUpDelayHours: null }, lead.campaign, settings);
   const inheritedLabel = `${describeRule(inherited.maxCount, inherited.delayHours)} (${inherited.source === "campaign" ? "da campanha" : "da conta"})`;
 
+  // Mensagens com data e hora já formatadas (servidor), para a conversa trocar de canal sem divergir na hidratação.
+  const threadMessages: ThreadMessage[] = lead.messages.map((m) => ({
+    id: m.id,
+    sender: m.sender,
+    channel: m.channel,
+    content: m.content,
+    subject: m.subject,
+    opened: m.channel === "EMAIL" && m.sender !== "LEAD" && m.openToken ? { count: m.openCount } : null,
+    time: clockTime(m.deliveredAt),
+    dayKey: m.deliveredAt.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
+    dayText: `${dayLabel(m.deliveredAt)}${dayLabel(m.deliveredAt) === "Hoje" ? `, ${shortDate(m.deliveredAt)}` : ""}`,
+  }));
+  const ORDER: ChannelKey[] = ["LINKEDIN", "WHATSAPP", "EMAIL"];
+  const counts: Record<ChannelKey, number> = { LINKEDIN: 0, WHATSAPP: 0, EMAIL: 0 };
+  for (const m of lead.messages) counts[m.channel] += 1;
+  // O seletor mostra os canais com mensagens e os canais por onde dá para enviar.
+  const available = ORDER.filter((c) => counts[c] > 0 || replyChannels.includes(c));
+  const lastChannel = lead.messages.at(-1)?.channel ?? lastLeadChannel;
+
   const conversation = (
-    <div className="thread">
+    <>
       {lead.messages.length === 0 && (
         <p className="empty" style={{ textAlign: "center" }}>
           {lead.status === "INVITE_SENT" ? "Nenhuma mensagem ainda. Quando o convite for aceito, o assistente abre a conversa." : "Conexão aceita. O assistente manda a primeira mensagem na próxima rodada."}
         </p>
       )}
-
-      {lead.messages.map((message, i) => {
-        const prev = lead.messages[i - 1];
-        const showDay = !prev || !sameDay(prev.deliveredAt, message.deliveredAt);
-        const fromLead = message.sender === "LEAD";
-        return (
-          <div key={message.id} style={{ display: "contents" }}>
-            {showDay && (
-              <div className="day-sep">
-                {dayLabel(message.deliveredAt)}
-                {dayLabel(message.deliveredAt) === "Hoje" ? `, ${shortDate(message.deliveredAt)}` : ""}
-              </div>
-            )}
-            <div className={`msg ${fromLead ? "msg-in" : "msg-out"}`}>
-              {message.channel !== "LINKEDIN" && (
-                <div className="msg-channel">
-                  {message.channel === "WHATSAPP" ? "WhatsApp" : `E-mail${message.subject ? ` · ${message.subject}` : ""}`}
-                  {message.channel === "EMAIL" && !fromLead && message.openToken && (
-                    <>
-                      {" · "}
-                      {message.openCount > 0 ? `aberto${message.openCount > 1 ? ` ${message.openCount}x` : ""}` : "não aberto"}
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="bubble">{message.content}</div>
-              <div className="msg-meta">
-                {message.sender === "AGENT" ? "Assistente · " : message.sender === "HUMAN" ? "Você · " : ""}
-                {clockTime(message.deliveredAt)}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {lead.status === "NEEDS_HUMAN" && (
-        <HandoffCard leadId={lead.id} firstName={firstName} reason={readableReason(lead.needsHumanReason ?? "A conversa precisa de você")} when={relativeTime(lead.updatedAt)} />
-      )}
-      <div id="thread-end" />
-    </div>
+      <ThreadView messages={threadMessages} leadFirst={lead.firstName} leadLast={lead.lastName} ownerName={author === "você" ? "Você" : author}>
+        {lead.status === "NEEDS_HUMAN" && (
+          <HandoffCard leadId={lead.id} firstName={firstName} reason={readableReason(lead.needsHumanReason ?? "A conversa precisa de você")} when={relativeTime(lead.updatedAt)} />
+        )}
+      </ThreadView>
+    </>
   );
 
   const about = (
@@ -208,9 +197,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       </aside>
 
       <LeadWorkspace>
+        <ChannelProvider available={available} reply={replyChannels} initial={lastChannel}>
         <div className="chat">
           <header className="chat-head">
-            <Link href="/conversations" className="btn-text only-mobile" aria-label="Voltar para Conversas">
+            <Link href="/" className="btn-text only-mobile" aria-label="Voltar para Conversas">
               ← Voltar
             </Link>
             <div className="grow">
@@ -220,21 +210,17 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <DetailsToggle />
           </header>
 
+          <ChannelSwitcher counts={counts} />
+
           <LeadTabs
             chat={conversation}
             about={about}
             composer={
-              <ReplyForm
-                key="composer"
-                leadId={lead.id}
-                firstName={firstName}
-                profileUrl={lead.linkedinProfileUrl}
-                channels={replyChannels}
-                defaultChannel={lastLeadChannel}
-              />
+              <ReplyForm key="composer" leadId={lead.id} firstName={firstName} />
             }
           />
         </div>
+        </ChannelProvider>
 
         <aside className="details only-desktop" aria-label="Detalhes">
           {about}
