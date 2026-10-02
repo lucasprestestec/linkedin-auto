@@ -1,54 +1,23 @@
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
-import { CHANNEL_LABEL } from "@/lib/channels";
-import { relativeTime } from "@/lib/format";
 import { approvalStats } from "@/lib/outbox";
-import { ApprovalCard, type ApprovalItem } from "./ApprovalCard";
+import { loadApprovalItems } from "@/lib/approvalItems";
+import { ApprovalCard } from "./ApprovalCard";
 import { ApprovalToggle } from "./ApprovalToggle";
-import { hasVoice, parseVoiceSettings } from "@/lib/voice/settings";
-import { fishConfigured } from "@/lib/voice/fish";
-import { publicBaseUrl } from "@/lib/voice/outgoingAudio";
 
 export const dynamic = "force-dynamic";
-
-const KIND_LABEL = {
-  REPLY: "Resposta",
-  OPENING: "Abertura",
-  FIRST_CONTACT: "Primeiro contato",
-  INTRO_EMAIL: "Apresentação por e-mail",
-  FOLLOW_UP: "Retomada",
-} as const;
 
 // Só passa a sugerir desligar a aprovação depois de amostra suficiente.
 const TRUST_MIN_DECIDED = 30;
 const TRUST_MIN_RATE = 0.9;
 
 export default async function ApprovalsPage() {
-  const [settings, pending, waiting, stats] = await Promise.all([
-    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { approvalMode: true, workStartHour: true, workEndHour: true, voiceSettings: true } }),
-    prisma.draft.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, include: { lead: { select: { firstName: true, lastName: true, jobTitle: true } } } }),
+  const [settings, items, waiting, stats] = await Promise.all([
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { approvalMode: true, workStartHour: true, workEndHour: true } }),
+    loadApprovalItems({ status: "PENDING" }),
     prisma.draft.count({ where: { status: "APPROVED" } }),
     approvalStats(),
   ]);
-
-  // Voz criada e autorizada, serviço de voz configurado e endereço público do sistema definido.
-  const audioReady = hasVoice(parseVoiceSettings(settings.voiceSettings)) && fishConfigured() && Boolean(publicBaseUrl());
-
-  const items: ApprovalItem[] = pending.map((d) => ({
-    id: d.id,
-    leadId: d.leadId,
-    firstName: d.lead.firstName,
-    lastName: d.lead.lastName,
-    jobTitle: d.lead.jobTitle,
-    channel: CHANNEL_LABEL[d.channel],
-    kind: KIND_LABEL[d.kind],
-    subject: d.subject,
-    content: d.content,
-    reason: d.reason,
-    asAudio: d.asAudio,
-    canAudio: d.channel === "WHATSAPP" && audioReady,
-    when: relativeTime(d.createdAt),
-  }));
 
   const rate = stats.decided ? stats.untouched / stats.decided : 0;
   const trusted = stats.decided >= TRUST_MIN_DECIDED && rate >= TRUST_MIN_RATE;

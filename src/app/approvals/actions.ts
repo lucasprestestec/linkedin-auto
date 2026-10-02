@@ -14,6 +14,7 @@ function refresh() {
   revalidatePath("/approvals");
   revalidatePath("/conversations");
   revalidatePath("/");
+  revalidatePath("/leads/[id]", "page");
 }
 
 // Aprova (com o texto editado, se o corretor mudou). Fora do horário de

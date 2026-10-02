@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { FeedbackPanel } from "@/components/FeedbackPanel";
+import type { ChannelKey } from "@/components/ChannelBadge";
 import { DRAFT_REASON_KEYS } from "@/lib/writingStyle";
 import { approve, discard, markDraftFeedback, previewDraftAudio, setDraftAudio } from "./actions";
 
@@ -14,6 +15,7 @@ export interface ApprovalItem {
   lastName: string | null;
   jobTitle: string | null;
   channel: string;
+  channelKey: ChannelKey;
   kind: string;
   subject: string | null;
   content: string;
@@ -22,11 +24,14 @@ export interface ApprovalItem {
   // A voz do usuario esta pronta e o servico de voz no ar: da pra mandar este rascunho em audio.
   canAudio: boolean;
   when: string;
+  // O que o lead escreveu por último (a que este rascunho responde); vazio quando não é uma resposta.
+  context: { content: string; channel: string; when: string }[];
 }
 
 // Uma mensagem que o assistente quer mandar. O texto é editável: mexer nele
 // também conta como aprovação (e fica registrado que você ajustou).
-export function ApprovalCard({ item }: { item: ApprovalItem }) {
+// `compact`: versão para dentro da conversa (a conversa já está na tela, então sem foto, nome nem contexto).
+export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; compact?: boolean }) {
   const [text, setText] = useState(item.content);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -73,22 +78,40 @@ export function ApprovalCard({ item }: { item: ApprovalItem }) {
   }
 
   return (
-    <article className="card">
-      <div className="row" style={{ gap: 12 }}>
-        <Avatar firstName={item.firstName} lastName={item.lastName} size={44} />
-        <div className="item-main">
-          <Link href={`/leads/${item.leadId}`} className="item-title" style={{ textDecoration: "none" }}>
-            {name}
-          </Link>
-          <span className="item-sub">{item.jobTitle ?? item.channel}</span>
-        </div>
-        <span className="stack" style={{ gap: 4, alignItems: "flex-end" }}>
+    <article className={compact ? "ap-inline-card" : "card"}>
+      {compact ? (
+        <div className="row" style={{ gap: 8, justifyContent: "space-between" }}>
+          <span className="pill pill-accent">Rascunho do assistente · {item.kind}</span>
           <span className="item-meta">{item.when}</span>
-          <span className="pill pill-accent">
-            {item.kind} · {item.channel}
+        </div>
+      ) : (
+        <div className="row" style={{ gap: 12 }}>
+          <Avatar firstName={item.firstName} lastName={item.lastName} size={44} />
+          <div className="item-main">
+            <Link href={`/leads/${item.leadId}`} className="item-title" style={{ textDecoration: "none" }}>
+              {name}
+            </Link>
+            <span className="item-sub">{item.jobTitle ?? item.channel}</span>
+          </div>
+          <span className="stack" style={{ gap: 4, alignItems: "flex-end" }}>
+            <span className="item-meta">{item.when}</span>
+            <span className="pill pill-accent">
+              {item.kind} · {item.channel}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
+      )}
+
+      {!compact && item.context.length > 0 && (
+        <blockquote className="ap-quote">
+          <span className="ap-quote-who">
+            {item.firstName ?? "O lead"} escreveu · {item.context.at(-1)?.when}
+          </span>
+          {item.context.map((c, i) => (
+            <p key={i}>{c.content}</p>
+          ))}
+        </blockquote>
+      )}
 
       {item.subject && <p className="small muted">Assunto: {item.subject}</p>}
       <textarea

@@ -11,12 +11,14 @@ function preview(c: ConvItem): string {
   return c.status === "INVITE_SENT" ? "Aguardando aceite do convite" : "Conexão aceita";
 }
 
-// Situação e cor da conversa (a mesma que agrupa a lista e as colunas do quadro).
-export function statusPill(c: ConvItem): { label: string; pill: string } {
-  const needsYou = c.status === "NEEDS_HUMAN" || (c.unanswered && c.status !== "LOST");
-  const pill = c.status === "NEEDS_HUMAN" ? "pill-danger" : needsYou ? "pill-warn" : c.status === "QUALIFIED" || c.status === "MEETING_SCHEDULED" ? "pill-ok" : "";
-  const label = c.status === "NEEDS_HUMAN" ? "Precisa de você" : needsYou ? "Responder" : STATUS_LABEL[c.status];
-  return { label, pill };
+// O que fazer com esta conversa (e não só em que situação ela está): a lista já agrupa por situação,
+// então repetir a situação em cada linha não informa nada. Sem ação a fazer, não há etiqueta.
+export function statusPill(c: ConvItem): { label: string; pill: string } | null {
+  if (c.hasDraft) return { label: "Rascunho pronto", pill: "pill-accent" };
+  if (c.status === "NEEDS_HUMAN") return { label: "Responder", pill: "pill-danger" };
+  if (c.unanswered && c.status !== "LOST" && c.status !== "QUALIFIED" && c.status !== "MEETING_SCHEDULED") return { label: "Responder", pill: "pill-warn" };
+  if (c.status === "MEETING_SCHEDULED" || c.status === "QUALIFIED") return { label: STATUS_LABEL[c.status], pill: "pill-ok" };
+  return null;
 }
 
 function fullName(c: ConvItem) {
@@ -25,7 +27,7 @@ function fullName(c: ConvItem) {
 
 // Uma conversa na lista: avatar, nome com o ícone do canal, prévia, etiquetas coloridas, situação e há quanto tempo.
 export function ConversationRow({ c, active }: { c: ConvItem; active?: boolean }) {
-  const { label, pill } = statusPill(c);
+  const action = statusPill(c);
   const tags = c.tags.slice(0, 2);
   return (
     <Link href={`/leads/${c.id}`} className="item cv-row" aria-current={active ? "page" : undefined}>
@@ -49,7 +51,7 @@ export function ConversationRow({ c, active }: { c: ConvItem; active?: boolean }
       </span>
       <span className="stack" style={{ gap: 4, alignItems: "flex-end" }}>
         <span className="item-meta">{c.when}</span>
-        <span className={`pill ${pill}`}>{label}</span>
+        {action && <span className={`pill ${action.pill}`}>{action.label}</span>}
       </span>
     </Link>
   );
