@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { CampaignStatus } from "@prisma/client";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { deleteCampaign, setCampaignStatus } from "./actions";
 
 // "Mais" de uma campanha: pausar/retomar, finalizar, editar, apagar.
 export function CampaignMenu({ id, name, status, leads }: { id: string; name: string; status: CampaignStatus; leads: number }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const { ask, dialog } = useConfirm();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,15 +57,21 @@ export function CampaignMenu({ id, name, status, leads }: { id: string; name: st
             type="button"
             className="danger"
             role="menuitem"
-            onClick={() => {
-              if (!confirm(`Apagar a campanha "${name}"?${leads ? ` As ${leads} pessoas dela continuam em Conversas.` : ""}`)) return;
-              run(() => deleteCampaign(id));
+            onClick={async () => {
+              const ok = await ask({
+                title: `Apagar a campanha "${name}"?`,
+                message: leads ? `As ${leads} pessoas dela continuam em Conversas.` : "Ela ainda não tem ninguém.",
+                confirmLabel: "Apagar a campanha",
+                danger: true,
+              });
+              if (ok) run(() => deleteCampaign(id));
             }}
           >
             Apagar
           </button>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

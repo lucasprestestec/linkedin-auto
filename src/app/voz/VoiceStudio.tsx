@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { encodeWav } from "@/lib/voice/wav";
 import type { VoiceSettings } from "@/lib/voice/settings";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { deleteMyVoice, previewMyVoice } from "./actions";
 
 const MIN_SECONDS = 15;
@@ -47,6 +48,7 @@ export function VoiceStudio({ ownerName, voice, configured }: { ownerName: strin
   const [done, setDone] = useState(false);
   const [sample, setSample] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { ask, dialog } = useConfirm();
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -136,8 +138,9 @@ export function VoiceStudio({ ownerName, voice, configured }: { ownerName: strin
     });
   }
 
-  function remove() {
-    if (!window.confirm("Apagar a sua voz? O assistente volta a responder só em texto.")) return;
+  async function remove() {
+    const ok = await ask({ title: "Apagar a sua voz?", message: "O assistente volta a responder só em texto. Você pode gravar de novo quando quiser.", confirmLabel: "Apagar a voz", danger: true });
+    if (!ok) return;
     startTransition(async () => {
       const r = await deleteMyVoice();
       if (r.error) setError(r.error);
@@ -185,6 +188,7 @@ export function VoiceStudio({ ownerName, voice, configured }: { ownerName: strin
           Em Conta → Mensagens de voz você escolhe quando o assistente responde em áudio. Nas primeiras semanas, com a aprovação ligada, você ouve cada áudio antes de ele sair.
         </p>
         {error && <p className="field-error">{error}</p>}
+        {dialog}
       </div>
     );
   }

@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { FeedbackPanel } from "@/components/FeedbackPanel";
 import type { ChannelKey } from "@/components/ChannelBadge";
 import { DRAFT_REASON_KEYS } from "@/lib/writingStyle";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { approve, discard, markDraftFeedback, previewDraftAudio, setDraftAudio } from "./actions";
 
 export interface ApprovalItem {
@@ -35,6 +36,7 @@ export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; co
   const [text, setText] = useState(item.content);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const { ask, dialog } = useConfirm();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [audio, setAudio] = useState(item.asAudio);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -69,8 +71,9 @@ export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; co
     });
   }
 
-  function drop() {
-    if (!window.confirm(`Descartar? A conversa com ${name} passa a ser sua.`)) return;
+  async function drop() {
+    const ok = await ask({ title: "Descartar esta mensagem?", message: `A conversa com ${name} passa a ser sua: o assistente não responde mais por ela.`, confirmLabel: "Descartar", danger: true });
+    if (!ok) return;
     startTransition(async () => {
       const r = await discard(item.id);
       if (r.error) setNotice({ tone: "error", text: r.error });
@@ -178,6 +181,7 @@ export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; co
           onDone={() => setFeedbackOpen(false)}
         />
       )}
+      {dialog}
     </article>
   );
 }

@@ -41,7 +41,7 @@ export function ThreadView({ messages, leadFirst, leadLast, ownerName, children 
   const rows = items.map((m, i) => ({ m, showDay: i === 0 || items[i - 1].dayKey !== m.dayKey }));
 
   return (
-    <div className={`thread th th-${channel.toLowerCase()}`} data-channel={channel}>
+    <div id="thread-panel" role="tabpanel" aria-labelledby={`tab-${channel}`} className={`thread th th-${channel.toLowerCase()}`} data-channel={channel}>
       {items.length === 0 && (
         <p className="empty" style={{ textAlign: "center" }}>
           Nenhuma mensagem por {CHANNELS[channel].label} ainda.

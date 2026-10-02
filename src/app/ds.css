@@ -14,7 +14,8 @@
   --border-strong: #d9dce7;
   --text: #0f0d11;
   --text-2: #4a4a55;
-  --text-3: #8e93a6;
+  /* Cinza de texto pequeno: escurecido para ficar acima de 4,5:1 sobre branco. */
+  --text-3: #6b7188;
 
   --accent: #3e5bd7;
   --accent-ink: #3450c8;
@@ -27,6 +28,19 @@
   --danger-soft: #fdeaea;
   --violet: #7a5af5;
   --violet-soft: #f0ebff;
+
+  /* Cores de cada canal (selo, aba e botão de envio). */
+  --ch-linkedin: #0a66c2;
+  --ch-linkedin-soft: #e6f0fa;
+  --ch-linkedin-line: #c4dcf2;
+  --ch-whatsapp: #14803a;
+  --ch-whatsapp-soft: #e4f6ea;
+  --ch-whatsapp-line: #bfe6cc;
+  --ch-whatsapp-solid: #1a9e4a;
+  --ch-email: #b8362c;
+  --ch-email-soft: #fdeceb;
+  --ch-email-line: #f5c9c5;
+  --ch-email-solid: #d9453a;
 
   --radius: 20px;
   --radius-sm: 12px;
@@ -2322,21 +2336,21 @@ textarea.field {
 }
 
 .ch-tab[aria-selected="true"].ch-linkedin {
-  background: #e6f0fa;
-  border-color: #c4dcf2;
-  color: #0a66c2;
+  background: var(--ch-linkedin-soft);
+  border-color: var(--ch-linkedin-line);
+  color: var(--ch-linkedin);
 }
 
 .ch-tab[aria-selected="true"].ch-whatsapp {
-  background: #e4f6ea;
-  border-color: #bfe6cc;
-  color: #14803a;
+  background: var(--ch-whatsapp-soft);
+  border-color: var(--ch-whatsapp-line);
+  color: var(--ch-whatsapp);
 }
 
 .ch-tab[aria-selected="true"].ch-email {
-  background: #fdeceb;
-  border-color: #f5c9c5;
-  color: #b8362c;
+  background: var(--ch-email-soft);
+  border-color: var(--ch-email-line);
+  color: var(--ch-email);
 }
 
 /* A conversa vira um "painel" no visual do app do canal. */
@@ -2496,7 +2510,7 @@ textarea.field {
 }
 
 .em-msg.out {
-  border-left-color: #d9453a;
+  border-left-color: var(--ch-email-solid);
 }
 
 .em-msg header {
@@ -2556,15 +2570,15 @@ textarea.field {
 }
 
 .composer-whatsapp .btn-solid {
-  background: #1a9e4a;
+  background: var(--ch-whatsapp-solid);
 }
 
 .composer-linkedin .btn-solid {
-  background: #0a66c2;
+  background: var(--ch-linkedin);
 }
 
 .composer-email .btn-solid {
-  background: #d9453a;
+  background: var(--ch-email-solid);
 }
 
 /* ==========================================================================
@@ -2652,4 +2666,109 @@ textarea.field {
 .chat-status .truncate {
   color: var(--text-2);
   font-size: 12px;
+}
+
+/* ==========================================================================
+   Acessibilidade: foco visível, texto só para leitor de tela, confirmação.
+   ========================================================================== */
+
+/* Quem navega pelo teclado vê onde está (só aparece com teclado, não ao clicar). */
+:where(a, button, input, select, textarea, summary, [role="tab"], [role="switch"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Confirmação (no lugar da caixa cinza do navegador). */
+.confirm {
+  width: min(380px, calc(100vw - 32px));
+  padding: 22px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 24px 60px -12px rgba(24, 30, 70, 0.35);
+}
+
+.confirm::backdrop {
+  background: rgba(15, 13, 17, 0.45);
+}
+
+.confirm-title {
+  font-family: var(--font-head);
+  font-size: 22px;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.confirm-text {
+  margin-top: 8px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #b93636;
+}
+
+/* Tela de erro própria. */
+.err-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.err-code {
+  color: var(--text-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.ch-c-linkedin {
+  color: var(--ch-linkedin);
+  background: var(--ch-linkedin-soft);
+}
+
+.ch-c-whatsapp {
+  color: var(--ch-whatsapp);
+  background: var(--ch-whatsapp-soft);
+}
+
+.ch-c-email {
+  color: var(--ch-email);
+  background: var(--ch-email-soft);
 }
