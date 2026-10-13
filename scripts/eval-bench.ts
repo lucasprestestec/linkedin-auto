@@ -40,7 +40,7 @@ function claudeCode(alias: string): Completer {
     ];
     const once = (input: string) =>
       new Promise<string>((resolve, reject) => {
-        const p = spawn("claude", args, { cwd: EMPTY_DIR });
+        const p = spawn(process.env.CLAUDE_BIN || "claude", args, { cwd: EMPTY_DIR });
         let so = "";
         let se = "";
         p.stdout.on("data", (d) => (so += d));

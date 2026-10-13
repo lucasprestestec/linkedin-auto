@@ -10,7 +10,22 @@ export interface CheckInput {
   instructions: string | null;
   // A assistente pode confirmar que é assistente virtual (admin).
   allowAiDisclosure?: boolean;
+  // Assistente com nome próprio (ex.: Helena): vale a lista de coisas que a DOR$ nunca diz (BRAND_RULES).
+  brandRules?: boolean;
+  // Última mensagem do lead: um nome que ELE citou (ex.: "o seguro do Bradesco") pode ser repetido.
+  incoming?: string;
 }
+
+// Coisas que a Base da Helena proíbe de dizer (partes 2.6, 8.3 e 3.2). Testadas no texto sem acento e em minúsculas.
+// Nomes de seguradoras, operadoras e plataformas: nunca no primeiro contato e nunca em crítica ao atual.
+const BRAND_NAMES =
+  /\b(prudential|azos|porto seguro|bradesco|sulamerica|allianz|tokio marine|metlife|mapfre|zurich|amil|unimed|hapvida|notredame|notre dame|intermedica|omint|sompo|icatu|yelum|pluxee|sodexo|alelo|wellhub|gympass|totalpass)\b/g;
+const BRAND_PATTERNS: [RegExp, string][] = [
+  [/\bde graca\b/, 'usa "de graça" (o que é sem custo é a reunião e o diagnóstico)'],
+  [/\b(estados unidos|eua|norte americ\w+|modelo americano|miami|orlando|nova york)\b/, "menciona os Estados Unidos"],
+  [/\b1 dos melhores\b|\bum por cento dos melhores\b|\bmdrt\b.{0,80}\bmelhores\b/, 'diz que o MDRT reúne "1% dos melhores"'],
+  [/\bdor (private|scale|corporate)\b/, "usa um nome interno (DOR$ Private, Scale ou Corporate)"],
+];
 
 const MAX_CHARS = 600;
 // Texto aprovado do material (abertura, cadência) pode ser maior, até aqui.
@@ -51,7 +66,7 @@ function followsMaterial(text: string, material: string | null): boolean {
   return total > 0 && found / total >= 0.5;
 }
 
-export function checkMessage({ message, previousOutgoing, instructions, allowAiDisclosure }: CheckInput): string[] {
+export function checkMessage({ message, previousOutgoing, instructions, allowAiDisclosure, brandRules, incoming }: CheckInput): string[] {
   const issues: string[] = [];
   const text = message.trim();
   if (!text) return ["mensagem vazia"];
@@ -96,6 +111,14 @@ export function checkMessage({ message, previousOutgoing, instructions, allowAiD
     }
   }
 
+
+  if (brandRules) {
+    const plain = normalize(text);
+    const heard = normalize(incoming ?? "");
+    const named = [...new Set(plain.match(BRAND_NAMES) ?? [])].filter((n) => !heard.includes(n));
+    if (named.length) issues.push(`cita seguradora, operadora ou plataforma (${named.join(", ")}): a Helena nunca cita nomes`);
+    for (const [re, why] of BRAND_PATTERNS) if (re.test(plain)) issues.push(why);
+  }
 
   const questions = (text.match(/\?/g) ?? []).length;
   if (questions > MAX_QUESTIONS && !approved) issues.push(`perguntas demais numa mensagem só (${questions})`);
