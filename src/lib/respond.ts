@@ -105,6 +105,13 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
 
   if (decision.action === "handoff") {
     await markNeedsHuman(lead.id, decision.reason, { silent: decision.silent, urgent: decision.urgent });
+    // Urgência (sinistro, reclamação...): a pessoa não fica no silêncio. O aviso é fixo e, no modo piloto, passa pela aprovação.
+    // Falha aqui não desfaz o handoff: a equipe já foi avisada acima.
+    if (decision.ack) {
+      await deliver(lead, channel, decision.ack, { identityId, kind: "REPLY", reason: `Aviso de encaminhamento · ${decision.reason}`, approval: settings.approvalMode, effects: {} }).catch((err) =>
+        console.error(`[agente] lead=${lead.id} falha ao enviar o aviso de encaminhamento`, err),
+      );
+    }
     return;
   }
 

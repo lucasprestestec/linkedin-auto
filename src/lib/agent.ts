@@ -286,7 +286,11 @@ ${persona.discloseAi ? "" : "- perguntar se está falando com robô/IA/mensagem 
 - trouxer assunto sensível (sinistro, doença, caso jurídico), pergunta técnica que o material não responde, ou escrever em outro idioma;
 - fizer algo que você não consiga responder com segurança.
 O motivo do handoff deve ser curto e específico, para o corretor entender em 3 segundos (ex.: "Pediu cotação para 20 vidas").
-
+${
+  persona.name
+    ? "URGÊNCIA: sinistro, morte ou doença na família, reclamação (inclusive SUSEP, ANS, Procon), assunto jurídico (processo, advogado) e pedido de cancelamento são handoff com urgent = true e urgent_kind. Deixe message vazio: o sistema envia o aviso de encaminhamento por você. Nada de oferta nem de pedido de indicação nesses casos.\n"
+    : ""
+}
 EM DÚVIDA (unsure = true): você tem uma resposta que parece certa, mas não tem segurança total (o material cobre só em parte, o tom da pessoa é ambíguo, pode soar mal). Escreva a melhor resposta e marque unsure: ela não sai sozinha, vai pro corretor aprovar ou corrigir. Sem resposta razoável nenhuma, use handoff.
 
 CONTATO (WhatsApp / e-mail)
@@ -340,6 +344,14 @@ ${leadBlock(lead)}`;
 // Resposta a uma mensagem do lead
 // ---------------------------------------------------------------------------
 
+// Aviso ao lead quando a conversa vai para humano por urgência. Texto da Base (Parte 4.2 e teste T4), sem improviso do modelo.
+export const HANDOFF_ACK: Record<string, string> = {
+  sinistro: "Sinto muito pelo que aconteceu. Vou encaminhar agora para a nossa equipe, que vai cuidar disso com você pessoalmente.",
+  reclamacao: "Entendi. Vou encaminhar agora para a nossa equipe, que vai cuidar disso com você pessoalmente.",
+  juridico: "Entendi. Vou encaminhar agora para a nossa equipe, que vai cuidar disso com você pessoalmente.",
+  cancelamento: "Entendi. Vou encaminhar agora para a nossa equipe, que vai cuidar disso com você pessoalmente.",
+};
+
 export type AgentDecision = (
   // audioOk: o texto cabe numa mensagem de voz (curto, sem link nem numero longo).
   // unsure: a IA tem uma resposta, mas sem segurança total: vai pro corretor aprovar antes de sair.
@@ -347,7 +359,8 @@ export type AgentDecision = (
   | { action: "book"; message: string; slotStart: Date }
   // silent: passou pro corretor sem acordá-lo por push (era uma mensagem automática, não uma pessoa).
   // urgent: sinistro, reclamação, jurídico, cancelamento (a equipe de urgência é avisada).
-  | { action: "handoff"; reason: string; silent?: boolean; urgent?: boolean }
+  // ack: aviso fixo ao lead de que a conversa foi encaminhada (só urgência, só assistente com nome próprio).
+  | { action: "handoff"; reason: string; silent?: boolean; urgent?: boolean; ack?: string }
 ) & { analysis: string; model: string; usage: Usage; attempts: number; checkIssues: string[] };
 
 const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
@@ -379,6 +392,11 @@ const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         urgent: {
           type: "boolean",
           description: "Só com action = handoff: true se for sinistro, morte ou doença grave, reclamação (inclusive SUSEP, ANS, Procon), assunto jurídico (processo, advogado) ou pedido de cancelamento.",
+        },
+        urgent_kind: {
+          type: "string",
+          enum: ["sinistro", "reclamacao", "juridico", "cancelamento"],
+          description: "Só com action = handoff urgente: qual é a urgência. O sistema avisa a pessoa por você (não escreva nada em message).",
         },
         proposed_slots: {
           type: "array",
@@ -506,18 +524,29 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
       slot_start?: unknown;
       handoff_reason?: string;
       urgent?: boolean;
+      urgent_kind?: string;
     };
     lastAnalysis = out.analysis?.trim() ?? "";
     const base = { analysis: lastAnalysis, model, usage, attempts: attempt };
 
     if (out.action !== "reply" && out.action !== "book") {
-      return { action: "handoff", reason: out.handoff_reason?.trim() || "O agente não soube responder.", urgent: Boolean(out.urgent), ...base, checkIssues: lastIssues };
+      const kind = out.urgent_kind && Object.hasOwn(HANDOFF_ACK, out.urgent_kind) ? out.urgent_kind : null;
+      const urgent = Boolean(out.urgent) || Boolean(kind);
+      return {
+        action: "handoff",
+        reason: out.handoff_reason?.trim() || "O agente não soube responder.",
+        urgent,
+        // Texto fixo da Base (Parte 4.2): a pessoa em luto ou reclamando não fica no silêncio. Sem nome próprio, o corretor assume sem aviso.
+        ...(urgent && persona.name ? { ack: HANDOFF_ACK[kind ?? "reclamacao"] } : {}),
+        ...base,
+        checkIssues: lastIssues,
+      };
     }
 
     // Quis responder mas esqueceu o texto (alguns modelos põem no content):
     // aproveita o content ou pede de novo, em vez de passar pro corretor.
     const message = (out.message?.trim() || response.choices[0]?.message?.content?.trim() || "").trim();
-    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions, allowAiDisclosure: persona.discloseAi }) : ["faltou o texto da mensagem (campo message vazio)"];
+    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions, allowAiDisclosure: persona.discloseAi, brandRules: Boolean(persona.name), incoming: lastLead?.content }) : ["faltou o texto da mensagem (campo message vazio)"];
 
     // Agenda: todo horário que a mensagem oferece ou confirma tem que existir de verdade.
     let proposedSlots: Date[] = [];
@@ -637,7 +666,7 @@ async function writeMessage(
     if (!message) throw new Error("O agente retornou uma mensagem vazia.");
     if (!opts.check) return message;
 
-    issues = checkMessage({ message, ...opts.check });
+    issues = checkMessage({ message, brandRules: Boolean((await assistantPersona()).name), ...opts.check });
     if (issues.length === 0) return message;
     messages.push(
       { role: "assistant", content: null, tool_calls: [toolCall] },
