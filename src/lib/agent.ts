@@ -287,6 +287,8 @@ ${persona.discloseAi ? "" : "- perguntar se está falando com robô/IA/mensagem 
 - fizer algo que você não consiga responder com segurança.
 O motivo do handoff deve ser curto e específico, para o corretor entender em 3 segundos (ex.: "Pediu cotação para 20 vidas").
 
+EM DÚVIDA (unsure = true): você tem uma resposta que parece certa, mas não tem segurança total (o material cobre só em parte, o tom da pessoa é ambíguo, pode soar mal). Escreva a melhor resposta e marque unsure: ela não sai sozinha, vai pro corretor aprovar ou corrigir. Sem resposta razoável nenhuma, use handoff.
+
 CONTATO (WhatsApp / e-mail)
 - Se o lead passar o próprio WhatsApp ou e-mail, ou disser que prefere falar por lá, NÃO é handoff: agradeça, diga que anotou e siga a conversa. O sistema já guarda o contato sozinho. Não prometa quando nem por qual canal vai chamar.
 - Se a ficha ainda não tem WhatsApp e o lead já demonstrou interesse, você pode perguntar UMA vez, com leveza, qual o melhor número para continuar por WhatsApp. Se ele ignorar ou recusar, não insista.
@@ -340,7 +342,8 @@ ${leadBlock(lead)}`;
 
 export type AgentDecision = (
   // audioOk: o texto cabe numa mensagem de voz (curto, sem link nem numero longo).
-  | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[]; audioOk: boolean }
+  // unsure: a IA tem uma resposta, mas sem segurança total: vai pro corretor aprovar antes de sair.
+  | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[]; audioOk: boolean; unsure: boolean }
   | { action: "book"; message: string; slotStart: Date }
   // silent: passou pro corretor sem acordá-lo por push (era uma mensagem automática, não uma pessoa).
   | { action: "handoff"; reason: string; silent?: boolean }
@@ -367,6 +370,10 @@ const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         },
         qualified: { type: "boolean", description: "true se o lead quer avançar. Só com action = reply." },
         declined: { type: "boolean", description: "true se o lead recusou claramente — encerra os follow-ups. Só com action = reply." },
+        unsure: {
+          type: "boolean",
+          description: "true se você tem uma resposta razoável mas NÃO tem segurança total (ver EM DÚVIDA). A mensagem vai pro corretor aprovar antes de sair. Só com action = reply.",
+        },
         handoff_reason: { type: "string", description: "Motivo curto e específico (obrigatório se action = handoff)." },
         proposed_slots: {
           type: "array",
@@ -489,6 +496,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
       message?: string;
       qualified?: boolean;
       declined?: boolean;
+      unsure?: boolean;
       proposed_slots?: unknown;
       slot_start?: unknown;
       handoff_reason?: string;
@@ -538,7 +546,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
 
     if (lastIssues.length === 0) {
       if (out.action === "book" && slotStart) return { action: "book", message, slotStart, ...base, checkIssues: [] };
-      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), proposedSlots, audioOk: speechIssues(message).length === 0, ...base, checkIssues: [] };
+      return { action: "reply", message, qualified: Boolean(out.qualified), declined: Boolean(out.declined), unsure: Boolean(out.unsure), proposedSlots, audioOk: speechIssues(message).length === 0, ...base, checkIssues: [] };
     }
 
     const alternatives = input.calendar ? ` Horários livres sugeridos: ${input.calendar.suggestions.map((s) => `${s.label} (${s.iso})`).join("; ")}.` : "";

@@ -9,6 +9,7 @@ import { deleteMeeting, type CreatedMeeting } from "@/lib/gcalendar";
 import { bookMeeting, type BookingPlan } from "@/lib/scheduling";
 import { formatSlot } from "@/lib/slots";
 import { sendAudioMessage } from "@/lib/voice/send";
+import { campaignReviewNote } from "@/lib/campaignReview";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
 // aprovação ligada (Settings.approvalMode) a mensagem vira um rascunho pro
@@ -47,6 +48,8 @@ export interface DeliverOptions {
   booking?: BookingPlan;
   // Sai como mensagem de voz (WhatsApp). Se o áudio falhar, sai o texto.
   asAudio?: boolean;
+  // Vai pra aprovação mesmo com ela desligada; o texto diz por quê (ex.: a IA ficou em dúvida).
+  forceApproval?: string;
 }
 
 // O que efetivamente acontece ao "enviar": marca a reunião (se houver), manda a
@@ -102,11 +105,16 @@ async function sendNow(
 }
 
 export async function deliver(lead: Lead, channel: MessageChannel, content: string, opts: DeliverOptions): Promise<"sent" | "queued"> {
-  const approval = opts.approval ?? (await approvalModeOn());
+  let approval = opts.approval ?? (await approvalModeOn());
+  // Com a aprovação geral desligada, ainda passam pelo corretor: a mensagem em
+  // que a IA ficou em dúvida e as de campanha nova em revisão.
+  const why = approval ? null : (opts.forceApproval ?? (await campaignReviewNote(lead.campaignId)));
+  if (why) approval = true;
   if (!approval) {
     await sendNow(lead, channel, content, opts);
     return "sent";
   }
+  const reason = why ? [why, opts.reason].filter(Boolean).join(" · ") : opts.reason;
 
   await prisma.draft.create({
     data: {
@@ -116,7 +124,7 @@ export async function deliver(lead: Lead, channel: MessageChannel, content: stri
       subject: opts.subject ?? null,
       content,
       asAudio: Boolean(opts.asAudio) && channel === "WHATSAPP" && !opts.booking,
-      reason: opts.reason?.slice(0, 300) ?? null,
+      reason: reason?.slice(0, 300) ?? null,
       effects: JSON.parse(JSON.stringify(opts.effects)) as Prisma.InputJsonValue,
       ...(opts.booking ? { booking: opts.booking as unknown as Prisma.InputJsonValue } : {}),
     },

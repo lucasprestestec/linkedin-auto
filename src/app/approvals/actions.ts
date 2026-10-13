@@ -76,3 +76,23 @@ export async function setApprovalMode(on: boolean) {
   await prisma.settings.update({ where: { id: "singleton" }, data: { approvalMode: on } });
   refresh();
 }
+
+// Revisão de campanha nova: liga/desliga e os dois limites (dias e mensagens).
+export async function updateCampaignReview(data: { on: boolean; days: number; messages: number }): Promise<{ error?: string }> {
+  await requireSession();
+  const days = Math.round(data.days);
+  const messages = Math.round(data.messages);
+  if (!(days >= 1 && days <= 90) || !(messages >= 1 && messages <= 500)) return { error: "Use de 1 a 90 dias e de 1 a 500 mensagens." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { campaignReview: data.on, campaignReviewDays: days, campaignReviewMessages: messages } });
+  refresh();
+  revalidatePath("/campaigns/[id]", "page");
+  return {};
+}
+
+// O corretor libera a campanha antes do prazo: daqui pra frente segue a aprovação geral.
+export async function releaseCampaignReview(campaignId: string) {
+  await requireSession();
+  await prisma.campaign.update({ where: { id: campaignId }, data: { reviewReleasedAt: new Date() } });
+  refresh();
+  revalidatePath(`/campaigns/${campaignId}`);
+}

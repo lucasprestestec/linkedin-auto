@@ -132,6 +132,8 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
       approval: settings.approvalMode,
       // So vai em audio se o texto cabe numa mensagem de voz (curto, sem link nem numero longo).
       asAudio: wantsAudio && decision.audioOk,
+      // Em dúvida: vai pra você aprovar mesmo com a aprovação desligada.
+      ...(decision.unsure ? { forceApproval: "A IA ficou em dúvida e pediu sua revisão" } : {}),
       // Recusou: encerra (sem follow-up). Quer avançar (ou recebeu horários): qualificado.
       effects: {
         status: decision.declined ? "LOST" : decision.qualified || proposed ? "QUALIFIED" : "CONVERSATION_OPEN",
