@@ -78,10 +78,13 @@ const restore = () => (globalThis.fetch = realFetch);
     const fake = "teste".repeat(4);
     process.env.ELEVENLABS_API_KEY = fake;
     const { listVoices, synthesizeEleven } = await import("../src/lib/voice/elevenlabs");
-    const rachel = { voice_id: "e1", name: "Rachel", labels: { gender: "female", age: "young", accent: "american" }, preview_url: "https://x/p.mp3" };
+    const rachel = { voice_id: "e1", name: "Rachel - Calm, Young, American", labels: { gender: "female", age: "young", accent: "american" }, preview_url: "https://x/p.mp3" };
+    const adam = { voice_id: "e4", name: "Adam - Deep, Narration", labels: { gender: "male" }, preview_url: "https://x/a.mp3" };
     const bruna = { voice_id: "e2", name: "Bruna", labels: { gender: "female" }, preview_url: "https://x/en.mp3", verified_languages: [{ language: "pt", locale: "pt-BR", accent: "brazilian", preview_url: "https://x/pt-br.mp3" }] };
     const ines = { voice_id: "e3", name: "Inês", verified_languages: [{ language: "Portuguese", locale: "pt-PT", preview_url: "https://x/pt-pt.mp3" }] };
-    let list: unknown[] = [rachel, ines, bruna];
+    let list: unknown[] = [adam, rachel, ines, bruna];
+    const modelsTried: string[] = [];
+    let refuseV4 = false;
     mockFetch((url, init) => {
       assert.equal((init.headers as Record<string, string>)["xi-api-key"], fake);
       if (url.includes("/v2/voices")) {
@@ -89,22 +92,34 @@ const restore = () => (globalThis.fetch = realFetch);
         return new Response(JSON.stringify({ voices: list }), { status: 200 });
       }
       assert.match(url, /\/v1\/text-to-speech\/e1\?output_format=mp3_44100_128/);
-      assert.equal(JSON.parse(String(init.body)).model_id, "eleven_multilingual_v2");
+      const model = JSON.parse(String(init.body)).model_id as string;
+      modelsTried.push(model);
+      if (refuseV4 && model === "eleven_v4") return new Response("{}", { status: 403 });
       return new Response(new Uint8Array(900), { status: 200 });
     });
     try {
-      // Há vozes verificadas em português: só elas, as do Brasil primeiro, com o trecho em português.
+      // Todas entram, só com o nome curto e a voz; as verificadas em português vêm primeiro (Brasil na frente),
+      // e dentro de cada grupo as femininas antes das masculinas.
       const pt = await listVoices();
-      assert.equal(pt.onlyPortuguese, true);
-      assert.deepEqual(pt.voices.map((v) => [v.name, v.portuguese, v.previewUrl]), [["Bruna", "pt-BR", "https://x/pt-br.mp3"], ["Inês", "pt", "https://x/pt-pt.mp3"]]);
-      // Nenhuma marcada: devolve todas e avisa.
-      list = [rachel];
+      assert.equal(pt.anyVerified, true);
+      assert.deepEqual(
+        pt.voices.map((v) => [v.name, v.gender, v.portuguese, v.previewUrl]),
+        [["Bruna", "feminina", "pt-BR", "https://x/pt-br.mp3"], ["Inês", null, "pt", "https://x/pt-pt.mp3"], ["Rachel", "feminina", null, "https://x/p.mp3"], ["Adam", "masculina", null, "https://x/a.mp3"]],
+      );
+      // Nenhuma marcada em português: ainda lista todas.
+      list = [adam, rachel];
       const all = await listVoices();
-      assert.equal(all.onlyPortuguese, false);
-      assert.deepEqual(all.voices, [{ id: "e1", name: "Rachel", about: "feminina · jovem · american", previewUrl: "https://x/p.mp3", portuguese: null }]);
+      assert.equal(all.anyVerified, false);
+      assert.deepEqual(all.voices.map((v) => v.name), ["Rachel", "Adam"]);
+      // Fala com o modelo mais novo; se a conta não puder usá-lo, cai no multilíngue v2.
       const audio = await synthesizeEleven("Olá", "e1");
       assert.equal(audio.mime, "audio/mpeg");
       assert.equal(audio.bytes.length, 900);
+      assert.deepEqual(modelsTried, ["eleven_v4"]);
+      modelsTried.length = 0;
+      refuseV4 = true;
+      await synthesizeEleven("Olá", "e1");
+      assert.deepEqual(modelsTried, ["eleven_v4", "eleven_multilingual_v2"]);
     } finally {
       restore();
     }

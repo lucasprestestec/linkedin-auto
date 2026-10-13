@@ -61,7 +61,7 @@ export async function deleteMyVoice(): Promise<{ error?: string }> {
 }
 
 // Lista de vozes prontas para escolher (cada uma com um trecho para ouvir).
-export async function loadCatalogVoices(): Promise<{ voices?: CatalogVoice[]; onlyPortuguese?: boolean; error?: string }> {
+export async function loadCatalogVoices(): Promise<{ voices?: CatalogVoice[]; anyVerified?: boolean; error?: string }> {
   await requireSession();
   try {
     return await listVoices();
