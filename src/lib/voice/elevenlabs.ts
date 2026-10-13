@@ -35,7 +35,20 @@ export interface CatalogVoice {
   name: string;
   // "feminina · adulta · americano": o que a ElevenLabs informa da voz, em uma linha.
   about: string;
+  // Trecho para ouvir. Em português, quando a ElevenLabs tem um para a voz.
   previewUrl: string | null;
+  // A ElevenLabs verificou esta voz em português ("pt-BR" quando marca o Brasil).
+  portuguese: "pt-BR" | "pt" | null;
+}
+
+type VerifiedLanguage = { language?: string | null; locale?: string | null; accent?: string | null; preview_url?: string | null };
+
+function portugueseOf(langs: VerifiedLanguage[] | undefined): { kind: "pt-BR" | "pt"; previewUrl: string | null } | null {
+  const pt = (langs ?? []).filter((l) => /^pt/i.test(l.locale ?? "") || /^pt$|portugu/i.test(l.language ?? ""));
+  if (pt.length === 0) return null;
+  const br = pt.find((l) => /^pt[-_]br/i.test(l.locale ?? "") || /brazil|brasil/i.test(`${l.accent ?? ""} ${l.language ?? ""}`));
+  const chosen = br ?? pt[0];
+  return { kind: br ? "pt-BR" : "pt", previewUrl: chosen.preview_url ?? null };
 }
 
 const LABEL_PT: Record<string, string> = { female: "feminina", male: "masculina", young: "jovem", middle_aged: "meia-idade", old: "madura", neutral: "neutra" };
@@ -46,13 +59,22 @@ function aboutOf(labels: Record<string, string> | undefined, description: string
   return parts.length ? parts.join(" · ") : (description ?? "").slice(0, 80);
 }
 
-// Vozes prontas da conta (as "premade"): servem para quem não quer gravar a própria voz.
-export async function listVoices(): Promise<CatalogVoice[]> {
+// Vozes prontas da conta (as "premade", que o plano gratuito usa): servem para quem não quer gravar a própria voz.
+// Só as que a ElevenLabs verificou em português (as do Brasil primeiro). Se ela não marcar nenhuma, devolve todas
+// (o modelo multilíngue fala português com qualquer voz) e avisa em onlyPortuguese = false.
+export async function listVoices(): Promise<{ voices: CatalogVoice[]; onlyPortuguese: boolean }> {
   const res = await call("/v2/voices?page_size=100&category=premade&include_total_count=false");
   const data = (await res.json().catch(() => null)) as {
-    voices?: { voice_id: string; name: string; labels?: Record<string, string>; description?: string | null; preview_url?: string | null }[];
+    voices?: { voice_id: string; name: string; labels?: Record<string, string>; description?: string | null; preview_url?: string | null; verified_languages?: VerifiedLanguage[] }[];
   } | null;
-  return (data?.voices ?? []).map((v) => ({ id: v.voice_id, name: v.name, about: aboutOf(v.labels, v.description), previewUrl: v.preview_url ?? null }));
+  const all: CatalogVoice[] = (data?.voices ?? []).map((v) => {
+    const pt = portugueseOf(v.verified_languages);
+    return { id: v.voice_id, name: v.name, about: aboutOf(v.labels, v.description), previewUrl: pt?.previewUrl ?? v.preview_url ?? null, portuguese: pt?.kind ?? null };
+  });
+  const rank = (v: CatalogVoice) => (v.portuguese === "pt-BR" ? 0 : v.portuguese === "pt" ? 1 : 2);
+  const sorted = all.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "pt-BR"));
+  const onlyPt = sorted.filter((v) => v.portuguese);
+  return onlyPt.length ? { voices: onlyPt, onlyPortuguese: true } : { voices: sorted, onlyPortuguese: false };
 }
 
 // Fala o texto com a voz escolhida. Devolve MP3 (o WhatsApp converte pra mensagem de voz).
