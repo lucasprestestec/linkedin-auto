@@ -183,6 +183,12 @@ model Settings {
   workStartHour       Int     @default(8)
   workEndHour         Int     @default(19)
   workWeekdaysOnly    Boolean @default(true)
+  // Responder a qualquer hora: só INICIAR conversa fica preso ao horário.
+  replyAnytime        Boolean @default(false)
+  // Identidade da assistente (ex.: "Helena"): vazio = escreve como o corretor.
+  // discloseAi = pode confirmar que é assistente virtual quando perguntarem.
+  assistantName       String?
+  assistantDiscloseAi Boolean @default(false)
   // Um item por linha: nome, empresa ou link de perfil que nunca deve ser contatado.
   exclusionList       String? @db.Text
   // Ações Engagement opcionais — desligadas até o corretor ativar.
@@ -221,4 +227,24 @@ model Settings {
   emailUidValidity    String?
   linkedinNeedsReconnect Boolean @default(false)
   linkedinReconnectReason String?
+}
+
+// Base de conhecimento importada (markdown dividido por títulos). ALWAYS entra
+// em toda mensagem; ON_DEMAND só quando o assunto aparece (um modelo rápido
+// escolhe); OFF fica guardada mas não é usada.
+enum KnowledgeMode {
+  ALWAYS
+  ON_DEMAND
+  OFF
+}
+
+model KnowledgeSection {
+  id        String        @id @default(cuid())
+  position  Int
+  title     String
+  content   String        @db.Text
+  mode      KnowledgeMode @default(ON_DEMAND)
+  updatedAt DateTime      @updatedAt
+
+  @@index([position])
 }

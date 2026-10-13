@@ -2,9 +2,12 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { adminEnabled, isAdmin } from "@/lib/admin";
-import { IconLogout } from "@/components/Icons";
+import { IconChevronRight, IconFileText, IconLogout } from "@/components/Icons";
 import { AdminLogin } from "./AdminLogin";
+import Link from "next/link";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
+import { AssistantIdentityForm } from "./AssistantIdentityForm";
+import { approxTokens } from "@/lib/knowledge";
 import { LimitsForm } from "./LimitsForm";
 import { WorkHoursForm } from "./WorkHoursForm";
 import { EngagementForm } from "./EngagementForm";
@@ -36,6 +39,11 @@ export default async function AdminPage() {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const knowledge = await prisma.knowledgeSection.groupBy({ by: ["mode"], _count: { _all: true } });
+  const kbCount = knowledge.reduce((n, k) => n + k._count._all, 0);
+  const kbAlways = kbCount
+    ? (await prisma.knowledgeSection.findMany({ where: { mode: "ALWAYS" }, select: { content: true } })).reduce((n, s) => n + s.content.length, 0)
+    : 0;
   const email = await emailConnection();
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
@@ -68,6 +76,27 @@ export default async function AdminPage() {
       <div className="settings-grid">
         <div className="settings-col">
           <section className="group">
+            <h2 className="group-title">Identidade da assistente</h2>
+            <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
+          </section>
+          <section className="group">
+            <h2 className="group-title">Base de conhecimento</h2>
+            <Link href="/admin/knowledge" className="card setting-row" style={{ textDecoration: "none", color: "inherit" }}>
+              <span className="setting-icon" style={{ background: "var(--info-soft)", color: "var(--info-ink)" }}>
+                <IconFileText size={19} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 700 }}>{kbCount ? `${kbCount} seções` : "Nenhuma base importada"}</span>
+                <span className="tiny faint">
+                  {kbCount
+                    ? `~${approxTokens(kbAlways).toLocaleString("pt-BR")} tokens sempre · o resto entra quando o assunto aparece`
+                    : "Importe o manual (.md): fichas, textos aprovados, objeções"}
+                </span>
+              </span>
+              <IconChevronRight size={18} />
+            </Link>
+          </section>
+          <section className="group">
             <h2 className="group-title">Agente de IA — instruções gerais</h2>
             <p className="tiny faint" style={{ padding: "0 4px 8px" }}>
               Valem para todas as conversas. O texto de cada campanha (escrito pelo usuário) é somado a estas instruções.
@@ -82,7 +111,12 @@ export default async function AdminPage() {
         <div className="settings-col">
           <section className="group">
             <h2 className="group-title">Horário de trabalho</h2>
-            <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} />
+            <WorkHoursForm
+              start={settings.workStartHour}
+              end={settings.workEndHour}
+              weekdaysOnly={settings.workWeekdaysOnly}
+              replyAnytime={settings.replyAnytime}
+            />
           </section>
           <section className="group">
             <h2 className="group-title">Ações extras do LinkedIn</h2>

@@ -154,7 +154,9 @@ async function sendOpenings(identityId: string, settings: Settings, budget: Budg
   let sent = 0;
   for (const lead of eligible) {
     try {
-      const content = await generateOpeningMessage(await instructionsFor(lead, settings), lead, { history: lead.messages });
+      const content = await generateOpeningMessage(
+        await instructionsFor(lead, settings, { task: "primeira mensagem no LinkedIn depois que a pessoa aceitou o convite de conexão", history: lead.messages }),
+        lead, { history: lead.messages });
       await sendOnChannel(lead, "LINKEDIN", content, { identityId });
       await prisma.lead.update({
         where: { id: lead.id },
@@ -200,7 +202,11 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
   for (const lead of eligible) {
     const pending = Math.max(days, Math.round((Date.now() - (lead.invitedAt ?? lead.createdAt).getTime()) / DAY_MS));
     try {
-      const content = await generateIntroEmail(await instructionsFor(lead, settings), lead, pending);
+      const content = await generateIntroEmail(
+        await instructionsFor(lead, settings, { task: "primeiro e-mail de apresentação (o convite do LinkedIn está parado há dias)" }),
+        lead,
+        pending,
+      );
       await sendOnChannel(lead, "EMAIL", content, { subject: "Conexão no LinkedIn" });
       await prisma.lead.update({
         where: { id: lead.id },
@@ -232,7 +238,11 @@ async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WH
     if (!ready[channel] || budget[channel] <= 0) continue;
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
     try {
-      const content = await generateFirstContact(await instructionsFor(lead, settings), lead, channel);
+      const content = await generateFirstContact(
+        await instructionsFor(lead, settings, { task: `primeira mensagem (${channel === "EMAIL" ? "e-mail" : "WhatsApp"}) para um contato que o corretor adicionou, por indicação ou conhecido` }),
+        lead,
+        channel,
+      );
       await sendOnChannel(lead, channel, content, channel === "EMAIL" ? { subject: `Tudo bem, ${lead.firstName ?? ""}?`.replace(" ?", "?") } : {});
       await prisma.lead.update({
         where: { id: lead.id },
@@ -350,7 +360,10 @@ async function sendFollowUps(
     if (options.length === 0) continue;
 
     try {
-      const instructions = await instructionsFor(lead, settings);
+      const instructions = await instructionsFor(lead, settings, {
+        task: `retomada: o lead não respondeu à nossa última mensagem (retomada ${lead.followUpsSent + 1})`,
+        history,
+      });
       let channel: MessageChannel;
       let reason: string;
       if (options.length === 1 && !extraTouch) {

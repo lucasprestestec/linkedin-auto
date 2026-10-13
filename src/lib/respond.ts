@@ -45,7 +45,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   let decision;
   try {
     decision = await decideResponse({
-      instructions: await instructionsFor(lead, settings),
+      instructions: await instructionsFor(lead, settings, { task: `responder à última mensagem do lead (canal ${channel})`, history }),
       history,
       channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },

@@ -93,7 +93,7 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
   if (!s) return { scenarioId, model, ok: false, error: "cenário não existe" };
   const started = Date.now();
   try {
-    const d = await decideResponse({ instructions: EVAL_INSTRUCTIONS, lead: s.lead, history: s.history }, { model });
+    const d = await decideResponse({ instructions: EVAL_INSTRUCTIONS, lead: s.lead, history: s.history, persona: { name: null, discloseAi: false } }, { model });
     const ms = Date.now() - started;
     const declined = d.action === "reply" && d.declined;
     const qualified = d.action === "reply" && d.qualified;

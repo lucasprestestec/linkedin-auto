@@ -5,12 +5,13 @@ import { updateWorkHours } from "./actions";
 import { IconCheck, IconClock } from "@/components/Icons";
 import { Stepper } from "@/components/Stepper";
 
-export function WorkHoursForm({ start, end, weekdaysOnly }: { start: number; end: number; weekdaysOnly: boolean }) {
+export function WorkHoursForm({ start, end, weekdaysOnly, replyAnytime }: { start: number; end: number; weekdaysOnly: boolean; replyAnytime: boolean }) {
   const [state, formAction, pending] = useActionState(updateWorkHours, undefined);
   const [from, setFrom] = useState(start);
   const [to, setTo] = useState(end);
   const [weekdays, setWeekdays] = useState(weekdaysOnly);
-  const dirty = from !== start || to !== end || weekdays !== weekdaysOnly;
+  const [anytime, setAnytime] = useState(replyAnytime);
+  const dirty = from !== start || to !== end || weekdays !== weekdaysOnly || anytime !== replyAnytime;
 
   return (
     <form action={formAction} className="card" style={{ overflow: "hidden" }}>
@@ -42,10 +43,18 @@ export function WorkHoursForm({ start, end, weekdaysOnly }: { start: number; end
         <input type="checkbox" name="workWeekdaysOnly" checked={weekdays} onChange={(e) => setWeekdays(e.target.checked)} className="sr-only" />
         <span className="switch switch-light" role="switch" aria-checked={weekdays} aria-hidden="true" />
       </label>
+      <label className="setting-row" style={{ cursor: "pointer" }}>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontWeight: 700 }}>Responder a qualquer hora</span>
+          <span className="tiny faint">o horário vale só pra começar conversas e retomar</span>
+        </span>
+        <input type="checkbox" name="replyAnytime" checked={anytime} onChange={(e) => setAnytime(e.target.checked)} className="sr-only" />
+        <span className="switch switch-light" role="switch" aria-checked={anytime} aria-hidden="true" />
+      </label>
       <div className="setting-row" style={{ background: "var(--surface-2)" }}>
         <p className="tiny muted" style={{ lineHeight: 1.5 }}>
-          A IA só manda mensagem {weekdays ? "de segunda a sexta" : "todos os dias"}, das {from}h às {to}h. Se um lead escrever fora
-          disso, a resposta sai quando o horário abrir.
+          A IA só começa conversas e retoma {weekdays ? "de segunda a sexta" : "todos os dias"}, das {from}h às {to}h.{" "}
+          {anytime ? "Quem escrever fora disso recebe resposta na hora." : "Se um lead escrever fora disso, a resposta sai quando o horário abrir."}
         </p>
       </div>
       {(dirty || state?.saved || state?.error) && (

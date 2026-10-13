@@ -66,10 +66,11 @@ export async function updateWorkHours(_prevState: unknown, formData: FormData) {
   const workStartHour = Number(formData.get("workStartHour"));
   const workEndHour = Number(formData.get("workEndHour"));
   const workWeekdaysOnly = formData.get("workWeekdaysOnly") === "on";
+  const replyAnytime = formData.get("replyAnytime") === "on";
   if (!Number.isInteger(workStartHour) || !Number.isInteger(workEndHour) || workStartHour < 0 || workEndHour > 24 || workStartHour >= workEndHour) {
     return { error: "O início precisa ser antes do fim." };
   }
-  await prisma.settings.update({ where: { id: "singleton" }, data: { workStartHour, workEndHour, workWeekdaysOnly } });
+  await prisma.settings.update({ where: { id: "singleton" }, data: { workStartHour, workEndHour, workWeekdaysOnly, replyAnytime } });
   revalidatePath("/admin");
   return { error: undefined, saved: true };
 }
@@ -91,3 +92,12 @@ export async function setWithdrawAfterDays(days: number) {
   revalidatePath("/admin");
 }
 
+
+export async function updateAssistantIdentity(_prevState: unknown, formData: FormData) {
+  await requireAdmin();
+  const assistantName = String(formData.get("assistantName") ?? "").trim().slice(0, 40);
+  const assistantDiscloseAi = formData.get("assistantDiscloseAi") === "on";
+  await prisma.settings.update({ where: { id: "singleton" }, data: { assistantName: assistantName || null, assistantDiscloseAi } });
+  revalidatePath("/admin");
+  return { saved: true };
+}
