@@ -31,21 +31,21 @@ export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; con
 
       {!ready ? (
         <div className="note stack" style={{ gap: 10 }}>
-          <b>Crie a sua voz para o assistente responder em áudio</b>
-          <span>Você grava uns 30 segundos lendo um texto, e o assistente passa a poder falar como você. Pode apagar a voz quando quiser.</span>
+          <b>Escolha uma voz para o assistente responder em áudio</b>
+          <span>Ouça as vozes prontas e escolha uma, ou grave a sua própria (uns 30 segundos). Dá para trocar quando quiser.</span>
           <div>
             <Link href="/voz" className="btn-solid btn-sm">
-              Criar minha voz
+              Escolher uma voz
             </Link>
           </div>
         </div>
       ) : (
         <div className="row wrap" style={{ gap: 8, justifyContent: "space-between" }}>
           <span>
-            <b>{voice.voiceName ?? "Minha voz"}</b> <span className="small muted">· pronta</span>
+            <b>{voice.voiceName ?? "Minha voz"}</b> <span className="small muted">· {voice.provider === "elevenlabs" ? "voz pronta" : "sua voz gravada"}</span>
           </span>
           <Link href="/voz" className="btn-line btn-sm">
-            Gerenciar minha voz
+            Trocar a voz
           </Link>
         </div>
       )}

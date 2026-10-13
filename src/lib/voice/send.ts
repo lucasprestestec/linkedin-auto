@@ -2,7 +2,8 @@ import { createHash } from "crypto";
 import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsappAudio } from "@/lib/deskcomm";
-import { synthesize, fishConfigured, VoiceError } from "@/lib/voice/fish";
+import { VoiceError } from "@/lib/voice/fish";
+import { speak, voiceServiceReady } from "@/lib/voice/engine";
 import { audioUrl, findDraftAudio, publicBaseUrl, storeOutgoingAudio } from "@/lib/voice/outgoingAudio";
 import { hasVoice, parseVoiceSettings } from "@/lib/voice/settings";
 import { prepareSpeechText, speechIssues } from "@/lib/voice/speech";
@@ -11,8 +12,8 @@ import { prepareSpeechText, speechIssues } from "@/lib/voice/speech";
 export async function ensureAudio(text: string, opts: { draftId?: string | null } = {}): Promise<{ token: string; mime: string }> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { voiceSettings: true } });
   const voice = parseVoiceSettings(settings.voiceSettings);
-  if (!hasVoice(voice)) throw new VoiceError("Você ainda não criou a sua voz.");
-  if (!fishConfigured()) throw new VoiceError("O serviço de voz ainda não foi configurado.");
+  if (!hasVoice(voice)) throw new VoiceError("Nenhuma voz escolhida ainda.");
+  if (!voiceServiceReady(voice)) throw new VoiceError("O serviço de voz ainda não foi configurado.");
 
   if (opts.draftId) {
     const cached = await findDraftAudio(opts.draftId, text);
@@ -20,7 +21,7 @@ export async function ensureAudio(text: string, opts: { draftId?: string | null 
   }
   const spoken = prepareSpeechText(text);
   if (!spoken) throw new VoiceError("Não há texto pra falar.");
-  const audio = await synthesize(spoken, voice.voiceId!);
+  const audio = await speak(voice, spoken);
   const token = await storeOutgoingAudio(audio.bytes, audio.mime, { draftId: opts.draftId, text });
   return { token, mime: audio.mime };
 }

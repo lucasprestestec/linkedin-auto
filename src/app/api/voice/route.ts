@@ -54,9 +54,9 @@ export async function POST(req: Request) {
   }
 
   const now = new Date().toISOString();
-  const next = { mode: previous.mode, voiceId: created.id, voiceName: `Voz de ${name}`, consentAt: now, createdAt: now };
+  const next = { mode: previous.mode, provider: "fish" as const, voiceId: created.id, voiceName: `Voz de ${name}`, consentAt: now, createdAt: now };
   await prisma.settings.update({ where: { id: "singleton" }, data: { voiceSettings: next as unknown as Prisma.InputJsonValue } });
   // Voz anterior (regravação): some do serviço, melhor esforço.
-  if (previous.voiceId && previous.voiceId !== created.id) await deleteVoice(previous.voiceId).catch(() => {});
+  if (previous.provider === "fish" && previous.voiceId && previous.voiceId !== created.id) await deleteVoice(previous.voiceId).catch(() => {});
   return NextResponse.json({ ok: true, voiceName: next.voiceName });
 }

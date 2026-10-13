@@ -64,6 +64,41 @@ const restore = () => (globalThis.fetch = realFetch);
   // ---------------- preferências de voz ----------------
   const ready = parseVoiceSettings({ mode: "mirror", voiceId: "v1", voiceName: "Voz de Ana", consentAt: "2026-09-30T12:00:00.000Z", createdAt: "2026-09-30T12:00:00.000Z" });
 
+  // ---------------- voz pronta da lista (ElevenLabs) ----------------
+  await t("voz pronta: quem já tinha voz clonada segue como 'fish'; a escolhida da lista vira 'elevenlabs'", () => {
+    assert.equal(ready.provider, "fish");
+    const picked = parseVoiceSettings({ mode: "mirror", provider: "elevenlabs", voiceId: "e1", voiceName: "Rachel", consentAt: "2026-10-14T12:00:00.000Z" });
+    assert.equal(picked.provider, "elevenlabs");
+    assert.ok(hasVoice(picked));
+    assert.match(summarizeVoice(picked), /^Voz Rachel/);
+    assert.equal(parseVoiceSettings({ provider: "outro", voiceId: "x" }).provider, "fish");
+  });
+
+  await t("voz pronta: lista só as vozes prontas da conta e fala com o modelo multilíngue", async () => {
+    const fake = "teste".repeat(4);
+    process.env.ELEVENLABS_API_KEY = fake;
+    const { listVoices, synthesizeEleven } = await import("../src/lib/voice/elevenlabs");
+    mockFetch((url, init) => {
+      assert.equal((init.headers as Record<string, string>)["xi-api-key"], fake);
+      if (url.includes("/v2/voices")) {
+        assert.match(url, /category=premade/);
+        return new Response(JSON.stringify({ voices: [{ voice_id: "e1", name: "Rachel", labels: { gender: "female", age: "young", accent: "american" }, preview_url: "https://x/p.mp3" }] }), { status: 200 });
+      }
+      assert.match(url, /\/v1\/text-to-speech\/e1\?output_format=mp3_44100_128/);
+      assert.equal(JSON.parse(String(init.body)).model_id, "eleven_multilingual_v2");
+      return new Response(new Uint8Array(900), { status: 200 });
+    });
+    try {
+      const voices = await listVoices();
+      assert.deepEqual(voices, [{ id: "e1", name: "Rachel", about: "feminina · jovem · american", previewUrl: "https://x/p.mp3" }]);
+      const audio = await synthesizeEleven("Olá", "e1");
+      assert.equal(audio.mime, "audio/mpeg");
+      assert.equal(audio.bytes.length, 900);
+    } finally {
+      restore();
+    }
+  });
+
   await t("voz: lixo vira 'sem voz, só texto'; sem voz o modo volta a só texto", () => {
     for (const bad of [null, undefined, 3, "x", [], { mode: "xyz" }]) {
       const s = parseVoiceSettings(bad);
@@ -78,7 +113,7 @@ const restore = () => (globalThis.fetch = realFetch);
   });
 
   await t("voz: resumo e opções", () => {
-    assert.match(summarizeVoice(parseVoiceSettings({})), /ainda não criada/);
+    assert.match(summarizeVoice(parseVoiceSettings({})), /Nenhuma voz escolhida/);
     assert.match(summarizeVoice(ready), /pronta.*áudio quando o lead mandar áudio/);
     assert.deepEqual(AUDIO_MODES.map((m) => m.value), ["off", "mirror", "always"]);
   });

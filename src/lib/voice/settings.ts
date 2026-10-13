@@ -5,8 +5,12 @@ import type { MessageChannel } from "@prisma/client";
 
 export type AudioMode = "off" | "mirror" | "always";
 
+// "fish" = a voz clonada do usuário; "elevenlabs" = uma voz pronta escolhida de uma lista.
+export type VoiceProvider = "fish" | "elevenlabs";
+
 export interface VoiceSettings {
   mode: AudioMode;
+  provider: VoiceProvider;
   // Id da voz no provedor (não é segredo).
   voiceId: string | null;
   voiceName: string | null;
@@ -15,7 +19,7 @@ export interface VoiceSettings {
   createdAt: string | null;
 }
 
-export const EMPTY_VOICE: VoiceSettings = { mode: "off", voiceId: null, voiceName: null, consentAt: null, createdAt: null };
+export const EMPTY_VOICE: VoiceSettings = { mode: "off", provider: "fish", voiceId: null, voiceName: null, consentAt: null, createdAt: null };
 
 export const AUDIO_MODES: { value: AudioMode; label: string; hint: string }[] = [
   { value: "off", label: "Só texto", hint: "O assistente nunca manda áudio." },
@@ -41,6 +45,8 @@ export function parseVoiceSettings(raw: unknown): VoiceSettings {
   return {
     // Sem voz, não há como falar: o modo volta a "só texto".
     mode: voiceId ? mode : "off",
+    // Quem já tinha voz clonada não tem o campo: segue como "fish".
+    provider: o.provider === "elevenlabs" ? "elevenlabs" : "fish",
     voiceId,
     voiceName: str(o.voiceName, 80),
     consentAt: date(o.consentAt),
@@ -53,9 +59,9 @@ export function hasVoice(s: VoiceSettings): boolean {
 }
 
 export function summarizeVoice(s: VoiceSettings): string {
-  if (!hasVoice(s)) return "Voz ainda não criada";
+  if (!hasVoice(s)) return "Nenhuma voz escolhida";
   const mode = AUDIO_MODES.find((m) => m.value === s.mode)?.label ?? "";
-  return `Sua voz está pronta · ${mode}`;
+  return `${s.provider === "elevenlabs" ? `Voz ${s.voiceName ?? "escolhida"}` : "Sua voz está pronta"} · ${mode}`;
 }
 
 // Esta resposta sai em áudio? Só no WhatsApp, só com voz criada e autorizada e o serviço de voz
