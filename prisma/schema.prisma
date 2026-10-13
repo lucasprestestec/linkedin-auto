@@ -135,6 +135,8 @@ model Campaign {
   // pelo corretor. Sem isso, sai da revisão sozinha (dias E mensagens).
   reviewReleasedAt DateTime?
   leads        Lead[]
+  // Cadência com texto fixo (aprovado) pra quem ainda não respondeu.
+  steps        CampaignStep[]
 }
 
 enum CampaignStatus {
@@ -393,4 +395,22 @@ model KnowledgeSection {
   updatedAt DateTime      @updatedAt
 
   @@index([position])
+}
+
+// Passo da cadência de uma campanha. position 0 = mensagem inicial (D0), que
+// substitui a abertura escrita pela IA; 1..n = retomadas, no dia "day" contado
+// a partir da mensagem inicial. Vale só enquanto a pessoa nunca respondeu.
+model CampaignStep {
+  id         String          @id @default(cuid())
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+  position   Int
+  day        Int
+  // null = no mesmo canal da conversa
+  channel    MessageChannel?
+  text       String          @db.Text
+  // Avisa o corretor ao enviar (ex.: "aviso de ligação": hora de ligar).
+  notify     Boolean         @default(false)
+
+  @@unique([campaignId, position])
 }
