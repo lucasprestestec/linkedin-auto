@@ -2,7 +2,7 @@ import type { Lead, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { knowledgeFor, type KnowledgeFocus } from "@/lib/knowledge";
 
-type LeadForMaterial = Pick<Lead, "campaignId" | "firstName" | "lastName" | "jobTitle" | "personal" | "tags">;
+type LeadForMaterial = Pick<Lead, "campaignId" | "firstName" | "lastName" | "jobTitle" | "personal" | "tags"> & Partial<Pick<Lead, "kind" | "referredBy">>;
 
 // Quem o assistente é perante o lead: o nome cadastrado em Conta. É obrigatório (sem ele o assistente não responde).
 // Com uma assistente de nome próprio (admin, ex.: "Helena"), esse nome é o do

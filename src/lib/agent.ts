@@ -1,6 +1,7 @@
 import OpenAI from "openai";
-import type { LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
+import type { LeadKind, LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { LEAD_KIND_PROMPT } from "@/lib/leadKind";
 import { checkMessage } from "@/lib/agentCheck";
 import { detectAutomatedMessage } from "@/lib/autoMessage";
 import { renderStyleBlock } from "@/lib/writingStyle";
@@ -127,6 +128,9 @@ export interface LeadContext {
   email?: string | null;
   // Quando a secretária sugeriu horários de reunião e ainda espera o lead escolher.
   slotsProposedAt?: Date | null;
+  // Tipo de contato e quem indicou (o [INDICADOR] dos textos aprovados).
+  kind?: LeadKind | null;
+  referredBy?: string | null;
 }
 
 type HistoryItem = Pick<DbMessage, "sender" | "content"> & {
@@ -186,6 +190,8 @@ const STAGE: Record<LeadStatus, string> = {
 function leadBlock(lead: LeadContext): string {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "(nome não disponível)";
   const lines = [`Nome: ${name}`, `Cargo/headline: ${lead.jobTitle || "(não informado)"}`];
+  if (lead.kind) lines.push(`Tipo de contato: ${LEAD_KIND_PROMPT[lead.kind]}`);
+  if (lead.referredBy?.trim()) lines.push(`Indicado por: ${lead.referredBy.trim()} (diga que essa pessoa recomendou ou passou o contato; nunca que ela é cliente)`);
   if (lead.campaignName) lines.push(`Campanha: ${lead.campaignName}`);
   if (lead.status) lines.push(`Etapa: ${STAGE[lead.status]}`);
   if (lead.followUpsSent) lines.push(`Follow-ups já enviados sem resposta: ${lead.followUpsSent}`);

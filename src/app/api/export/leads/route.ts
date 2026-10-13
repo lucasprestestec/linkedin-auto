@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { LEAD_KIND_LABEL } from "@/lib/leadKind";
 import { STATUS_LABEL } from "@/lib/status";
 
 // Exporta os leads em CSV. Protegida pelo login do painel (proxy.ts): só
@@ -29,6 +30,9 @@ export async function GET(request: Request) {
     "Cargo",
     "Status",
     "Campanha",
+    "Tipo",
+    "Indicado por",
+    "Abordagem",
     "Etiquetas",
     "Encaixe (0-100)",
     "Follow-ups enviados",
@@ -44,6 +48,9 @@ export async function GET(request: Request) {
     l.jobTitle,
     STATUS_LABEL[l.status],
     l.campaign?.name,
+    l.kind ? LEAD_KIND_LABEL[l.kind] : null,
+    l.referredBy,
+    l.otherAiActive ? "Em conversa com outra IA" : l.doNotContact ? "Não quer mais contato" : null,
     l.tags.join(", "),
     l.icpScore,
     l.followUpsSent,

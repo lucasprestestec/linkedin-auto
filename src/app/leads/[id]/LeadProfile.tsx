@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Help } from "@/components/Help";
+import type { LeadKind } from "@prisma/client";
+import { LEAD_KIND_LABEL } from "@/lib/leadKind";
 import { updateLeadProfile } from "./actions";
 
 function formatPhone(phone: string | null) {
@@ -18,26 +20,30 @@ export function LeadProfile({
   email,
   phone,
   personal,
+  kind,
+  referredBy,
 }: {
   leadId: string;
   firstName: string;
   email: string | null;
   phone: string | null;
   personal: string | null;
+  kind: LeadKind | null;
+  referredBy: string | null;
 }) {
-  const [saved, setSaved] = useState({ email: email ?? "", phone: formatPhone(phone), personal: personal ?? "" });
+  const [saved, setSaved] = useState({ email: email ?? "", phone: formatPhone(phone), personal: personal ?? "", kind: kind ?? "", referredBy: referredBy ?? "" });
   const [form, setForm] = useState(saved);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const empty = !saved.email && !saved.phone && !saved.personal;
+  const empty = !saved.email && !saved.phone && !saved.personal && !saved.kind && !saved.referredBy;
 
   function save() {
     setError(null);
     start(async () => {
       const r = await updateLeadProfile(leadId, form);
       if (r.error) return setError(r.error);
-      const next = { ...form, email: form.email.trim().toLowerCase(), personal: form.personal.trim() };
+      const next = { ...form, email: form.email.trim().toLowerCase(), personal: form.personal.trim(), referredBy: form.referredBy.trim() };
       setSaved(next);
       setForm(next);
       setEditing(false);
@@ -60,6 +66,21 @@ export function LeadProfile({
 
       {editing ? (
         <div className="form" style={{ gap: 12 }}>
+          <div>
+            <label className="label">Tipo de contato</label>
+            <select className="field" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+              <option value="">Não definido</option>
+              {(Object.keys(LEAD_KIND_LABEL) as LeadKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {LEAD_KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Quem indicou</label>
+            <input className="field" value={form.referredBy} onChange={(e) => setForm({ ...form, referredBy: e.target.value })} placeholder="Ex.: Bruno Alves" />
+          </div>
           <div>
             <label className="label">E-mail</label>
             <input className="field" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com.br" />
@@ -100,6 +121,11 @@ export function LeadProfile({
         <p className="empty">Sem e-mail, WhatsApp ou detalhes ainda.</p>
       ) : (
         <div className="stack" style={{ gap: 6 }}>
+          {(saved.kind || saved.referredBy) && (
+            <span>
+              {[saved.kind ? LEAD_KIND_LABEL[saved.kind as LeadKind] : null, saved.referredBy ? `Indicação de ${saved.referredBy}` : null].filter(Boolean).join(" · ")}
+            </span>
+          )}
           {saved.email && <span>{saved.email}</span>}
           {saved.phone && <span>{saved.phone}</span>}
           {saved.personal && <p className="muted">{saved.personal}</p>}
