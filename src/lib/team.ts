@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import type { TeamMember } from "@prisma/client";
+import type { LeadKind, TeamMember } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { emailEnabled, sendEmail } from "@/lib/email";
 import { deskcommConfig, sendWhatsapp } from "@/lib/deskcomm";
@@ -18,6 +18,20 @@ function wants(member: Pick<TeamMember, "notifyUrgent" | "notifyMeetings" | "not
   return member.notifyHandoffs;
 }
 
+type LeadRouting = { kind: LeadKind | null; assigneeId: string | null };
+
+// Quem recebe o aviso: quem marcou esse tipo de aviso, o responsável pelo contato e, se ele
+// não tem responsável, quem cuida desse tipo de contato (reunião e "precisa de você"; urgência só
+// vai pra quem marcou urgência e pro responsável, pra não avisar o time inteiro à toa).
+export function recipients(members: TeamMember[], kind: TeamNoticeKind, lead: LeadRouting | null): TeamMember[] {
+  return members.filter((m) => {
+    if (wants(m, kind)) return true;
+    if (!lead) return false;
+    if (m.id === lead.assigneeId) return true;
+    return kind !== "urgent" && !lead.assigneeId && lead.kind !== null && m.handles.includes(lead.kind);
+  });
+}
+
 function leadLink(leadId: string | undefined): string | null {
   const base = process.env.APP_URL?.replace(/\/$/, "");
   return base && leadId ? `${base}/leads/${leadId}` : null;
@@ -29,7 +43,7 @@ export async function noticeToMember(member: TeamMember, notice: { title: string
   const text = [notice.body, link].filter(Boolean).join("\n\n");
   const done: string[] = [];
 
-  if (member.email && (await emailEnabled())) {
+  if (member.email && member.viaEmail && (await emailEnabled())) {
     try {
       await sendEmail({ to: member.email, subject: notice.title, text });
       done.push("e-mail");
@@ -37,7 +51,7 @@ export async function noticeToMember(member: TeamMember, notice: { title: string
       console.error(`[equipe] e-mail pra ${member.name} não saiu:`, err instanceof Error ? err.message : err);
     }
   }
-  if (member.phone && (await deskcommConfig())) {
+  if (member.phone && member.viaWhatsapp && (await deskcommConfig())) {
     try {
       const sent = await sendWhatsapp({
         conversationId: member.whatsappConversationId,
@@ -60,8 +74,8 @@ export async function noticeToMember(member: TeamMember, notice: { title: string
 // Avisa todo mundo da equipe que quer esse tipo de aviso. Nunca derruba quem chamou.
 export async function notifyTeam(kind: TeamNoticeKind, notice: { title: string; body: string; leadId?: string }): Promise<void> {
   try {
-    const members = (await prisma.teamMember.findMany()).filter((m) => wants(m, kind));
-    for (const m of members) await noticeToMember(m, notice);
+    const lead = notice.leadId ? await prisma.lead.findUnique({ where: { id: notice.leadId }, select: { kind: true, assigneeId: true } }) : null;
+    for (const m of recipients(await prisma.teamMember.findMany(), kind, lead)) await noticeToMember(m, notice);
   } catch (err) {
     console.error("[equipe] falha ao avisar a equipe", err);
   }

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
 import { noticeToMember } from "@/lib/team";
+import { parseLeadKind } from "@/lib/leadKind";
+import type { LeadKind } from "@prisma/client";
 
 // Lembretes da reunião: liga/desliga e os textos (vazio = o padrão).
 export async function updateMeetingReminders(data: { enabled: boolean; day: string; h5: string; h1: string; noShow: string }): Promise<{ error?: string }> {
@@ -31,6 +33,11 @@ export interface MemberInput {
   notifyUrgent: boolean;
   notifyMeetings: boolean;
   notifyHandoffs: boolean;
+  role: string;
+  // Tipos de contato de que a pessoa cuida (PERSON, BUSINESS, CANDIDATE, PARTNER).
+  handles: string[];
+  viaEmail: boolean;
+  viaWhatsapp: boolean;
 }
 
 export async function saveTeamMember(id: string | null, data: MemberInput): Promise<{ error?: string }> {
@@ -42,7 +49,20 @@ export async function saveTeamMember(id: string | null, data: MemberInput): Prom
   const p = parsePhone(data.phone);
   if ("error" in p) return { error: p.error };
   if (!e.email && !p.phone) return { error: "Informe o e-mail ou o WhatsApp para os avisos chegarem." };
-  const fields = { name, email: e.email, phone: p.phone, notifyUrgent: data.notifyUrgent, notifyMeetings: data.notifyMeetings, notifyHandoffs: data.notifyHandoffs };
+  if (!(e.email && data.viaEmail) && !(p.phone && data.viaWhatsapp)) return { error: "Escolha por onde os avisos chegam: ligue o e-mail ou o WhatsApp que a pessoa tem." };
+  const handles = [...new Set(data.handles.map(parseLeadKind).filter((k): k is LeadKind => k !== null))];
+  const fields = {
+    name,
+    email: e.email,
+    phone: p.phone,
+    notifyUrgent: data.notifyUrgent,
+    notifyMeetings: data.notifyMeetings,
+    notifyHandoffs: data.notifyHandoffs,
+    role: data.role.trim().slice(0, 60) || null,
+    handles,
+    viaEmail: data.viaEmail,
+    viaWhatsapp: data.viaWhatsapp,
+  };
   if (id) {
     const current = await prisma.teamMember.findUnique({ where: { id }, select: { phone: true } });
     // Trocou o número: a conversa antiga no Deskcomm não serve mais.

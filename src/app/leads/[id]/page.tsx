@@ -11,6 +11,7 @@ import type { ChannelKey } from "@/components/ChannelBadge";
 import { LeadTabs } from "./LeadTabs";
 import { LeadTags } from "./LeadTags";
 import { LeadCampaign } from "./LeadCampaign";
+import { LeadAssignee } from "./LeadAssignee";
 import { LeadNotes } from "./LeadNotes";
 import { LeadProfile } from "./LeadProfile";
 import { LeadOutreach } from "./LeadOutreach";
@@ -33,7 +34,7 @@ const WHEN_FORMAT = { day: "2-digit", month: "2-digit", hour: "2-digit", minute:
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [lead, settings, campaigns, tagRows, conversations, drafts] = await Promise.all([
+  const [lead, settings, campaigns, tagRows, conversations, drafts, team] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
       include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
@@ -43,6 +44,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     prisma.lead.findMany({ where: { tags: { isEmpty: false } }, select: { tags: true } }),
     getConversationItems(),
     loadApprovalItems({ status: "PENDING", leadId: id }),
+    prisma.teamMember.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, name: true, role: true } }),
   ]);
 
   if (!lead) notFound();
@@ -152,6 +154,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       <LeadOutreach leadId={lead.id} otherAiActive={lead.otherAiActive} doNotContact={lead.doNotContact} />
       <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
       <LeadTags leadId={lead.id} tags={lead.tags} knownTags={knownTags} />
+      <LeadAssignee leadId={lead.id} assigneeId={lead.assigneeId} team={team} />
       <LeadCampaign
         leadId={lead.id}
         campaignId={lead.campaignId}
