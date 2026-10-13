@@ -104,7 +104,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   }
 
   if (decision.action === "handoff") {
-    await markNeedsHuman(lead.id, decision.reason, { silent: decision.silent });
+    await markNeedsHuman(lead.id, decision.reason, { silent: decision.silent, urgent: decision.urgent });
     return;
   }
 

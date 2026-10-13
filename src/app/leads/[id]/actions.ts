@@ -13,6 +13,7 @@ import { parseLeadKind } from "@/lib/leadKind";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
 import { recordFeedback } from "@/lib/agentFeedback";
 import { requireSession } from "@/lib/session";
+import { sendNoShow } from "@/lib/meetingReminders";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -109,7 +110,7 @@ export async function markMeeting(leadId: string, when: string | null) {
   await supersedeDrafts(leadId);
   await prisma.lead.update({
     where: { id: leadId },
-    data: { status: "MEETING_SCHEDULED", meetingAt, needsHumanReason: null, nextStep: "Reunião marcada.", nextStepAt: null },
+    data: { status: "MEETING_SCHEDULED", meetingAt, meetingReminders: [], needsHumanReason: null, nextStep: "Reunião marcada.", nextStepAt: null },
   });
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/conversations");
@@ -192,4 +193,36 @@ export async function setLeadOutreach(leadId: string, field: "otherAiActive" | "
   if (field !== "otherAiActive" && field !== "doNotContact") return;
   await prisma.lead.update({ where: { id: leadId }, data: { [field]: value } });
   revalidatePath(`/leads/${leadId}`);
+}
+
+// A pessoa faltou à reunião: o assistente manda o "senti sua falta" (texto de
+// Conta → Lembretes da reunião) e a conversa volta a andar pra remarcar.
+export async function markNoShow(leadId: string): Promise<{ error?: string }> {
+  await requireSession();
+  const [lead, settings, identityId] = await Promise.all([
+    prisma.lead.findUniqueOrThrow({ where: { id: leadId }, include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, channel: true } } } }),
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
+    activeIdentityIdOrNull(),
+  ]);
+  if (lead.status !== "MEETING_SCHEDULED") return { error: "Essa conversa não está com reunião marcada." };
+  try {
+    await sendNoShow(lead, identityId, settings);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "A mensagem não saiu." };
+  }
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: {
+      status: "CONVERSATION_OPEN",
+      meetingAt: null,
+      meetingLink: null,
+      meetingReminders: [],
+      needsHumanReason: null,
+      nextStep: "Faltou à reunião; perguntei se quer marcar outro horário.",
+      nextStepAt: null,
+    },
+  });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/conversations");
+  return {};
 }

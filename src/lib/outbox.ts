@@ -10,6 +10,7 @@ import { bookMeeting, type BookingPlan } from "@/lib/scheduling";
 import { formatSlot } from "@/lib/slots";
 import { sendAudioMessage } from "@/lib/voice/send";
 import { campaignReviewNote } from "@/lib/campaignReview";
+import { notifyTeam } from "@/lib/team";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
 // aprovação ligada (Settings.approvalMode) a mensagem vira um rascunho pro
@@ -78,6 +79,8 @@ async function sendNow(
       googleEventId: meeting.id,
       meetingLink: meeting.meetLink,
       slotsProposedAt: null,
+      // Reunião nova: os lembretes (véspera, 5h, 1h) começam do zero.
+      meetingReminders: [],
       needsHumanReason: null,
       nextStep: `Reunião marcada para ${formatSlot(new Date(opts.booking.startIso))}.`,
       nextStepAt: null,
@@ -102,6 +105,10 @@ async function sendNow(
     throw err;
   }
   await prisma.lead.update({ where: { id: lead.id }, data: effects });
+  if (opts.booking) {
+    const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Um lead";
+    await notifyTeam("meeting", { title: `Reunião marcada com ${name}`, body: `${formatSlot(new Date(opts.booking.startIso))} (${opts.booking.minutes} min, por vídeo).`, leadId: lead.id });
+  }
 }
 
 export async function deliver(lead: Lead, channel: MessageChannel, content: string, opts: DeliverOptions): Promise<"sent" | "queued"> {
