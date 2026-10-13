@@ -33,8 +33,11 @@ function claudeCode(alias: string): Completer {
       })
       .join("\n\n");
     const fn = tool.type === "function" ? tool.function : null;
+    // Em arquivo: o prompt da Helena (com a Base) é grande demais para a linha de comando do Windows.
+    const sysFile = join(EMPTY_DIR, `sys-${randomUUID()}.md`);
+    writeFileSync(sysFile, system);
     const args = [
-      "-p", "--model", alias, "--system-prompt", system, "--tools", "", "--setting-sources", "",
+      "-p", "--model", alias, "--system-prompt-file", sysFile, "--tools", "", "--setting-sources", "",
       "--no-session-persistence", "--disable-slash-commands", "--output-format", "json",
       "--json-schema", JSON.stringify(fn?.parameters ?? {}),
     ];

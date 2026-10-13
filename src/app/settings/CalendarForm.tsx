@@ -15,12 +15,15 @@ export function CalendarForm({
   calendarEnabled,
   configured,
   workHours,
+  notice,
 }: {
   minutes: number;
   googleEmail: string | null;
   calendarEnabled: boolean;
   configured: boolean;
   workHours: string;
+  // "com 4 horas de antecedência" ou "a partir do próximo dia útil".
+  notice: string;
 }) {
   const [value, setValue] = useState(minutes);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function CalendarForm({
         <label htmlFor="meeting-minutes" className="label">
           Duração da reunião{" "}
           <Help>
-            Só oferece horários dentro do seu horário de trabalho ({workHours}), de hora cheia ou meia hora, com 4 horas de antecedência e folga entre
+            Só oferece horários dentro do seu horário de trabalho ({workHours}), de hora cheia ou meia hora, {notice} e folga entre
             compromissos. Vídeo pelo Google Meet.
           </Help>
         </label>

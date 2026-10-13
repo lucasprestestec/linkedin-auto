@@ -67,6 +67,7 @@ export async function loadAgenda(googleConfigured: boolean, view: AgendaViewMode
       workEndHour: settings.workEndHour,
       workWeekdaysOnly: settings.workWeekdaysOnly,
       meetingMinutes: settings.meetingMinutes,
+      assistantName: settings.assistantName,
     },
     upcomingMeetings: 0,
   };

@@ -26,6 +26,23 @@ export interface SlotRules {
   bufferMinutes?: number;
   // Os horários começam em múltiplos disto (30 = hora cheia e meia hora).
   stepMinutes?: number;
+  // Só oferece a partir do próximo dia útil (regra da Helena, Base Parte 6).
+  fromNextBusinessDay?: boolean;
+  // Quantos horários oferecer de uma vez (padrão 3; a Helena oferece 2).
+  offerCount?: number;
+}
+
+// 00h do próximo dia útil (pula sábado e domingo), em Brasília.
+export function nextBusinessDayStart(now: Date): Date {
+  const t = local(now);
+  let add = 1;
+  while ([0, 6].includes((t.weekday + add) % 7)) add++;
+  return fromLocal(t.y, t.m, t.d + add);
+}
+
+// Texto curto da antecedência, pras telas.
+export function noticeLabel(rules: Pick<SlotRules, "fromNextBusinessDay" | "noticeHours">): string {
+  return rules.fromNextBusinessDay ? "a partir do próximo dia útil" : `com ${rules.noticeHours ?? DEFAULTS.noticeHours} horas de antecedência`;
 }
 
 const DEFAULTS = { noticeHours: 4, horizonDays: 10, bufferMinutes: 10, stepMinutes: 30 };
@@ -59,7 +76,7 @@ function conflicts(start: Date, end: Date, busy: Busy[], bufferMs: number): bool
 // Todos os inícios possíveis, em ordem.
 export function freeStarts(busy: Busy[], now: Date, rules: SlotRules): Date[] {
   const { noticeHours, horizonDays, bufferMinutes, stepMinutes } = { ...DEFAULTS, ...stripUndefined(rules) };
-  const earliest = now.getTime() + noticeHours * 60 * MIN_MS;
+  const earliest = Math.max(now.getTime() + noticeHours * 60 * MIN_MS, rules.fromNextBusinessDay ? nextBusinessDayStart(now).getTime() : 0);
   const bufferMs = bufferMinutes * MIN_MS;
   const today = local(now);
   const out: Date[] = [];
@@ -92,6 +109,7 @@ export function checkSlot(start: Date, busy: Busy[], now: Date, rules: SlotRules
   if (minuteOfDay < rules.workStartHour * 60 || minuteOfDay + rules.minutes > rules.workEndHour * 60) return { ok: false, reason: "fora do horário de atendimento" };
   if (l.min % r.stepMinutes !== 0) return { ok: false, reason: `use horário cheio ou meia hora (múltiplo de ${r.stepMinutes} minutos)` };
   if (start.getTime() < now.getTime() + r.noticeHours * 60 * MIN_MS) return { ok: false, reason: "muito em cima da hora" };
+  if (rules.fromNextBusinessDay && start.getTime() < nextBusinessDayStart(now).getTime()) return { ok: false, reason: "só a partir do próximo dia útil" };
   if (start.getTime() > now.getTime() + (r.horizonDays + 1) * 24 * 60 * MIN_MS) return { ok: false, reason: "longe demais" };
   const end = new Date(start.getTime() + rules.minutes * MIN_MS);
   if (conflicts(start, end, busy, r.bufferMinutes * MIN_MS)) return { ok: false, reason: "horário ocupado na agenda" };

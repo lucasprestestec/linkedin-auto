@@ -1,5 +1,5 @@
 import { addDays, addMonths, dayOfMonth, isValidKey, longDayLabel, monthGrid, monthOf, monthTitle, weekKeys, weekTitle, weekdayOf } from "@/lib/dateKeys";
-import { dayKeyOf, freeStarts, minutesOfDay, nextDays, timeLabel, windowsByDay, type SlotRules } from "@/lib/slots";
+import { dayKeyOf, freeStarts, minutesOfDay, nextDays, noticeLabel, timeLabel, windowsByDay, type SlotRules } from "@/lib/slots";
 
 // Monta o calendário (mês ou semana) a partir dos compromissos já lidos. Só conta e
 // data, sem Google nem banco: roda no navegador (a tela troca de dia e de mês sem
@@ -58,6 +58,8 @@ export interface SettingsForAgenda {
   workEndHour: number;
   workWeekdaysOnly: boolean;
   meetingMinutes: number;
+  // Com nome próprio (Helena) os horários só começam no próximo dia útil.
+  assistantName?: string | null;
 }
 
 // Os dias que a tela mostra para cada visão (mês = 6 semanas cheias; semana = dom a sáb).
@@ -101,6 +103,8 @@ export interface BuiltAgenda {
   workHours: string;
   workStartHour: number;
   workEndHour: number;
+  // "com 4 horas de antecedência" ou "a partir do próximo dia útil".
+  notice: string;
 }
 
 export function buildAgenda({ events, leads, settings, now, view, focusKey }: BuildInput): BuiltAgenda {
@@ -113,6 +117,7 @@ export function buildAgenda({ events, leads, settings, now, view, focusKey }: Bu
     workEndHour: settings.workEndHour,
     workWeekdaysOnly: settings.workWeekdaysOnly,
     minutes: settings.meetingMinutes,
+    ...(settings.assistantName?.trim() ? { fromNextBusinessDay: true } : {}),
   };
   const free = new Map(
     windowsByDay(
@@ -177,6 +182,7 @@ export function buildAgenda({ events, leads, settings, now, view, focusKey }: Bu
     workHours: `${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`,
     workStartHour: settings.workStartHour,
     workEndHour: settings.workEndHour,
+    notice: noticeLabel(rules),
   };
 }
 
