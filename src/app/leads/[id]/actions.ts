@@ -69,6 +69,14 @@ export async function updateLeadCampaign(leadId: string, campaignId: string | nu
   return { saved: true };
 }
 
+// Responsável pelo contato (quem da equipe atende). Vazio = ninguém em particular.
+export async function updateLeadAssignee(leadId: string, assigneeId: string | null) {
+  const member = assigneeId ? await prisma.teamMember.findUnique({ where: { id: assigneeId }, select: { id: true } }) : null;
+  await prisma.lead.update({ where: { id: leadId }, data: { assigneeId: member?.id ?? null } });
+  revalidatePath(`/leads/${leadId}`);
+  return { saved: true };
+}
+
 // ---------------------------------------------------------------------------
 // Ações do corretor sobre o lead (menu "Mais ações" e card de handoff).
 // ---------------------------------------------------------------------------

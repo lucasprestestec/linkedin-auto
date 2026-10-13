@@ -181,6 +181,10 @@ export default async function SettingsPage() {
               notifyUrgent: m.notifyUrgent,
               notifyMeetings: m.notifyMeetings,
               notifyHandoffs: m.notifyHandoffs,
+              role: m.role ?? "",
+              handles: m.handles,
+              viaEmail: m.viaEmail,
+              viaWhatsapp: m.viaWhatsapp,
             }))}
           />
         </SettingItem>

@@ -83,6 +83,9 @@ model Lead {
   otherAiActive     Boolean   @default(false)
   // Recusou ou pediu pra parar: nada automático sai mais, nem em campanha nova.
   doNotContact      Boolean   @default(false)
+  // Quem da equipe atende este contato (os avisos de reunião e "precisa de você" vão pra essa pessoa).
+  assignee          TeamMember? @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId        String?
   // CRM: anotações livres do corretor (só ele vê) e etiquetas.
   notes             String?   @db.Text
   tags              String[]  @default([])
@@ -438,5 +441,14 @@ model TeamMember {
   notifyUrgent           Boolean  @default(true)
   notifyMeetings         Boolean  @default(false)
   notifyHandoffs         Boolean  @default(false)
+  // Função (texto livre: "Especialista", "Preposto", "Recrutamento"...) e de que tipo de contato
+  // a pessoa cuida: ela recebe reunião marcada e "precisa de você" desses contatos.
+  role                   String?
+  handles                LeadKind[] @default([])
+  // Por onde os avisos chegam (precisa ter o e-mail / WhatsApp preenchido).
+  viaEmail               Boolean  @default(true)
+  viaWhatsapp            Boolean  @default(true)
+  // Contatos de que esta pessoa é a responsável.
+  leads                  Lead[]
   createdAt              DateTime @default(now())
 }
