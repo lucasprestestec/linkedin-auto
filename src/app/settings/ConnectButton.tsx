@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { getOrCreateIdentityLoginLink } from "./actions";
-import { IconAlert, IconLinkedin } from "@/components/Icons";
 
 export function ConnectButton() {
   const [error, setError] = useState<string | null>(null);
@@ -17,37 +16,25 @@ export function ConnectButton() {
         setOpened(true);
         window.open(link, "_blank", "noopener,noreferrer");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Falha ao gerar link de conexão.");
+        setError(err instanceof Error ? err.message : "Não foi possível gerar o link de conexão.");
       }
     });
   }
 
   return (
-    <div className="stack" style={{ gap: 8 }}>
-      <button onClick={() => handleClick()} disabled={pending} className="btn btn-block" style={{ background: "#0a66c2", color: "#fff" }}>
-        {pending ? (
-          <>
-            <span className="spinner" /> Gerando link…
-          </>
-        ) : (
-          <>
-            <IconLinkedin size={18} /> Conectar com LinkedIn
-          </>
-        )}
+    <div className="stack" style={{ gap: 8, alignItems: "flex-start" }}>
+      <button type="button" onClick={() => handleClick()} disabled={pending} className="btn-solid">
+        {pending ? "Gerando link…" : "Conectar o LinkedIn"}
       </button>
-      <p className="hint" style={{ textAlign: "center" }}>
-        Abre em uma nova aba. Depois de entrar, volte aqui.
+      <p className="hint" style={{ margin: 0 }}>
+        Abre em outra aba. Depois de entrar, volte aqui.
       </p>
       {opened && (
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleClick(true)} disabled={pending} style={{ alignSelf: "center" }}>
-          O link não abriu ou expirou? Gerar um novo
+        <button type="button" className="btn-text" onClick={() => handleClick(true)} disabled={pending}>
+          O link não abriu? Gerar outro
         </button>
       )}
-      {error && (
-        <p className="error-text">
-          <IconAlert size={15} /> {error}
-        </p>
-      )}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

@@ -1,82 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { useOptimistic, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { toggleAutomation } from "./actions";
-import { IconZap } from "@/components/Icons";
 
-// Estado da automação com o interruptor. "item" é a linha do card Hoje.
-export function AutomationBar({
-  paused,
-  connected,
-  today,
-  variant = "bar",
-}: {
-  paused: boolean;
-  connected: boolean;
-  today: string;
-  variant?: "bar" | "item";
-}) {
+// Liga e desliga o assistente. Cápsula pequena para o topo da tela (não ocupa a linha toda).
+export function AutomationBar({ paused, connected, hasName, today }: { paused: boolean; connected: boolean; hasName: boolean; today: string }) {
   const [optimisticPaused, setOptimisticPaused] = useOptimistic(paused);
   const [, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const on = connected && !optimisticPaused;
 
-  const toggle = (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={on ? "Pausar automação" : "Ligar automação"}
-      className="switch switch-light"
-      onClick={() =>
-        startTransition(async () => {
-          setOptimisticPaused(!optimisticPaused);
-          await toggleAutomation();
-        })
-      }
-    />
-  );
-
-  if (variant === "item") {
-    return (
-      <div className={`today-item auto-item${on ? " on" : ""}`}>
-        <span className="today-icon">
-          <IconZap size={18} />
-        </span>
-        <span className="today-text">
-          <b>{!connected ? "Automação parada" : on ? "Automação ligada" : "Automação pausada"}</b>
-          <small>{!connected ? "Conecte seu LinkedIn pra começar" : on ? today : "Nada é enviado enquanto estiver pausada"}</small>
-        </span>
-        {connected ? (
-          toggle
-        ) : (
-          <Link href="/settings" className="btn btn-gold btn-sm">
-            Conectar
-          </Link>
-        )}
-      </div>
-    );
-  }
-
-  if (!connected) {
-    return (
-      <Link href="/settings" className="auto-bar-row off">
-        <i className="auto-dot-sm" />
-        <span className="auto-bar-text">
-          <b>Automação parada</b> · conecte seu LinkedIn pra começar
-        </span>
-        <span className="auto-bar-cta">Conectar</span>
-      </Link>
-    );
-  }
+  const title = !connected ? "Assistente parado" : on ? "Assistente ligado" : "Assistente pausado";
+  const detail = !connected
+    ? "Conecte um canal para começar."
+    : error
+      ? error
+      : !hasName && !on
+        ? "Falta o seu nome: é com ele que o assistente se apresenta."
+        : on
+          ? today
+          : "Nada é enviado enquanto estiver pausado.";
 
   return (
-    <div className={`auto-bar-row${on ? " on" : " off"}`}>
-      <i className="auto-dot-sm" />
-      <span className="auto-bar-text">
-        <b>{on ? "Automação ligada" : "Automação pausada"}</b> · {on ? today : "nada é enviado enquanto estiver pausada"}
+    <div className={`auto-pill${on ? " is-on" : ""}`} title={detail}>
+      <i className={`dot-b ${on ? "b-ok" : "b-neutral"}`} />
+      <span className="auto-text">
+        <b>{title}</b>
+        <small>{detail}</small>
       </span>
-      {toggle}
+      {connected && !hasName && !on ? (
+        <Link href="/settings" className="btn-line btn-sm">
+          Cadastrar nome
+        </Link>
+      ) : connected ? (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label={on ? "Pausar" : "Ligar"}
+          className="switch"
+          onClick={() =>
+            startTransition(async () => {
+              setError(null);
+              setOptimisticPaused(!optimisticPaused);
+              const r = await toggleAutomation();
+              if (r.error) setError(r.error);
+            })
+          }
+        />
+      ) : (
+        <Link href="/channels" className="btn-line btn-sm">
+          Conectar
+        </Link>
+      )}
     </div>
   );
 }

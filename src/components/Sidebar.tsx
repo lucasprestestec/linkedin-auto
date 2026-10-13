@@ -2,84 +2,64 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 import { NAV_ITEMS, isActive } from "./navItems";
 import { Brand } from "./Brand";
-import { IconArrowUpRight, IconDots, IconDownload, IconLogout, IconSparkles } from "./Icons";
 import { useShell } from "./ShellContext";
-import { initials, avatarGradient } from "@/lib/format";
+import { ThemeToggle } from "./ThemeToggle";
+import { useRootAttr } from "./useRootAttr";
+import { IconLogOut, IconPanelLeft } from "./Icons";
+import { SIDE_KEY } from "@/lib/prefs";
 import { logout } from "@/app/actions";
 
-// Barra lateral escura do computador (≥1024px).
+// Menu lateral do computador (≥1024px). Pode ficar só com os ícones (a escolha fica guardada neste navegador).
 export function Sidebar() {
   const pathname = usePathname();
-  const { ownerName, needYouCount } = useShell();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const name = ownerName ?? "Seu perfil";
-  const [first, ...rest] = name.split(/\s+/);
+  const { ownerName, needYouCount, draftCount } = useShell();
+  const collapsed = useRootAttr("side") === "collapsed";
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [menuOpen]);
+  function toggleCollapsed() {
+    const next = !collapsed;
+    if (next) document.documentElement.dataset.side = "collapsed";
+    else delete document.documentElement.dataset.side;
+    try {
+      localStorage.setItem(SIDE_KEY, next ? "collapsed" : "open");
+    } catch {}
+  }
 
   return (
-    <aside className="sidebar" aria-label="Navegação principal">
-      <Brand size={30} className="sidebar-brand" />
+    <aside className="side" aria-label="Navegação principal">
+      <div className="side-top">
+        <Brand />
+        <button type="button" className="icon-btn side-collapse" onClick={toggleCollapsed} aria-pressed={collapsed} aria-label={collapsed ? "Mostrar nomes do menu" : "Mostrar só os ícones"} title={collapsed ? "Mostrar nomes" : "Só ícones"}>
+          <IconPanelLeft size={18} />
+        </button>
+      </div>
 
-      <nav className="sidebar-nav">
+      <nav className="side-nav">
         {NAV_ITEMS.map(({ href, label, Icon, badge }) => {
-          const active = isActive(pathname, href);
-          const count = badge === "attention" ? needYouCount : 0;
+          const count = badge === "attention" ? needYouCount : badge === "drafts" ? draftCount : 0;
           return (
-            <Link key={href} href={href} className="sidebar-item" aria-current={active ? "page" : undefined}>
-              <Icon size={19} strokeWidth={active ? 2.2 : 1.9} />
-              <span className="sidebar-label">{label}</span>
-              {count > 0 && <span className="sidebar-badge">{count > 99 ? "99+" : count}</span>}
+            <Link key={href} href={href} className="side-link" title={label} aria-label={collapsed ? label : undefined} aria-current={isActive(pathname, href) ? "page" : undefined}>
+              <span className="row" style={{ gap: 10 }}>
+                <Icon size={18} strokeWidth={1.9} />
+                <span className="side-label">{label}</span>
+              </span>
+              {count > 0 && <span className="side-count">{count > 99 ? "99+" : count}</span>}
             </Link>
           );
         })}
       </nav>
 
-      <Link href="/prospect" className="sidebar-promo">
-        <IconSparkles size={20} className="promo-spark" />
-        <strong className="promo-title">Turbo com IA</strong>
-        <p className="promo-text">Encontre, conecte e converta mais leads no LinkedIn.</p>
-        <span className="promo-arrow" aria-hidden>
-          <IconArrowUpRight size={18} />
-        </span>
-      </Link>
-
-      <div className="sidebar-user" ref={menuRef}>
-        <Link href="/settings" className="sidebar-user-link">
-          <span className="avatar" style={{ width: 34, height: 34, background: avatarGradient(name), fontSize: 12.5 }}>
-            {initials(first, rest.at(-1))}
-          </span>
-          <span className="stack" style={{ minWidth: 0 }}>
-            <strong className="truncate">{name}</strong>
-            <small>Ver perfil</small>
-          </span>
-        </Link>
-        <button type="button" className="sidebar-user-more" onClick={() => setMenuOpen((o) => !o)} aria-label="Mais opções" aria-expanded={menuOpen}>
-          <IconDots size={16} />
-        </button>
-        {menuOpen && (
-          <div className="popover popover-up" role="menu">
-            <a href="/api/export/leads" download className="menu-item" role="menuitem">
-              <IconDownload size={16} /> Baixar meus leads
-            </a>
-            <form action={logout}>
-              <button type="submit" className="menu-item" role="menuitem">
-                <IconLogout size={16} /> Sair
-              </button>
-            </form>
-          </div>
-        )}
+      <div className="side-foot">
+        <span className="side-who">{ownerName ?? "Sua conta"}</span>
+        <div className="side-actions">
+          <ThemeToggle />
+          <form action={logout}>
+            <button type="submit" className="icon-btn" aria-label="Sair" title="Sair">
+              <IconLogOut size={18} />
+            </button>
+          </form>
+        </div>
       </div>
     </aside>
   );

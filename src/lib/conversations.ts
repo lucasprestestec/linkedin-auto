@@ -1,4 +1,4 @@
-import type { LeadStatus, MessageSender } from "@prisma/client";
+import type { LeadStatus, MessageChannel, MessageSender } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readableReason, relativeTime, splitHeadline } from "@/lib/format";
 
@@ -7,14 +7,19 @@ export interface ConvItem {
   id: string;
   firstName: string | null;
   lastName: string | null;
+  avatarUrl: string | null;
   role: string | null;
   company: string | null;
   status: LeadStatus;
   needsHumanReason: string | null;
   lastMessage: { content: string; sender: MessageSender } | null;
+  // Canal da última mensagem (para o ícone na lista); vazio quando ainda não houve mensagem.
+  channel: MessageChannel | null;
   // A última mensagem é do lead: ninguém respondeu ainda.
   unanswered: boolean;
   replied: boolean;
+  // Há uma mensagem do assistente esperando a sua aprovação.
+  hasDraft: boolean;
   tags: string[];
   campaignId: string | null;
   campaignName: string | null;
@@ -28,7 +33,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
     include: {
       messages: { orderBy: { deliveredAt: "desc" }, take: 1 },
       campaign: { select: { name: true } },
-      _count: { select: { messages: { where: { sender: "LEAD" } } } },
+      _count: { select: { messages: { where: { sender: "LEAD" } }, drafts: { where: { status: "PENDING" } } } },
     },
   });
   return leads
@@ -40,13 +45,16 @@ export async function getConversationItems(): Promise<ConvItem[]> {
         id: l.id,
         firstName: l.firstName,
         lastName: l.lastName,
+        avatarUrl: l.avatarUrl,
         role,
         company,
         status: l.status,
         needsHumanReason: l.needsHumanReason && readableReason(l.needsHumanReason),
         lastMessage: last ? { content: last.content, sender: last.sender } : null,
+        channel: last?.channel ?? null,
         unanswered: last?.sender === "LEAD",
         replied: l._count.messages > 0,
+        hasDraft: l._count.drafts > 0,
         tags: l.tags,
         campaignId: l.campaignId,
         campaignName: l.campaign?.name ?? null,

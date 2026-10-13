@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
 import { extractThreadMessages, threadUrl, type EdgesConversation, type EdgesThreadMessage } from "@/lib/edges";
 import { syncLeadFromConversation } from "@/lib/leads";
+import { captureContactsSafely } from "@/lib/contactCapture";
 
 // Mensagem já normalizada, pronta pra comparar com o banco.
 export interface SyncedMessage {
@@ -103,6 +104,7 @@ export async function saveNewMessages(lead: Lead, messages: SyncedMessage[]): Pr
     });
     knownIds.add(m.messageId);
     saved.push(m);
+    if (m.fromLead) await captureContactsSafely(lead.id, m.content);
   }
   return saved;
 }

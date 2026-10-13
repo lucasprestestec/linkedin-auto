@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { CampaignStatus } from "@prisma/client";
-import { IconCheck, IconDots, IconSettings, IconTrash } from "@/components/Icons";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { deleteCampaign, setCampaignStatus } from "./actions";
 
-// "…" de uma campanha: pausar/retomar, finalizar, editar, apagar.
+// "Mais" de uma campanha: pausar/retomar, finalizar, editar, apagar.
 export function CampaignMenu({ id, name, status, leads }: { id: string; name: string; status: CampaignStatus; leads: number }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const { ask, dialog } = useConfirm();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,42 +30,48 @@ export function CampaignMenu({ id, name, status, leads }: { id: string; name: st
   }
 
   return (
-    <div className="popover-anchor" ref={ref} onClick={(e) => e.preventDefault()}>
-      <button type="button" className="kebab" aria-label={`Ações da campanha ${name}`} aria-expanded={open} disabled={pending} onClick={() => setOpen((o) => !o)}>
-        <IconDots size={18} />
+    <div className="menu-anchor" ref={ref} onClick={(e) => e.preventDefault()}>
+      <button type="button" className="btn-line btn-sm" aria-label={`Ações da campanha ${name}`} aria-expanded={open} disabled={pending} onClick={() => setOpen((o) => !o)}>
+        Mais
       </button>
       {open && (
-        <div className="popover" role="menu" style={{ width: 220 }}>
+        <div className="menu" role="menu">
           {status === "ACTIVE" ? (
-            <button type="button" className="menu-item" role="menuitem" onClick={() => run(() => setCampaignStatus(id, "PAUSED"))}>
-              ⏸ Pausar
+            <button type="button" role="menuitem" onClick={() => run(() => setCampaignStatus(id, "PAUSED"))}>
+              Pausar
             </button>
           ) : (
-            <button type="button" className="menu-item" role="menuitem" onClick={() => run(() => setCampaignStatus(id, "ACTIVE"))}>
-              ▶ {status === "PAUSED" ? "Retomar" : "Reativar"}
+            <button type="button" role="menuitem" onClick={() => run(() => setCampaignStatus(id, "ACTIVE"))}>
+              {status === "PAUSED" ? "Retomar" : "Reativar"}
             </button>
           )}
           {status !== "FINISHED" && (
-            <button type="button" className="menu-item" role="menuitem" onClick={() => run(() => setCampaignStatus(id, "FINISHED"))}>
-              <IconCheck size={16} /> Finalizar
+            <button type="button" role="menuitem" onClick={() => run(() => setCampaignStatus(id, "FINISHED"))}>
+              Finalizar
             </button>
           )}
-          <Link href={`/campaigns/${id}/edit`} className="menu-item" role="menuitem">
-            <IconSettings size={16} /> Editar
+          <Link href={`/campaigns/${id}/edit`} role="menuitem">
+            Editar
           </Link>
           <button
             type="button"
-            className="menu-item danger"
+            className="danger"
             role="menuitem"
-            onClick={() => {
-              if (!confirm(`Apagar a campanha "${name}"?${leads ? ` As ${leads} pessoas dela continuam em Conversas.` : ""}`)) return;
-              run(() => deleteCampaign(id));
+            onClick={async () => {
+              const ok = await ask({
+                title: `Apagar a campanha "${name}"?`,
+                message: leads ? `As ${leads} pessoas dela continuam em Conversas.` : "Ela ainda não tem ninguém.",
+                confirmLabel: "Apagar a campanha",
+                danger: true,
+              });
+              if (ok) run(() => deleteCampaign(id));
             }}
           >
-            <IconTrash size={16} /> Apagar
+            Apagar
           </button>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

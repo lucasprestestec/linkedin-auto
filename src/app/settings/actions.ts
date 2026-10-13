@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { createIdentity, deleteIdentity, getIdentity } from "@/lib/edges";
+import { createIdentity, deleteIdentity, extractConnections, getIdentity } from "@/lib/edges";
+import { linkedinProfileSlug } from "@/lib/linkedin";
 import { sendPush } from "@/lib/push";
 import { validFollowUp } from "@/lib/settings-ranges";
 import { disconnectGoogle } from "@/lib/gmail";
@@ -90,8 +91,18 @@ export async function sendTestPush() {
 
 export async function updateOwnerName(_prevState: unknown, formData: FormData) {
   const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 60);
-  await prisma.settings.update({ where: { id: "singleton" }, data: { ownerName: ownerName || null } });
+  // Obrigatório: o assistente se apresenta com esse nome. Nome em branco não apaga o que já existe.
+  if (!ownerName) return { error: "Escreva o seu nome. É assim que o assistente vai se apresentar nas conversas." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { ownerName } });
   revalidatePath("/", "layout");
+  return { saved: true };
+}
+
+// Duração da reunião que o assistente marca na agenda.
+export async function updateMeetingMinutes(minutes: number) {
+  if (![15, 20, 30, 45, 60].includes(minutes)) return { error: "Duração fora do permitido." };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { meetingMinutes: minutes } });
+  revalidatePath("/settings");
   return { saved: true };
 }
 
@@ -108,13 +119,41 @@ export async function updateFollowUpDefault(count: number, days: number) {
 // Desconecta o LinkedIn: apaga a identidade na edges.run (a mesma chamada que
 // já é usada ao gerar um link novo) e limpa o vínculo. Depois disso o botão
 // "Conectar" volta e dá pra entrar com outra conta — ou com a mesma de novo.
-export async function disconnectLinkedin() {
+// Pessoas que vieram do LinkedIn. Quem tem reunião marcada pra frente fica: a
+// reunião é real, mesmo que o LinkedIn saia.
+function linkedinLeadsWhere() {
+  return {
+    AND: [
+      { OR: [{ linkedinProfileUrl: { not: null } }, { linkedinThreadId: { not: null } }] },
+      // Data vazia também conta como "sem reunião" (NOT sozinho descartaria os nulos).
+      { OR: [{ meetingAt: null }, { meetingAt: { lt: new Date() } }] },
+    ],
+  };
+}
+
+export async function linkedinDataCount() {
+  return prisma.lead.count({ where: linkedinLeadsWhere() });
+}
+
+// "Conectar" volta e dá pra entrar com outra conta — ou com a mesma de novo.
+// Desconecta a conta. Com deleteData, apaga também as pessoas e conversas que
+// vieram do LinkedIn (irreversível: a tela avisa antes).
+export async function disconnectLinkedin(deleteData = false) {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { linkedinIdentityId: true } });
   if (settings.linkedinIdentityId) await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
   await prisma.settings.update({
     where: { id: "singleton" },
     data: { linkedinIdentityId: null, linkedinLoginLink: null, linkedinLoginLinkAt: null, linkedinNeedsReconnect: false, linkedinReconnectReason: null },
   });
+  if (deleteData) await deleteLinkedinData();
+  revalidatePath("/", "layout");
+}
+
+// Apaga as pessoas e conversas que vieram do LinkedIn (a conta já pode estar desconectada).
+export async function deleteLinkedinData() {
+  const ids = (await prisma.lead.findMany({ where: linkedinLeadsWhere(), select: { id: true } })).map((l) => l.id);
+  // Mensagens primeiro: elas não apagam junto com a pessoa. Rascunhos sim.
+  await prisma.$transaction([prisma.message.deleteMany({ where: { leadId: { in: ids } } }), prisma.lead.deleteMany({ where: { id: { in: ids } } })]);
   revalidatePath("/", "layout");
 }
 
@@ -128,4 +167,36 @@ export async function disconnectEmail() {
 export async function updateDailySummary(enabled: boolean) {
   await prisma.settings.update({ where: { id: "singleton" }, data: { dailySummaryEnabled: enabled } });
   revalidatePath("/settings");
+}
+
+// Traz a foto de perfil de quem jÃ¡ estÃ¡ conectado no LinkedIn. Usa a lista de conexÃµes do Edges
+// (aÃ§Ã£o gratuita) e sÃ³ preenche quem ainda nÃ£o tem foto.
+export async function refreshLeadPhotos(): Promise<{ updated?: number; error?: string }> {
+  const settings = await prisma.settings.findUnique({ where: { id: "singleton" } });
+  if (!settings?.linkedinIdentityId) return { error: "Conecte o LinkedIn primeiro." };
+
+  let connections;
+  try {
+    connections = await extractConnections(settings.linkedinIdentityId);
+  } catch {
+    return { error: "NÃ£o consegui consultar o LinkedIn agora. Tente de novo em instantes." };
+  }
+
+  const photoBySlug = new Map<string, string>();
+  for (const c of connections) {
+    const slug = (c.linkedin_profile_url && linkedinProfileSlug(c.linkedin_profile_url)) || c.linkedin_profile_handle?.trim().toLowerCase();
+    if (slug && c.profile_image_url?.startsWith("https://")) photoBySlug.set(slug, c.profile_image_url);
+  }
+
+  const leads = await prisma.lead.findMany({ where: { avatarUrl: null, linkedinProfileUrl: { not: null } }, select: { id: true, linkedinProfileUrl: true } });
+  let updated = 0;
+  for (const lead of leads) {
+    const slug = linkedinProfileSlug(lead.linkedinProfileUrl);
+    const photo = slug ? photoBySlug.get(slug) : undefined;
+    if (!photo) continue;
+    await prisma.lead.update({ where: { id: lead.id }, data: { avatarUrl: photo } });
+    updated++;
+  }
+  revalidatePath("/", "layout");
+  return { updated };
 }

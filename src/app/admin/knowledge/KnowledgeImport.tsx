@@ -1,17 +1,14 @@
 "use client";
 
-import { startTransition, useActionState, useRef } from "react";
+import { startTransition, useActionState } from "react";
 import { importKnowledge, type ImportState } from "./actions";
-import { IconCheck, IconFileText } from "@/components/Icons";
 
 export function KnowledgeImport({ hasSections }: { hasSections: boolean }) {
   const [state, action, pending] = useActionState<ImportState, FormData>(importKnowledge, undefined);
-  const formRef = useRef<HTMLFormElement>(null);
 
   return (
     <form
-      ref={formRef}
-      className="card card-pad stack"
+      className="form"
       style={{ gap: 12 }}
       onSubmit={(e) => {
         e.preventDefault();
@@ -20,28 +17,24 @@ export function KnowledgeImport({ hasSections }: { hasSections: boolean }) {
         startTransition(() => action(data));
       }}
     >
-      <label className="field" style={{ gap: 6 }}>
-        <span className="label">
-          <IconFileText size={15} /> Arquivo (.md ou .txt)
-        </span>
-        <input type="file" name="file" accept=".md,.markdown,.txt,text/markdown,text/plain" className="input" />
+      <label>
+        <span className="label">Arquivo (.md ou .txt)</span>
+        <input type="file" name="file" accept=".md,.markdown,.txt,text/markdown,text/plain" className="field" />
       </label>
-      <label className="field" style={{ gap: 6 }}>
+      <label>
         <span className="label">ou cole o texto</span>
-        <textarea name="markdown" className="textarea" rows={5} placeholder={"# 1. Quem é a assistente\n...\n# 2. Produtos\n..."} style={{ resize: "vertical" }} />
+        <textarea name="markdown" className="field" rows={5} placeholder={"# 1. Quem é a assistente\n...\n# 2. Produtos\n..."} />
       </label>
-      <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
-        <span className="tiny faint">Títulos com &quot;# &quot; viram seções; índice, fontes e pendências já vêm desligados.</span>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
+      <p className="hint" style={{ margin: 0 }}>
+        Títulos com &quot;# &quot; viram seções; índice, fontes e pendências já vêm desligados.
+      </p>
+      <div className="form-actions">
+        <button type="submit" className="btn-solid btn-sm" disabled={pending}>
           {pending ? "Importando…" : hasSections ? "Substituir" : "Importar"}
         </button>
+        {state?.error && <span className="field-error">{state.error}</span>}
+        {state?.imported && <span className="ok-text">{state.imported} seções importadas. Confira os modos.</span>}
       </div>
-      {state?.error && <p className="error-text">{state.error}</p>}
-      {state?.imported && (
-        <p className="success-text">
-          <IconCheck size={15} strokeWidth={3} /> {state.imported} seções importadas. Confira os modos ao lado.
-        </p>
-      )}
     </form>
   );
 }

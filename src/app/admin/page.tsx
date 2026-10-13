@@ -1,10 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { adminEnabled, isAdmin } from "@/lib/admin";
-import { IconChevronRight, IconFileText, IconLogout } from "@/components/Icons";
 import { AdminLogin } from "./AdminLogin";
-import Link from "next/link";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { AssistantIdentityForm } from "./AssistantIdentityForm";
 import { approxTokens } from "@/lib/knowledge";
@@ -30,8 +29,8 @@ export default async function AdminPage() {
   if (!(await isAdmin())) {
     return (
       <main className="page">
-        <header className="page-hero">
-          <h1 className="display page-title">Admin.</h1>
+        <header className="p-head">
+          <h1 className="t-title">Admin</h1>
         </header>
         <AdminLogin />
       </main>
@@ -39,113 +38,110 @@ export default async function AdminPage() {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const knowledge = await prisma.knowledgeSection.groupBy({ by: ["mode"], _count: { _all: true } });
-  const kbCount = knowledge.reduce((n, k) => n + k._count._all, 0);
-  const kbAlways = kbCount
-    ? (await prisma.knowledgeSection.findMany({ where: { mode: "ALWAYS" }, select: { content: true } })).reduce((n, s) => n + s.content.length, 0)
-    : 0;
+  const knowledge = await prisma.knowledgeSection.findMany({ where: { mode: { not: "OFF" } }, select: { mode: true, content: true } });
+  const kbAlways = knowledge.filter((k) => k.mode === "ALWAYS").reduce((n, k) => n + k.content.length, 0);
+  const kbCount = await prisma.knowledgeSection.count();
   const email = await emailConnection();
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
   return (
     <main className="page">
-      <header className="page-hero row" style={{ justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+      <header className="p-head">
         <div>
-          <h1 className="display page-title">
-            Ad<span className="name-grad">min.</span>
-          </h1>
-          <p className="hero-sub">Configurações técnicas. O usuário do painel não vê esta página.</p>
+          <h1 className="t-title">Admin</h1>
+          <p className="t-sub">Configurações técnicas. O usuário do painel não vê esta página.</p>
         </div>
         <form action={adminLogout}>
-          <button type="submit" className="btn btn-secondary btn-sm">
-            <IconLogout size={16} /> Sair do admin
+          <button type="submit" className="btn-line btn-sm">
+            Sair do admin
           </button>
         </form>
       </header>
 
-      <section className="group">
-        <h2 className="group-title">Agente de IA — banco de testes e modelo</h2>
-        <p className="tiny faint" style={{ padding: "0 4px 8px" }}>
-          Roda situações difíceis de conversa em cada modelo e mostra quem decide melhor, escreve mais natural e erra menos. Depois é só escolher
-          qual usar nas conversas.
-        </p>
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Agente de IA: banco de testes e modelo</h2>
+          <small>Roda situações difíceis de conversa em cada modelo e mostra quem decide melhor, escreve mais natural e erra menos.</small>
+        </div>
         <AgentEval />
       </section>
 
-      <div className="settings-grid">
-        <div className="settings-col">
-          <section className="group">
-            <h2 className="group-title">Identidade da assistente</h2>
-            <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Base de conhecimento</h2>
-            <Link href="/admin/knowledge" className="card setting-row" style={{ textDecoration: "none", color: "inherit" }}>
-              <span className="setting-icon" style={{ background: "var(--info-soft)", color: "var(--info-ink)" }}>
-                <IconFileText size={19} />
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontWeight: 700 }}>{kbCount ? `${kbCount} seções` : "Nenhuma base importada"}</span>
-                <span className="tiny faint">
-                  {kbCount
-                    ? `~${approxTokens(kbAlways).toLocaleString("pt-BR")} tokens sempre · o resto entra quando o assunto aparece`
-                    : "Importe o manual (.md): fichas, textos aprovados, objeções"}
-                </span>
-              </span>
-              <IconChevronRight size={18} />
-            </Link>
-          </section>
-          <section className="group">
-            <h2 className="group-title">Agente de IA — instruções gerais</h2>
-            <p className="tiny faint" style={{ padding: "0 4px 8px" }}>
-              Valem para todas as conversas. O texto de cada campanha (escrito pelo usuário) é somado a estas instruções.
-            </p>
-            <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Limites diários</h2>
-            <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-          </section>
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Identidade da assistente</h2>
+          <small>Com um nome (ex.: Helena), ela se apresenta como ela mesma e nunca como você. Vazio: escreve como o corretor.</small>
         </div>
-        <div className="settings-col">
-          <section className="group">
-            <h2 className="group-title">Horário de trabalho</h2>
-            <WorkHoursForm
-              start={settings.workStartHour}
-              end={settings.workEndHour}
-              weekdaysOnly={settings.workWeekdaysOnly}
-              replyAnytime={settings.replyAnytime}
-            />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Ações extras do LinkedIn</h2>
-            <EngagementForm
-              values={{
-                acceptInvitesEnabled: settings.acceptInvitesEnabled,
-                withdrawInvitesEnabled: settings.withdrawInvitesEnabled,
-                warmupEnabled: settings.warmupEnabled,
-                archiveLostEnabled: settings.archiveLostEnabled,
-              }}
-              withdrawAfterDays={settings.withdrawAfterDays}
-            />
-          </section>
-          <section className="group">
-            <h2 className="group-title">E-mail da secretária</h2>
-            <EmailStatus
-              googleConfigured={googleConfigured()}
-              redirectUri={googleRedirectUri(origin)}
-              connectedAddress={email?.address ?? null}
-              provider={email?.provider ?? null}
-              appUrlSet={Boolean(process.env.APP_URL)}
-            />
-          </section>
-          <section className="group">
-            <h2 className="group-title">Tipo de conta do LinkedIn</h2>
-            <AccountTypeNotice />
-          </section>
+        <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
+      </section>
+
+      <section className="sec">
+        <div className="sec-head">
+          <div className="setting-text">
+            <h2 className="t-label">Base de conhecimento</h2>
+            <small>
+              {kbCount
+                ? `${kbCount} seções · ~${approxTokens(kbAlways).toLocaleString("pt-BR")} tokens em toda mensagem · o resto entra quando o assunto aparece`
+                : "Nenhuma base importada. Importe o manual (.md): fichas de produto, textos aprovados, objeções."}
+            </small>
+          </div>
+          <Link href="/admin/knowledge" className="btn-line btn-sm">
+            {kbCount ? "Abrir" : "Importar"}
+          </Link>
         </div>
-      </div>
+      </section>
+
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Agente de IA: instruções gerais</h2>
+          <small>Valem para todas as conversas. O texto de cada campanha é somado a estas instruções.</small>
+        </div>
+        <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Limites diários</h2>
+        <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Horário de trabalho</h2>
+        <WorkHoursForm
+          start={settings.workStartHour}
+          end={settings.workEndHour}
+          weekdaysOnly={settings.workWeekdaysOnly}
+          replyAnytime={settings.replyAnytime}
+        />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Ações extras do LinkedIn</h2>
+        <EngagementForm
+          values={{
+            acceptInvitesEnabled: settings.acceptInvitesEnabled,
+            withdrawInvitesEnabled: settings.withdrawInvitesEnabled,
+            warmupEnabled: settings.warmupEnabled,
+            archiveLostEnabled: settings.archiveLostEnabled,
+          }}
+          withdrawAfterDays={settings.withdrawAfterDays}
+        />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">E-mail do assistente</h2>
+        <EmailStatus
+          googleConfigured={googleConfigured()}
+          redirectUri={googleRedirectUri(origin)}
+          connectedAddress={email?.address ?? null}
+          provider={email?.provider ?? null}
+          appUrlSet={Boolean(process.env.APP_URL)}
+        />
+      </section>
+
+      <section className="sec">
+        <h2 className="t-label">Tipo de conta do LinkedIn</h2>
+        <AccountTypeNotice />
+      </section>
     </main>
   );
 }

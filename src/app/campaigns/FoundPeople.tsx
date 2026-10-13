@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { IconCheck, IconExternal } from "@/components/Icons";
 import { inviteFound, type FoundResult } from "./actions";
 import { InviteSheet, SelectionBar } from "./InviteSheet";
 
@@ -46,20 +45,20 @@ export function FoundPeople({
   }
 
   return (
-    <section className="card found" aria-label="Pessoas encontradas">
-      <div className="found-head">
-        <div className="stack" style={{ gap: 2 }}>
-          <h2 className="title-md">
+    <section className="sec" aria-label="Pessoas encontradas">
+      <div className="sec-head">
+        <div className="setting-text">
+          <h2 className="t-label">
             {people.length} pessoa{people.length !== 1 ? "s" : ""} encontrada{people.length !== 1 ? "s" : ""}
           </h2>
-          <span className="tiny faint">
+          <small>
             {chosen.length} selecionada{chosen.length !== 1 ? "s" : ""} · {left} busca{left !== 1 ? "s" : ""} grátis restante{left !== 1 ? "s" : ""} no mês
-          </span>
+          </small>
         </div>
         {available.length > 1 && (
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn-text"
             onClick={() => setSelected(allSelected ? new Set() : new Set(available.map((p) => p.linkedinProfileUrl)))}
           >
             {allSelected ? "Limpar" : "Selecionar todos"}
@@ -68,57 +67,46 @@ export function FoundPeople({
       </div>
 
       {people.length === 0 ? (
-        <p className="empty-line" style={{ padding: "8px 18px 18px" }}>
-          Nenhum perfil encontrado com esses filtros. Tente menos filtros ou outros termos.
-        </p>
+        <p className="empty">Nenhum perfil encontrado com esses filtros. Tente menos filtros ou outros termos.</p>
       ) : (
-        <ul className="rows found-rows">
+        <ul className="list">
           {people.map((p) => {
             const blocked = isLead(p) || p.excluded;
-            const tone = p.icpScore == null ? "" : p.icpScore >= 80 ? "badge-qualified" : p.icpScore >= GOOD_FIT ? "badge-open" : p.icpScore >= 40 ? "badge-invite" : "";
+            const tone = p.icpScore == null ? "" : p.icpScore >= 80 ? "pill-ok" : p.icpScore >= GOOD_FIT ? "pill-accent" : "";
             return (
               <li key={p.linkedinProfileUrl}>
-                <label className={`found-row${blocked ? " blocked" : ""}`}>
+                <label className={`item pick${blocked ? " blocked" : ""}`}>
                   {!blocked ? (
-                    <>
-                      <input type="checkbox" checked={selected.has(p.linkedinProfileUrl)} onChange={() => toggle(p.linkedinProfileUrl)} />
-                      <span className="checkbox">
-                        <IconCheck size={15} strokeWidth={3.2} />
-                      </span>
-                    </>
+                    <input type="checkbox" checked={selected.has(p.linkedinProfileUrl)} onChange={() => toggle(p.linkedinProfileUrl)} />
                   ) : (
-                    <span className="checkbox-space" />
+                    <span style={{ width: 18, flex: "none" }} />
                   )}
-                  <Avatar firstName={p.firstName} lastName={p.lastName} size={42} />
-                  <span className="row-main">
-                    <span className="row-top">
-                      <span className="row-name">
-                        {p.firstName} {p.lastName}
-                      </span>
-                      {blocked ? (
-                        <span className="badge badge-plain" style={{ height: 22, fontSize: 11 }}>
-                          {invited.has(p.linkedinProfileUrl) ? "Convidado agora" : p.alreadyLead ? "Já é lead" : "Nunca contatar"}
-                        </span>
-                      ) : (
-                        p.icpScore != null && (
-                          <span className={`badge badge-plain ${tone}`} style={{ height: 22, fontSize: 11, flexShrink: 0 }} title={p.icpReason ?? undefined}>
-                            {p.icpScore}% encaixe
-                          </span>
-                        )
-                      )}
+                  <Avatar firstName={p.firstName} lastName={p.lastName} size={40} />
+                  <span className="item-main">
+                    <span className="item-title">
+                      {p.firstName} {p.lastName}
                     </span>
-                    {p.headline && <span className="row-sub found-headline">{p.headline}</span>}
-                    {p.snippet && <span className="found-snippet">{p.snippet}</span>}
+                    {p.headline && <span className="item-sub">{p.headline}</span>}
+                    {p.snippet && <span className="hint" style={{ margin: 0 }}>{p.snippet}</span>}
                   </span>
+                  {blocked ? (
+                    <span className="pill">{invited.has(p.linkedinProfileUrl) ? "Convidado agora" : p.alreadyLead ? "Já é contato" : "Nunca contatar"}</span>
+                  ) : (
+                    p.icpScore != null && (
+                      <span className={`pill ${tone}`} title={p.icpReason ?? undefined}>
+                        {p.icpScore}% de encaixe
+                      </span>
+                    )
+                  )}
                   <a
                     href={p.linkedinProfileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="kebab"
+                    className="btn-text tiny"
                     aria-label={`Abrir perfil de ${p.firstName} no LinkedIn`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <IconExternal size={15} />
+                    Perfil
                   </a>
                 </label>
               </li>
@@ -128,19 +116,9 @@ export function FoundPeople({
       )}
 
       {hasMore && (
-        <div style={{ padding: "0 18px 12px" }}>
-          <button type="button" className="btn btn-secondary btn-block" onClick={onLoadMore} disabled={loadingMore || left <= 0}>
-            {loadingMore ? (
-              <>
-                <span className="spinner" /> Buscando mais…
-              </>
-            ) : left <= 0 ? (
-              "Buscas do mês acabaram"
-            ) : (
-              "Carregar mais pessoas"
-            )}
-          </button>
-        </div>
+        <button type="button" className="btn-line btn-block" onClick={onLoadMore} disabled={loadingMore || left <= 0}>
+          {loadingMore ? "Buscando mais…" : left <= 0 ? "Buscas do mês acabaram" : "Carregar mais pessoas"}
+        </button>
       )}
 
       <SelectionBar count={chosen.length} onContinue={() => setSheetOpen(true)} />

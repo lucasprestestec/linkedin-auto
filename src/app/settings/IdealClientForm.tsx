@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { COMPANY_SIZES, parseIdealClient, serializeIdealClient, type IdealClient } from "@/lib/audience";
 import { TagInput } from "@/components/TagInput";
-import { IconBan, IconBriefcase, IconBuilding, IconFactory, IconMail, IconMapPin, IconTarget } from "@/components/Icons";
 import { updateTargetAudience } from "./actions";
 import { Field, FieldsCard } from "./FieldsCard";
 
@@ -25,13 +24,9 @@ export function IdealClientForm({ value }: { value: string }) {
       name="targetAudience"
       serialized={serialized}
       initial={initial}
-      title="Quem você quer alcançar"
-      subtitle="A IA usa isso pra sugerir pessoas e dizer quem combina mais com você"
-      icon={<IconTarget size={19} />}
-      iconStyle={{ background: "var(--success-soft)", color: "var(--success-ink)" }}
-      status={serialized ? "Preencha só o que importa — campos vazios são ignorados" : "Sem descrição — as sugestões vêm sem nota"}
+      status={serialized ? "" : "Sem descrição, as sugestões vêm sem nota"}
     >
-      <Field icon={<IconBriefcase size={15} />} label="Cargos">
+      <Field label="Cargos">
         <TagInput
           label="Cargos"
           values={icp.titles}
@@ -40,7 +35,7 @@ export function IdealClientForm({ value }: { value: string }) {
           suggestions={["Sócio", "Diretor de RH", "Diretor financeiro", "CFO", "Gerente administrativo", "Proprietário"]}
         />
       </Field>
-      <Field icon={<IconFactory size={15} />} label="Setores">
+      <Field label="Setores">
         <TagInput
           label="Setores"
           values={icp.industries}
@@ -49,16 +44,16 @@ export function IdealClientForm({ value }: { value: string }) {
           suggestions={["Tecnologia", "Saúde", "Advocacia", "Construção", "Indústria", "Varejo"]}
         />
       </Field>
-      <Field icon={<IconBuilding size={15} />} label="Tamanho da empresa (funcionários)">
-        <div className="row" style={{ gap: 6, flexWrap: "wrap" }} role="group" aria-label="Tamanho da empresa">
+      <Field label="Tamanho da empresa (funcionários)">
+        <div className="tabs" role="group" aria-label="Tamanho da empresa" style={{ flexWrap: "wrap" }}>
           {COMPANY_SIZES.map((size) => (
-            <button key={size} type="button" className="chip" style={{ height: 34 }} aria-pressed={icp.sizes.includes(size)} onClick={() => toggleSize(size)}>
+            <button key={size} type="button" aria-pressed={icp.sizes.includes(size)} onClick={() => toggleSize(size)}>
               {size}
             </button>
           ))}
         </div>
       </Field>
-      <Field icon={<IconMapPin size={15} />} label="Região">
+      <Field label="Região">
         <TagInput
           label="Região"
           values={icp.regions}
@@ -67,7 +62,7 @@ export function IdealClientForm({ value }: { value: string }) {
           suggestions={["Rio Grande do Sul", "Santa Catarina", "Paraná", "São Paulo"]}
         />
       </Field>
-      <Field icon={<IconBan size={15} />} label="Evitar" hint="Perfis assim ficam no fim da fila. Pra bloquear de vez, use &ldquo;Quem nunca contatar&rdquo;.">
+      <Field label="Evitar" hint="Perfis assim ficam no fim da fila. Pra bloquear de vez, use &ldquo;Quem nunca contatar&rdquo;.">
         <TagInput
           label="Evitar"
           values={icp.avoid}
@@ -76,15 +71,15 @@ export function IdealClientForm({ value }: { value: string }) {
           suggestions={["Estudante", "Corretor de seguros", "Recrutador", "Estagiário"]}
         />
       </Field>
-      <Field icon={<IconMail size={15} />} label="Observações">
+      <Field label="Observações">
         <textarea
-          className="textarea"
+          className="field"
           value={icp.notes}
           onChange={(e) => set("notes", e.target.value)}
           rows={3}
           aria-label="Observações"
           placeholder="Qualquer detalhe a mais. Ex.: empresas que ainda não têm plano de saúde."
-          style={{ fontSize: 14.5, resize: "vertical" }}
+         
         />
       </Field>
     </FieldsCard>

@@ -13,6 +13,7 @@ enum LeadStatus {
   CONVERSATION_OPEN // o lead já respondeu pelo menos uma vez — conversa de verdade
   NEEDS_HUMAN      // agente pediu handoff
   QUALIFIED        // pronto para fechar
+  MEETING_SCHEDULED // reunião marcada: a secretária não escreve mais, só o corretor
   LOST             // sem resposta / recusou
 }
 
@@ -36,6 +37,8 @@ model Lead {
   firstName         String?
   lastName          String?
   jobTitle          String?
+  // Foto de perfil do LinkedIn (endereço vindo do Edges); sem ela, aparece o bonequinho.
+  avatarUrl         String?
   status            LeadStatus @default(INVITE_SENT)
   linkedinThreadId  String?   @unique
   // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
@@ -77,9 +80,20 @@ model Lead {
   // quando ela volta a olhar esse lead (ex.: decidiu esperar).
   nextStep          String?
   nextStepAt        DateTime?
+  // Reunião: data marcada e, quando foi a secretária que marcou, o evento no Google
+  // Agenda (id, pra remarcar/cancelar) e o link da videochamada.
+  meetingAt         DateTime?
+  googleEventId     String?
+  meetingLink       String?
+  // Quando a secretária sugeriu horários e ainda espera o lead escolher.
+  slotsProposedAt   DateTime?
+  // Ela já perguntou "conseguiu ver um horário?" (uma vez só).
+  bookingNudgedAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
+  drafts            Draft[]
+  feedbacks         AgentFeedback[]
 }
 
 // Campanha (opcional) = um público com uma oferta própria (ex.: "Saúde
@@ -122,6 +136,97 @@ model WebSearchLog {
   @@index([createdAt])
 }
 
+// Mensagem que a secretária quer mandar e espera a sua aprovação (modo piloto,
+// Settings.approvalMode). Ao aprovar, ela é enviada e "effects" (o que mudaria
+// no lead se tivesse saído sozinha: status, follow-ups, próximo passo) é aplicado.
+enum DraftKind {
+  REPLY
+  OPENING
+  FIRST_CONTACT
+  INTRO_EMAIL
+  FOLLOW_UP
+}
+
+enum DraftStatus {
+  PENDING    // esperando o corretor
+  APPROVED   // aprovada; sai assim que a janela de horário permitir
+  SENT
+  DISCARDED  // corretor descartou, ou o lead respondeu antes
+  EXPIRED    // ninguém decidiu a tempo
+  FAILED     // aprovada, mas o envio deu erro
+}
+
+model Draft {
+  id          String         @id @default(cuid())
+  lead        Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String
+  kind        DraftKind
+  channel     MessageChannel
+  subject     String?
+  content     String         @db.Text
+  // Por que a secretária escolheu isso (uma linha, pro corretor decidir rápido).
+  reason      String?
+  // Atualizações do lead a aplicar quando a mensagem sair (JSON).
+  effects     Json
+  // Reunião a marcar no Google Agenda quando a mensagem sair (início ISO + minutos).
+  // O evento só é criado no envio: rascunho descartado não deixa evento sobrando.
+  booking     Json?
+  status      DraftStatus    @default(PENDING)
+  feedbacks   AgentFeedback[]
+  // O corretor mudou o texto antes de aprovar (mede a confiança na IA).
+  edited      Boolean        @default(false)
+  // Texto que a secretária escreveu, guardado quando o corretor edita (o content passa
+  // a ser o texto dele). A diferença entre os dois mostra o jeito que ele prefere.
+  originalContent String?    @db.Text
+  // Sai como mensagem de voz (com a voz do corretor): o content é o que será falado.
+  asAudio     Boolean        @default(false)
+  error       String?
+  createdAt   DateTime       @default(now())
+  decidedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([leadId, status])
+}
+
+// "Não é meu jeito": o corretor marca uma mensagem do assistente (ou uma conversa que ele
+// não devia ter passado pra você) e diz por quê. Vira sugestão de regra e, depois, cenário
+// do banco de testes (context guarda o trecho da conversa, sem nome de ninguém).
+model AgentFeedback {
+  id        String   @id @default(cuid())
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  leadId    String?
+  draft     Draft?   @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  draftId   String?
+  // Texto do assistente que motivou a marcação (vazio quando é sobre passar a conversa).
+  agentText String?  @db.Text
+  // Motivos escolhidos (chaves de src/lib/writingStyle.ts) e observação livre.
+  reasons   String[]
+  note      String?  @db.Text
+  // O que o corretor teria dito (opcional).
+  corrected String?  @db.Text
+  // Últimas mensagens da conversa ([{ sender, channel, content }]), sem nomes.
+  context   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Áudio gerado pra enviar por WhatsApp. O WhatsApp (Deskcomm) busca o arquivo por um endereço
+// público; o id é um código longo e impossível de adivinhar, e o arquivo some depois do prazo.
+// draftId + textHash deixam reaproveitar o áudio já ouvido na aprovação.
+model OutgoingAudio {
+  id        String   @id
+  bytes     Bytes
+  mime      String
+  draftId   String?
+  textHash  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@index([draftId])
+}
+
 // Inscrição de Web Push (um por navegador/aparelho do corretor).
 model PushSubscription {
   id        String   @id @default(cuid())
@@ -146,6 +251,10 @@ model Message {
   emailThreadId String?
   // WhatsApp (Deskcomm): id da mensagem lá — evita gravar duas vezes.
   whatsappMessageId String? @unique
+  // Mensagem de áudio, foto ou vídeo: "audio" | "image" | "video". Recebida: o content é o
+  // texto que o sistema tirou da mídia (transcrição/descrição). Enviada: o content é o
+  // texto falado no áudio.
+  mediaKind String?
   // Rastreio de abertura dos e-mails enviados (imagem invisível). Sinal fraco:
   // alguns apps abrem sozinhos (Apple Mail), outros bloqueiam imagens (Outlook).
   openToken    String?   @unique
@@ -159,6 +268,13 @@ model Message {
 model Settings {
   id                  String  @id @default("singleton")
   automationPaused    Boolean @default(true)
+  // Modo piloto: a secretária escreve, mas nada sai sem o seu OK (aba Aprovações).
+  approvalMode        Boolean @default(true)
+  // Google Agenda: a conexão do Google já tinha e-mail; aqui, se o corretor também
+  // liberou a agenda (escopo calendar.events). Só então a secretária marca reunião.
+  googleCalendarEnabled Boolean @default(false)
+  // Duração da reunião que a secretária marca, em minutos.
+  meetingMinutes      Int     @default(30)
   // Como o corretor quer ser chamado no painel ("Boa noite, Lucas.").
   ownerName           String?
   dailyInviteLimit    Int     @default(18)
@@ -169,6 +285,12 @@ model Settings {
   linkedinLoginLink   String?
   linkedinLoginLinkAt DateTime?
   agentInstructions   String? @db.Text
+  // "Meu jeito de escrever": tratamento, emojis, tamanho, regras e exemplos de
+  // mensagens do corretor (JSON, ver src/lib/writingStyle.ts).
+  writingStyle        Json?
+  // Mensagens de voz: voz clonada do corretor, consentimento e quando mandar áudio
+  // (JSON, ver src/lib/voice/settings.ts).
+  voiceSettings       Json?
   // Modelo do Nous usado nas conversas (escolhido no admin depois do banco de
   // testes). Vazio = NOUS_MODEL do ambiente.
   agentModel          String?

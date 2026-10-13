@@ -1,28 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { IconAlert, IconArrowRight, IconChat, IconLinkedin, IconMail, IconPaperclip, IconSparkles } from "@/components/Icons";
+import { ChannelBadge, CHANNELS } from "@/components/ChannelBadge";
 import { sendReply, suggestLeadReply } from "./actions";
+import { useChannel } from "./ChannelContext";
 
-type Channel = "LINKEDIN" | "EMAIL" | "WHATSAPP";
-const LABEL: Record<Channel, string> = { LINKEDIN: "LinkedIn", EMAIL: "E-mail", WHATSAPP: "WhatsApp" };
-
-export function ReplyForm({
-  leadId,
-  firstName,
-  profileUrl,
-  channels = ["LINKEDIN"],
-  defaultChannel = "LINKEDIN",
-}: {
-  leadId: string;
-  firstName: string;
-  profileUrl: string | null;
-  // Canais possíveis com essa pessoa; começa no último em que ela escreveu.
-  channels?: Channel[];
-  defaultChannel?: Channel;
-}) {
+// A resposta sai pelo canal que está aberto na conversa (o seletor de cima); aqui só se mostra qual é.
+export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: string }) {
   const [value, setValue] = useState("");
-  const [channel, setChannel] = useState<Channel>(channels.includes(defaultChannel) ? defaultChannel : channels[0]);
+  const { channel, reply } = useChannel();
+  const canUseChannel = reply.includes(channel);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [suggesting, startSuggest] = useTransition();
   const [state, formAction, pending] = useActionState(
@@ -35,7 +22,7 @@ export function ReplyForm({
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Cresce junto com o texto, até o max-height do CSS.
+  // Cresce junto com o texto, até o limite do CSS.
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -48,12 +35,11 @@ export function ReplyForm({
     document.getElementById("thread-end")?.scrollIntoView({ block: "end" });
   }, []);
 
-  // Envio bem-sucedido: rola até a mensagem nova.
   useEffect(() => {
     if (state && !state.error) document.getElementById("thread-end")?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [state]);
 
-  // Rascunho da IA: preenche o campo pra você revisar — nada é enviado sozinho.
+  // Rascunho do assistente: preenche o campo pra você revisar. Nada é enviado sozinho.
   function suggest() {
     setSuggestError(null);
     startSuggest(async () => {
@@ -65,70 +51,36 @@ export function ReplyForm({
     });
   }
 
-  const canSend = value.trim() !== "" && !pending;
+  const canSend = value.trim() !== "" && !pending && canUseChannel;
   const error = state?.error ?? suggestError;
 
   return (
-    <form action={formAction} className="composer">
-      {error && (
-        <p className="error-text" style={{ padding: "0 8px 8px" }}>
-          <IconAlert size={15} /> {error}
-        </p>
-      )}
+    <form action={formAction} className={`composer composer-${channel.toLowerCase()}`}>
       <input type="hidden" name="channel" value={channel} />
-      {channels.length > 1 && (
-        <div className="composer-channels" role="radiogroup" aria-label="Enviar por">
-          {channels.map((c) => (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={channel === c}
-              className={channel === c ? "active" : undefined}
-              onClick={() => setChannel(c)}
-            >
-              {c === "EMAIL" ? <IconMail size={14} /> : c === "WHATSAPP" ? <IconChat size={14} /> : <IconLinkedin size={14} />} {LABEL[c]}
-            </button>
-          ))}
-        </div>
-      )}
+      {error && <p className="field-error composer-meta">{error}</p>}
       <div className="composer-row">
-        {channel === "LINKEDIN" && profileUrl ? (
-          <a
-          href={profileUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="composer-clip"
-          aria-label="Enviar anexo pelo LinkedIn"
-          title="Anexos: envie direto pelo LinkedIn"
-        >
-            <IconPaperclip size={21} />
-          </a>
-        ) : null}
-        <div className="composer-box">
-          <textarea
-            ref={textareaRef}
-            id="reply-box"
-            name="content"
-            placeholder={
-              channel === "EMAIL"
-                ? `Escreva um e-mail para ${firstName}...`
-                : channel === "WHATSAPP"
-                  ? `WhatsApp para ${firstName}...`
-                  : `Digite uma mensagem para ${firstName}...`
-            }
-            aria-label="Mensagem"
-            required
-            rows={1}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-          <button type="button" className="ai-suggest" onClick={suggest} disabled={suggesting} aria-label="Sugerir resposta com IA" title="Sugerir resposta com IA">
-            {suggesting ? <span className="spinner" /> : <IconSparkles size={20} />}
-          </button>
-        </div>
-        <button type="submit" className="send-btn" disabled={!canSend} aria-label="Enviar mensagem">
-          {pending ? <span className="spinner" /> : <IconArrowRight size={22} strokeWidth={2.4} />}
+        <textarea
+          ref={textareaRef}
+          id="reply-box"
+          name="content"
+          placeholder={channel === "EMAIL" ? `E-mail para ${firstName}` : channel === "WHATSAPP" ? `WhatsApp para ${firstName}` : `Mensagem para ${firstName}`}
+          aria-label="Mensagem"
+          required
+          rows={1}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button type="submit" className="btn-solid" disabled={!canSend}>
+          {pending ? "Enviando…" : "Enviar"}
+        </button>
+      </div>
+      <div className="composer-meta">
+        <span className="composer-via">
+          <ChannelBadge channel={channel} size={18} />
+          {canUseChannel ? `Enviando por ${CHANNELS[channel].label}` : `Envio por ${CHANNELS[channel].label} indisponível para esta pessoa`}
+        </span>
+        <button type="button" className="btn-text" style={{ marginLeft: "auto" }} onClick={suggest} disabled={suggesting || !canUseChannel}>
+          {suggesting ? "Escrevendo…" : "Sugerir resposta"}
         </button>
       </div>
     </form>

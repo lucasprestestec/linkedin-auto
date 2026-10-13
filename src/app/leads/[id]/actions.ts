@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { activeIdentityIdOrNull } from "@/lib/identity";
 import { sendOnChannel } from "@/lib/channels";
+import { supersedeDrafts } from "@/lib/outbox";
 import type { MessageChannel } from "@prisma/client";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
 import { validFollowUp } from "@/lib/settings-ranges";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
+import { recordFeedback } from "@/lib/agentFeedback";
+import { requireSession } from "@/lib/session";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   const content = String(formData.get("content") ?? "").trim();
@@ -81,7 +84,7 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
     const replied = await prisma.message.count({ where: { leadId, sender: "LEAD" } });
     await prisma.lead.update({
       where: { id: leadId },
-      data: { status: replied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null, followUpsSent: 0 },
+      data: { status: replied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null, followUpsSent: 0, meetingAt: null },
     });
   } else if (kind === "lost") {
     await prisma.lead.update({ where: { id: leadId }, data: { status: "LOST", needsHumanReason: null } });
@@ -91,11 +94,43 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
   return { ok: true, previous: lead.status };
 }
 
+// Reunião marcada (por você, ou pelo lead na sua agenda). A data é opcional: vem do
+// campo "datetime-local" (sem fuso), que tratamos como horário de Brasília.
+// Depois disso o assistente não escreve mais nesta conversa.
+export async function markMeeting(leadId: string, when: string | null) {
+  let meetingAt: Date | null = null;
+  if (when) {
+    // Formato exato do campo (AAAA-MM-DDTHH:MM): o parser de datas do JS aceita lixo demais.
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when.slice(0, 16))) return { error: "Data inválida." };
+    meetingAt = new Date(`${when.slice(0, 16)}:00-03:00`);
+    if (Number.isNaN(meetingAt.getTime())) return { error: "Data inválida." };
+  }
+  await supersedeDrafts(leadId);
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { status: "MEETING_SCHEDULED", meetingAt, needsHumanReason: null, nextStep: "Reunião marcada.", nextStepAt: null },
+  });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/conversations");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 async function leadWithHistory(leadId: string) {
   return prisma.lead.findUniqueOrThrow({
     where: { id: leadId },
     include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, content: true, deliveredAt: true, channel: true, openToken: true, openCount: true } } },
   });
+}
+
+// "Não precisava passar pra mim": ensina o assistente a responder esse tipo de conversa sozinho
+// e já devolve a conversa a ele (senão o aviso ficava lá e a automação continuava pausada).
+export async function markHandoffFeedback(leadId: string, reasons: string[], note: string): Promise<{ error?: string }> {
+  await requireSession();
+  const result = await recordFeedback({ leadId, reasons, note });
+  revalidatePath("/settings");
+  if (!result.error) await leadAction(leadId, "handback");
+  return result;
 }
 
 export async function summarizeLead(leadId: string): Promise<{ text?: string; error?: string }> {
@@ -130,7 +165,7 @@ export async function updateLeadFollowUp(leadId: string, value: { count: number;
 }
 
 // Ficha pessoal: canais (e-mail, WhatsApp) e o que o corretor sabe da pessoa.
-// A secretária usa isso pra escolher o canal e personalizar as mensagens.
+// O assistente usa isso pra escolher o canal e personalizar as mensagens.
 export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string }) {
   const e = parseEmail(data.email);
   if ("error" in e) return { error: e.error };

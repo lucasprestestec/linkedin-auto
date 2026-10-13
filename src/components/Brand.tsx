@@ -1,15 +1,10 @@
 import Link from "next/link";
-import { LogoMark } from "./Icons";
 
-export function Brand({ size = 34, className = "" }: { size?: number; className?: string }) {
+export function Brand({ className = "" }: { size?: number; className?: string }) {
   return (
-    <Link href="/" className={`brand ${className}`} aria-label="LinkedIn Leads — início">
-      <LogoMark size={size} />
-      <span className="brand-name">
-        LinkedIn
-        <br />
-        <span className="brand-accent">Leads</span>
-      </span>
+    <Link href="/" className={`brand ${className}`} aria-label="Início">
+      <span className="brand-full">Central Dors</span>
+      <span className="brand-short" aria-hidden="true">CD</span>
     </Link>
   );
 }

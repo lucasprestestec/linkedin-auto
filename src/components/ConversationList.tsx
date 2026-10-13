@@ -3,27 +3,35 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { ConvItem } from "@/lib/conversations";
-import { ConversationRow } from "./ConversationRow";
-import { IconFilter, IconInbox, IconPlus, IconSearch, IconX } from "./Icons";
+import { ConversationCard, ConversationRow } from "./ConversationRow";
+import { IconBars, IconLayers } from "./Icons";
 
-const GROUPS = [
-  { key: "all", label: "Todas", test: () => true },
-  { key: "urgent", label: "Precisa de você", test: (c: ConvItem) => c.status === "NEEDS_HUMAN" },
-  { key: "replied", label: "Respondidas", test: (c: ConvItem) => c.replied && c.status !== "NEEDS_HUMAN" },
-  { key: "waiting", label: "Aguardando", test: (c: ConvItem) => c.status === "WAITING_REPLY" },
-  { key: "invited", label: "Convites", test: (c: ConvItem) => c.status === "INVITE_SENT" },
-  { key: "lost", label: "Sem resposta", test: (c: ConvItem) => c.status === "LOST" },
+// Cada conversa cai em UM grupo, na ordem do que pede a sua atenção.
+const BUCKETS = [
+  { key: "urgent", label: "Precisa de você", tone: "danger", test: (c: ConvItem) => c.status === "NEEDS_HUMAN" || (c.unanswered && c.status !== "LOST" && c.status !== "QUALIFIED" && c.status !== "MEETING_SCHEDULED") },
+  { key: "open", label: "Em conversa", tone: "accent", test: (c: ConvItem) => c.status === "CONVERSATION_OPEN" },
+  { key: "waiting", label: "Aguardando", tone: "neutral", test: (c: ConvItem) => c.status === "WAITING_REPLY" || c.status === "INVITE_SENT" || c.status === "NEW" },
+  { key: "win", label: "Oportunidades", tone: "ok", test: (c: ConvItem) => c.status === "QUALIFIED" || c.status === "MEETING_SCHEDULED" },
+  { key: "lost", label: "Sem resposta", tone: "muted", test: (c: ConvItem) => c.status === "LOST" },
 ] as const;
-type GroupKey = (typeof GROUPS)[number]["key"];
+type BucketKey = (typeof BUCKETS)[number]["key"];
 
-// Lista de conversas: chips de grupo, busca e (se houver) filtro por campanha
-// ou etiqueta. Usada na página Conversas e ao lado do chat no computador.
+function bucketOf(c: ConvItem): BucketKey {
+  return BUCKETS.find((b) => b.test(c))?.key ?? "waiting";
+}
+
+// Endereços antigos (?status=replied etc.) continuam funcionando.
+function initialFilter(raw: string): BucketKey | "all" {
+  if (raw === "replied") return "open";
+  return BUCKETS.some((b) => b.key === raw) ? (raw as BucketKey) : "all";
+}
+
+// Lista de conversas com busca, filtros, grupos coloridos por situação e a opção de ver em quadro (kanban).
 export function ConversationList({
   items,
   activeId,
   initialQuery = "",
   initialGroup = "all",
-  pane = false,
 }: {
   items: ConvItem[];
   activeId?: string;
@@ -31,135 +39,103 @@ export function ConversationList({
   initialGroup?: string;
   pane?: boolean;
 }) {
-  const [group, setGroup] = useState<GroupKey>(GROUPS.some((g) => g.key === initialGroup) ? (initialGroup as GroupKey) : "all");
+  const [filter, setFilter] = useState<BucketKey | "all">(initialFilter(initialGroup));
   const [query, setQuery] = useState(initialQuery);
-  const [campaign, setCampaign] = useState("");
-  const [tag, setTag] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState<"list" | "board">("list");
 
-  const campaigns = useMemo(
-    () => [...new Map(items.filter((i) => i.campaignId).map((i) => [i.campaignId!, i.campaignName ?? ""])).entries()],
-    [items],
-  );
-  const tags = useMemo(() => [...new Set(items.flatMap((i) => i.tags))].sort(), [items]);
-  const hasFilters = campaigns.length > 0 || tags.length > 0;
-
-  const visible = useMemo(() => {
+  const searched = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const test = GROUPS.find((g) => g.key === group)!.test;
-    return items.filter(
-      (c) =>
-        test(c) &&
-        (!campaign || (campaign === "none" ? !c.campaignId : c.campaignId === campaign)) &&
-        (!tag || c.tags.includes(tag)) &&
-        (!q || [c.firstName, c.lastName, c.role, c.company, c.campaignName, ...c.tags].filter(Boolean).join(" ").toLowerCase().includes(q)),
-    );
-  }, [items, group, query, campaign, tag]);
+    if (!q) return items;
+    return items.filter((c) => [c.firstName, c.lastName, c.role, c.company, c.campaignName, ...c.tags].filter(Boolean).join(" ").toLowerCase().includes(q));
+  }, [items, query]);
+
+  const byBucket = useMemo(() => {
+    const map = new Map<BucketKey, ConvItem[]>(BUCKETS.map((b) => [b.key, []]));
+    for (const c of searched) map.get(bucketOf(c))!.push(c);
+    return map;
+  }, [searched]);
+
+  const count = (k: BucketKey) => byBucket.get(k)!.length;
+  const shown = BUCKETS.filter((b) => (filter === "all" || filter === b.key) && count(b.key) > 0);
 
   return (
-    <section className={`conv-list${pane ? " pane" : ""}`} aria-label="Conversas">
-      {pane && (
-        <div className="conv-pane-head only-desktop">
-          <h2 className="display">Conversas</h2>
-          <Link href="/contacts/new" className="square-btn brand" aria-label="Adicionar contato" title="Adicionar contato">
-            <IconPlus size={18} />
-          </Link>
-        </div>
-      )}
-
-      <div className="chip-row" role="toolbar" aria-label="Mostrar">
-        {GROUPS.map((g) => {
-          const count = items.filter(g.test).length;
-          if (g.key !== "all" && count === 0) return null;
-          return (
-            <button
-              key={g.key}
-              type="button"
-              className={`chip${g.key === "urgent" ? " chip-urgent" : ""}`}
-              aria-pressed={group === g.key}
-              onClick={() => setGroup(g.key)}
-            >
-              {g.label} <span className="chip-count">{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="row" style={{ gap: 8 }}>
-        <label className="pill-input">
-          <IconSearch size={17} />
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome, cargo ou empresa..." aria-label="Buscar conversas" />
-          {query && (
-            <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca">
-              <IconX size={14} />
-            </button>
-          )}
-        </label>
-        {hasFilters && (
-          <button
-            type="button"
-            className="square-btn"
-            aria-label="Filtrar por campanha ou etiqueta"
-            aria-expanded={filtersOpen}
-            aria-pressed={filtersOpen || Boolean(campaign || tag)}
-            onClick={() => setFiltersOpen((o) => !o)}
-          >
-            <IconFilter size={17} />
+    <section className="stack" aria-label="Conversas">
+      <div className="cv-bar">
+        <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar" aria-label="Buscar conversas" />
+        <div className="seg" role="group" aria-label="Como ver">
+          <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} title="Lista">
+            <IconBars size={16} />
+            <span>Lista</span>
           </button>
-        )}
+          <button type="button" aria-pressed={view === "board"} onClick={() => setView("board")} title="Quadro">
+            <IconLayers size={16} />
+            <span>Quadro</span>
+          </button>
+        </div>
       </div>
 
-      {filtersOpen && (
-        <div className="conv-filters">
-          {campaigns.length > 0 && (
-            <label className="field" style={{ gap: 4 }}>
-              <span className="label">Campanha</span>
-              <select className="input" value={campaign} onChange={(e) => setCampaign(e.target.value)}>
-                <option value="">Todas</option>
-                <option value="none">Sem campanha</option>
-                {campaigns.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {tags.length > 0 && (
-            <label className="field" style={{ gap: 4 }}>
-              <span className="label">Etiqueta</span>
-              <select className="input" value={tag} onChange={(e) => setTag(e.target.value)}>
-                <option value="">Todas</option>
-                {tags.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
+      {view === "list" && (
+        <div className="tabs" role="toolbar" aria-label="Mostrar">
+          <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
+            Todas
+            <span className="count">{searched.length}</span>
+          </button>
+          {BUCKETS.map((b) =>
+            count(b.key) === 0 ? null : (
+              <button key={b.key} type="button" aria-pressed={filter === b.key} onClick={() => setFilter(b.key)}>
+                <i className={`dot-b b-${b.tone}`} />
+                {b.label}
+                <span className="count">{count(b.key)}</span>
+              </button>
+            ),
           )}
         </div>
       )}
 
-      {visible.length === 0 ? (
-        <div className="empty-line" style={{ flexDirection: "column", alignItems: "flex-start" }}>
-          <span className="row" style={{ gap: 8 }}>
-            <IconInbox size={18} /> {items.length === 0 ? "Nenhuma conversa ainda." : "Nada encontrado com esses filtros."}
-          </span>
-          {items.length === 0 && (
-            <Link href="/prospect" className="btn btn-primary btn-sm">
-              <IconPlus size={16} /> Adicionar pessoas
-            </Link>
+      {searched.length === 0 ? (
+        <p className="empty card">
+          {items.length === 0 ? (
+            <>
+              Nenhuma conversa ainda. <Link href="/prospect" className="btn-text">Adicionar pessoas</Link>
+            </>
+          ) : (
+            "Nada encontrado."
           )}
+        </p>
+      ) : view === "list" ? (
+        <div className="stack" style={{ gap: 14 }}>
+          {shown.map((b) => (
+            <div key={b.key} className="cv-group">
+              <h3 className="cv-group-head">
+                <i className={`dot-b b-${b.tone}`} />
+                {b.label}
+                <span className="count">{count(b.key)}</span>
+              </h3>
+              <ul className="list card card-flush">
+                {byBucket.get(b.key)!.map((c) => (
+                  <li key={c.id}>
+                    <ConversationRow c={c} active={c.id === activeId} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       ) : (
-        <ul className="rows conv-rows">
-          {visible.map((c) => (
-            <li key={c.id}>
-              <ConversationRow c={c} active={c.id === activeId} />
-            </li>
+        <div className="kb" role="list" aria-label="Quadro de conversas">
+          {BUCKETS.map((b) => (
+            <div key={b.key} className="kb-col" role="listitem">
+              <h3 className="cv-group-head">
+                <i className={`dot-b b-${b.tone}`} />
+                {b.label}
+                <span className="count">{count(b.key)}</span>
+              </h3>
+              <div className="kb-cards">
+                {byBucket.get(b.key)!.length === 0 ? <p className="kb-empty">Nenhuma</p> : byBucket.get(b.key)!.map((c) => <ConversationCard key={c.id} c={c} />)}
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );

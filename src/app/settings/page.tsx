@@ -1,7 +1,8 @@
+import { RefreshPhotosButton } from "./RefreshPhotosButton";
 import Link from "next/link";
+import type { ComponentType, SVGProps } from "react";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
-import { linkedinStatus } from "../channels/LinkedinCard";
 import { logout } from "../actions";
 import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
@@ -11,39 +12,76 @@ import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
 import { DailySummaryToggle } from "./DailySummaryToggle";
+import { CalendarForm } from "./CalendarForm";
+import { googleConfigured } from "@/lib/gmail";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
-import { IconBan, IconBell, IconCalendar, IconChat, IconChevronDown, IconChevronRight, IconClock, IconDownload, IconLinkedin, IconLogout, IconMail, IconTarget } from "@/components/Icons";
+import { parseWritingStyle, summarizeStyle } from "@/lib/writingStyle";
+import { loadSuggestions } from "@/lib/styleSuggestions";
+import { StyleOverview } from "./StyleOverview";
+import { VoiceOverview } from "./VoiceOverview";
+import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
+import { fishConfigured } from "@/lib/voice/fish";
+import type { Tone } from "@/components/IconChip";
+import { IconCalendar, IconChevronRight, IconLayers, IconSparkles, IconTarget } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
-// Uma linha que mostra o valor atual e abre pra editar — a página inteira cabe
-// numa olhada e ninguém precisa rolar por formulários que não vai mexer.
-function SettingItem({
-  icon,
-  tone,
-  title,
-  summary,
-  children,
-}: {
-  icon: React.ReactNode;
-  tone: string;
-  title: string;
-  summary: string;
-  children: React.ReactNode;
-}) {
+type IconType = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
+
+// Bloco da Conta: título com ícone e uma frase do que tem dentro, para a página ser lida em partes.
+function Group({ id, Icon, tone, title, hint, children }: { id?: string; Icon: IconType; tone: Tone; title: string; hint: string; children: React.ReactNode }) {
   return (
-    <details className="setting-item">
-      <summary className="setting-row">
-        <span className={`setting-icon tone-${tone}`}>{icon}</span>
+    <section id={id} className="sec" style={{ scrollMarginTop: 90 }}>
+      <header className="group-head">
+        <div>
+          <h2 className={`t-label group-title ink-${tone}`}>
+            <Icon size={20} />
+            <span>{title}</span>
+          </h2>
+          <p className="group-sub">{hint}</p>
+        </div>
+      </header>
+      <div className="group-body">{children}</div>
+    </section>
+  );
+}
+
+// Uma linha que mostra o valor atual e abre para editar: a página inteira cabe
+// numa olhada e ninguém precisa rolar por formulários que não vai mexer.
+function SettingItem({ id, title, summary, children }: { id?: string; title: string; summary: string; children: React.ReactNode }) {
+  return (
+    <details className="fold" id={id} style={{ scrollMarginTop: 90 }}>
+      <summary>
         <span className="setting-text">
           <b>{title}</b>
-          <span className="tiny faint setting-summary">{summary}</span>
+          <small>{summary}</small>
         </span>
-        <IconChevronDown size={18} className="chev" />
       </summary>
-      <div className="setting-body">{children}</div>
+      <div className="fold-body">{children}</div>
     </details>
+  );
+}
+
+// Atalho para outra tela, com o mesmo ícone em quadradinho dos itens acima.
+function ShortcutItem({ href, download, title, sub }: { href: string; download?: boolean; title: string; sub: string }) {
+  const body = (
+    <>
+      <span className="item-main">
+        <span className="item-title">{title}</span>
+        <span className="item-sub">{sub}</span>
+      </span>
+      <IconChevronRight size={16} style={{ color: "var(--text-3)" }} />
+    </>
+  );
+  return download ? (
+    <a href={href} download className="item">
+      {body}
+    </a>
+  ) : (
+    <Link href={href} className="item">
+      {body}
+    </Link>
   );
 }
 
@@ -65,105 +103,93 @@ function exclusionSummary(raw: string | null) {
 
 export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [status, email] = await Promise.all([linkedinStatus(settings), emailConnection()]);
-  const linkedinOk = status.connected;
+  const email = await emailConnection();
+  const style = parseWritingStyle(settings.writingStyle);
+  const voice = parseVoiceSettings(settings.voiceSettings);
+  // As sugestões são um extra: se falharem, a tela abre do mesmo jeito.
+  const suggestions = await loadSuggestions(style).catch(() => []);
 
   return (
-    <main className="page account">
+    <main className="page page-roomy">
       <MobileHeader />
-      <header className="page-hero rise">
-        <h1 className="display page-title">
-          Sua <span className="name-grad">conta.</span>
-        </h1>
-        <p className="hero-sub">Seus canais e como a secretária deve abordar as pessoas. Toque num item pra mudar.</p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Conta</h1>
+          <p className="t-sub">Como o assistente deve trabalhar por você.</p>
+        </div>
       </header>
 
-      <div className="account-col">
-        <section className="group rise">
-          <h2 className="group-title">Canais</h2>
-          <Link href="/channels" className="card channels-summary">
-            <span className="stack" style={{ gap: 8, flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 700 }}>LinkedIn, e-mail e WhatsApp</span>
-              <span className="channel-chips">
-                <span className={linkedinOk ? "chip on" : "chip off"}>
-                  <IconLinkedin size={13} /> {linkedinOk ? "Conectado" : settings.linkedinNeedsReconnect ? "Reconectar" : "Não conectado"}
-                </span>
-                <span className={email ? "chip on" : "chip"}>
-                  <IconMail size={13} /> {email ? "Conectado" : "Opcional"}
-                </span>
-                <span className={settings.deskcommUrl ? "chip on" : "chip"}>
-                  <IconChat size={13} /> {settings.deskcommUrl ? "Conectado" : "Opcional"}
-                </span>
-              </span>
-            </span>
-            <IconChevronRight size={18} className="chev" />
-          </Link>
-        </section>
+      <OwnerNameForm value={settings.ownerName ?? ""} />
 
-        <section className="group rise">
-          <h2 className="group-title">Você</h2>
-          <OwnerNameForm value={settings.ownerName ?? ""} />
-        </section>
+      <Group id="alcance" Icon={IconTarget} tone="accent" title="Prospecção" hint="Quem o assistente aborda e como ele acompanha">
+        <SettingItem title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
+          <IdealClientForm value={settings.targetAudience ?? ""} />
+        </SettingItem>
+        <SettingItem
+          title="Acompanhamento"
+          summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
+        >
+          <FollowUpDefaultForm
+            count={Math.min(10, settings.followUpMaxCount)}
+            days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
+          />
+        </SettingItem>
+        <SettingItem title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
+          <ExclusionListForm value={settings.exclusionList ?? ""} />
+        </SettingItem>
+      </Group>
 
-        <section id="alcance" className="group rise" style={{ scrollMarginTop: 90 }}>
-          <h2 className="group-title">Sua abordagem</h2>
-          <div className="card setting-list">
-            <SettingItem icon={<IconTarget size={19} />} tone="brand" title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
-              <IdealClientForm value={settings.targetAudience ?? ""} />
-            </SettingItem>
-            <SettingItem
-              icon={<IconClock size={19} />}
-              tone="waiting"
-              title="Follow-up"
-              summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
-            >
-              <FollowUpDefaultForm
-                count={Math.min(10, settings.followUpMaxCount)}
-                days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
-              />
-            </SettingItem>
-            <SettingItem icon={<IconBan size={19} />} tone="urgent" title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
-              <ExclusionListForm value={settings.exclusionList ?? ""} />
-            </SettingItem>
-            <SettingItem
-              icon={<IconCalendar size={19} />}
-              tone="open"
-              title="Resumo do dia"
-              summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
-            >
-              <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
-            </SettingItem>
-            {/* Sem as chaves de push no servidor, o card só mostraria um aviso técnico. */}
-            {pushPublicKey() && (
-              <SettingItem icon={<IconBell size={19} />} tone="open" title="Avisos no celular" summary="Quando alguém precisar de você">
-                <NotificationsCard publicKey={pushPublicKey()} />
-              </SettingItem>
-            )}
-          </div>
-        </section>
+      <Group Icon={IconCalendar} tone="ok" title="Rotina e avisos" hint="Reuniões, resumo do dia e notificações">
+        <SettingItem
+          title="Agenda de reuniões"
+          summary={settings.googleCalendarEnabled ? `Google Agenda conectada · ${settings.meetingMinutes} min` : "Não conectada: o assistente passa a conversa para você"}
+        >
+          <CalendarForm
+            minutes={settings.meetingMinutes}
+            googleEmail={settings.googleEmail}
+            calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
+            configured={googleConfigured()}
+            workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
+          />
+        </SettingItem>
+        <SettingItem
+          title="Resumo do dia"
+          summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}
+        >
+          <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
+        </SettingItem>
+        {/* Sem as chaves de push no servidor, o bloco só mostraria um aviso técnico. */}
+        {pushPublicKey() && (
+          <SettingItem title="Avisos no celular" summary="Quando alguém precisar de você">
+            <NotificationsCard publicKey={pushPublicKey()} />
+          </SettingItem>
+        )}
+      </Group>
 
-        <div className="card rise" style={{ overflow: "hidden" }}>
-          <a href="/api/export/leads" className="setting-row" download>
-            <span className="setting-icon" style={{ background: "var(--brand-soft)", color: "var(--brand-ink)" }}>
-              <IconDownload size={19} />
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 700 }}>Baixar meus leads</span>
-              <span className="tiny faint">Planilha para Excel ou Google Planilhas</span>
-            </span>
-            <IconChevronRight size={18} className="chev" />
-          </a>
-          <form action={logout} style={{ borderTop: "1px solid var(--border)" }}>
-            <button type="submit" className="setting-row" style={{ width: "100%", border: "none", background: "none", textAlign: "left" }}>
-              <span className="setting-icon" style={{ background: "var(--urgent-soft)", color: "var(--urgent-ink)" }}>
-                <IconLogout size={19} />
-              </span>
-              <span style={{ flex: 1, fontWeight: 700, color: "var(--urgent-ink)" }}>Sair</span>
-              <IconChevronRight size={18} className="chev" />
-            </button>
-          </form>
-        </div>
-      </div>
+      <Group id="jeito" Icon={IconSparkles} tone="violet" title="Jeito do assistente" hint="Como ele escreve e como ele soa nos áudios">
+        <SettingItem
+          title="Meu jeito de escrever"
+          summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
+        >
+          <StyleOverview style={style} suggestions={suggestions} />
+        </SettingItem>
+        <SettingItem id="voz" title="Mensagens de voz" summary={summarizeVoice(voice)}>
+          <VoiceOverview voice={voice} configured={fishConfigured()} />
+        </SettingItem>
+      </Group>
+
+      <Group Icon={IconLayers} tone="neutral" title="Atalhos e dados" hint="Outras telas e a sua lista de contatos">
+        <ShortcutItem href="/prospect" title="Prospectar" sub="Adicionar pessoas para o assistente abordar" />
+        <ShortcutItem href="/campaigns" title="Campanhas" sub="Grupos de pessoas com uma oferta" />
+        <ShortcutItem href="/channels" title="Canais" sub="LinkedIn, e-mail e WhatsApp" />
+        <ShortcutItem href="/api/export/leads" download title="Baixar meus contatos" sub="Planilha para Excel ou Google Planilhas" />
+        <RefreshPhotosButton />
+        <form action={logout} style={{ paddingTop: 12 }}>
+          <button type="submit" className="btn-line btn-danger-line btn-sm">
+            Sair
+          </button>
+        </form>
+      </Group>
     </main>
   );
 }

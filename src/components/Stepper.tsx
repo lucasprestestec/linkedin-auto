@@ -1,7 +1,5 @@
 "use client";
 
-import { IconMinus, IconPlus } from "./Icons";
-
 export function Stepper({
   id,
   name,
@@ -23,7 +21,7 @@ export function Stepper({
   return (
     <div className="stepper">
       <button type="button" onClick={() => onChange(clamp(value - step))} disabled={value <= min} aria-label="Diminuir">
-        <IconMinus size={16} strokeWidth={2.6} />
+        −
       </button>
       <input
         id={id}
@@ -37,7 +35,7 @@ export function Stepper({
         onChange={(e) => onChange(clamp(Number(e.target.value) || min))}
       />
       <button type="button" onClick={() => onChange(clamp(value + step))} disabled={value >= max} aria-label="Aumentar">
-        <IconPlus size={16} strokeWidth={2.6} />
+        +
       </button>
     </div>
   );

@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { adminEnabled, isAdmin } from "@/lib/admin";
 import { approxTokens } from "@/lib/knowledge";
-import { IconArrowLeft } from "@/components/Icons";
 import { KnowledgeImport } from "./KnowledgeImport";
 import { KnowledgeList } from "./KnowledgeList";
 import { PickTester } from "./PickTester";
@@ -24,66 +23,67 @@ export default async function KnowledgePage() {
 
   return (
     <main className="page">
-      <Link href="/admin" className="back-link">
-        <IconArrowLeft size={18} /> Admin
+      <Link href="/admin" className="btn-text" style={{ alignSelf: "flex-start" }}>
+        ← Admin
       </Link>
-      <header className="page-hero">
-        <h1 className="display page-title">
-          Base de <span className="name-grad">conhecimento.</span>
-        </h1>
-        <p className="hero-sub">
-          O manual da assistente, dividido em seções. &quot;Sempre&quot; entra em toda mensagem; &quot;Sob demanda&quot; entra só quando o assunto aparece na
-          conversa (um modelo rápido escolhe até 4); &quot;Desligada&quot; fica guardada.
-        </p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Base de conhecimento</h1>
+          <p className="t-sub">
+            O manual da assistente, dividido em seções. &quot;Sempre&quot; entra em toda mensagem; &quot;Sob demanda&quot; entra só quando o assunto aparece na
+            conversa (um modelo rápido escolhe até 4); &quot;Desligada&quot; fica guardada.
+          </p>
+        </div>
       </header>
 
       {sections.length > 0 && (
-        <section className="kb-summary card card-pad">
+        <section className="sec know-summary">
           <div>
             <b>{sections.length}</b>
-            <span className="tiny faint">seções</span>
+            <small>seções</small>
           </div>
           <div>
             <b>~{approxTokens(always).toLocaleString("pt-BR")}</b>
-            <span className="tiny faint">tokens sempre ({(always / 1000).toFixed(1)} mil caracteres)</span>
+            <small>tokens em toda mensagem ({(always / 1000).toFixed(1)} mil caracteres)</small>
           </div>
           <div>
             <b>{(onDemand / 1000).toFixed(1)} mil</b>
-            <span className="tiny faint">caracteres sob demanda</span>
+            <small>caracteres sob demanda</small>
           </div>
           <div>
             <b>{off}</b>
-            <span className="tiny faint">desligadas</span>
+            <small>desligadas</small>
           </div>
           {approxTokens(always) > 15000 && (
-            <p className="tiny" style={{ gridColumn: "1 / -1", color: "var(--warn-ink, #b7791f)" }}>
+            <p className="note note-warn" style={{ gridColumn: "1 / -1", margin: 0 }}>
               O núcleo está grande: cada mensagem fica mais cara e o modelo se perde mais. Passe seções longas para &quot;Sob demanda&quot;.
             </p>
           )}
         </section>
       )}
 
-      <div className="settings-grid" style={{ marginTop: 16 }}>
-        <div className="settings-col">
-          <section className="group">
-            <h2 className="group-title">{sections.length ? "Seções" : "Nenhuma seção ainda"}</h2>
-            {sections.length > 0 ? (
-              <KnowledgeList sections={sections.map((s) => ({ id: s.id, title: s.title, content: s.content, mode: s.mode }))} />
-            ) : (
-              <p className="tiny faint" style={{ padding: "0 4px" }}>
-                Importe o arquivo da base (.md). Cada título &quot;# &quot; vira uma seção; seções longas são divididas pelos &quot;## &quot;.
-              </p>
-            )}
-          </section>
-        </div>
-        <div className="settings-col">
-          <section className="group">
-            <h2 className="group-title">{sections.length ? "Substituir a base" : "Importar a base"}</h2>
+      <div className="know-layout">
+        <section className="sec">
+          <h2 className="t-label">{sections.length ? "Seções" : "Nenhuma seção ainda"}</h2>
+          {sections.length > 0 ? (
+            <KnowledgeList sections={sections.map((s) => ({ id: s.id, title: s.title, content: s.content, mode: s.mode }))} />
+          ) : (
+            <p className="hint" style={{ margin: 0 }}>
+              Importe o arquivo da base (.md). Cada título &quot;# &quot; vira uma seção; seções longas são divididas pelos &quot;## &quot;.
+            </p>
+          )}
+        </section>
+        <div className="stack" style={{ gap: 16 }}>
+          <section className="sec">
+            <h2 className="t-label">{sections.length ? "Substituir a base" : "Importar a base"}</h2>
             <KnowledgeImport hasSections={sections.length > 0} />
           </section>
           {sections.length > 0 && (
-            <section className="group">
-              <h2 className="group-title">Testar a escolha</h2>
+            <section className="sec">
+              <div className="setting-text">
+                <h2 className="t-label">Testar a escolha</h2>
+                <small>Quais seções &quot;sob demanda&quot; entrariam para uma mensagem de exemplo.</small>
+              </div>
               <PickTester />
             </section>
           )}

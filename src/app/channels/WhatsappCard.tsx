@@ -1,25 +1,28 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconAlert, IconChat, IconCheck, IconLogout } from "@/components/Icons";
+import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
 import { connectDeskcomm, disconnectDeskcomm, updateWhatsappChannel } from "./actions";
 
-// WhatsApp pelo Deskcomm: endereço + token de API. Conectado, mostra as regras
-// (liga/desliga e limite diário). A secretária só usa o WhatsApp com quem já
-// deu sinal de interesse.
+// WhatsApp pelo Deskcomm: chave de acesso (e o endereço, se o servidor não tem um
+// fixo). Conectado, mostra as regras (liga/desliga e limite diário). A
+// secretária só usa o WhatsApp com quem já deu sinal de interesse.
 export function WhatsappCard({
   host,
   channelId,
   enabled,
   dailyLimit,
   sentToday,
+  fixedAddress,
 }: {
   host: string | null;
   channelId: string | null;
   enabled: boolean;
   dailyLimit: number;
   sentToday: number;
+  // O servidor tem endereço único: o cliente não precisa informá-lo.
+  fixedAddress: boolean;
 }) {
   const connected = Boolean(host);
   const [form, setForm] = useState({ url: "", token: "", channelId: "" });
@@ -37,12 +40,10 @@ export function WhatsappCard({
       if (r.error) return setMessage({ ok: false, text: r.error });
       setMessage({
         ok: true,
-        text: r.channelDetected
-          ? "Deskcomm conectado."
-          : "Deskcomm conectado, mas não achei o número de onde as conversas novas saem. Informe o ID do canal abaixo.",
+        text: r.channelDetected ? "WhatsApp conectado." : "WhatsApp conectado. O número é reconhecido sozinho quando a primeira conversa chegar.",
       });
       setForm({ url: "", token: "", channelId: "" });
-      setEditing(!r.channelDetected);
+      setEditing(false);
       setConfirming(false);
     });
   }
@@ -60,157 +61,151 @@ export function WhatsappCard({
   }
 
   return (
-    <>
-      <section className="card card-pad connection" aria-label="WhatsApp">
-        <div className="row" style={{ gap: 14 }}>
-          <span className="li-mark wa-mark">
-            <IconChat size={24} />
-          </span>
-          <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
-            <span className="title-md">WhatsApp</span>
-            {connected ? (
-              <span className="row small" style={{ gap: 8, color: "var(--success-ink)", fontWeight: 700, minWidth: 0 }}>
-                <span className="pulse" />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>Conectado pelo Deskcomm · {host}</span>
-              </span>
-            ) : (
-              <span className="row small faint" style={{ fontWeight: 700 }}>
-                Opcional · não conectado
-              </span>
-            )}
+    <div className="stack" aria-label="WhatsApp">
+      <div className="setting" style={{ padding: 0 }}>
+        <div className="setting-text">
+          <b>{connected ? "Conectado" : "Não conectado"}</b>
+          <small>
+            {connected
+              ? channelId
+                ? "O assistente usa o WhatsApp só com quem já deu sinal de interesse."
+                : "O número é reconhecido sozinho quando a primeira conversa chegar."
+              : "Opcional. O assistente só usa o WhatsApp com quem já respondeu ou abriu seus e-mails."}
+          </small>
+        </div>
+        {connected && !editing && !confirming && (
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn-line btn-sm" onClick={() => setEditing(true)}>
+              {fixedAddress ? "Trocar chave" : "Trocar"}
+            </button>
+            <button type="button" className="btn-line btn-sm" onClick={() => setConfirming(true)}>
+              Desconectar
+            </button>
+          </div>
+        )}
+      </div>
+
+      {message && <p className={message.ok ? "ok-text" : "field-error"}>{message.text}</p>}
+
+      {confirming && (
+        <div className="note stack" style={{ gap: 10 }}>
+          <p>
+            <b>Desconectar o WhatsApp?</b> O assistente para de enviar e ler mensagens por lá.
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="btn-line btn-sm btn-danger-line"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  await disconnectDeskcomm();
+                  setConfirming(false);
+                  setMessage(null);
+                })
+              }
+            >
+              {pending ? "Desconectando…" : "Desconectar"}
+            </button>
+            <button type="button" className="btn-text" onClick={() => setConfirming(false)} disabled={pending}>
+              Cancelar
+            </button>
           </div>
         </div>
+      )}
 
-        {connected && !channelId && (
-          <p className="error-text">
-            <IconAlert size={15} /> Falta o número (canal) de onde as conversas novas saem.
-          </p>
-        )}
-
-        {message && (
-          <p className={message.ok ? "small" : "error-text"} style={message.ok ? { color: "var(--success-ink)" } : undefined}>
-            {message.ok ? <IconCheck size={15} /> : <IconAlert size={15} />} {message.text}
-          </p>
-        )}
-
-        {editing || !connected ? (
-          <form className="stack" style={{ gap: 10 }} onSubmit={connect}>
-            {!connected && (
-              <p className="small muted">
-                Pelo seu número conectado no Deskcomm. A secretária só usa o WhatsApp com quem já deu sinal de interesse (respondeu ou abriu seus
-                e-mails) — mensagem fria no WhatsApp pode bloquear o número.
-              </p>
-            )}
-            <label className="field" style={{ gap: 4 }}>
-              <span className="label">Endereço do Deskcomm</span>
+      {(editing || !connected) && (
+        <form className="form" onSubmit={connect}>
+          {!fixedAddress && (
+            <div>
+              <label className="label">
+                Endereço da conexão <Help>Fornecido pelo suporte na hora de configurar o WhatsApp.</Help>
+              </label>
               <input
-                className="input"
+                className="field"
                 inputMode="url"
-                placeholder={host ? `Atual: ${host}` : "https://seu-deskcomm.com.br"}
+                placeholder={host ? "Deixe em branco para manter o atual" : "https://…"}
                 value={form.url}
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
                 required={!connected}
               />
-            </label>
-            <label className="field" style={{ gap: 4 }}>
-              <span className="label">Token de API</span>
-              <input
-                className="input"
-                type="password"
-                autoComplete="off"
-                placeholder={connected ? "Deixe em branco pra manter o atual" : "dsk_..."}
-                value={form.token}
-                onChange={(e) => setForm({ ...form, token: e.target.value })}
-                required={!connected}
-              />
-              <span className="tiny faint">
-                No Deskcomm: Configurações → API tokens → novo token com &quot;Agentes de IA podem LER o CRM (MCP)&quot;, &quot;…AGIR no CRM (MCP)&quot;
-                e &quot;Tratar o token como gerente&quot;.
-              </span>
-            </label>
-            <label className="field" style={{ gap: 4 }}>
-              <span className="label">ID do canal (opcional)</span>
-              <input
-                className="input"
-                placeholder={channelId ?? "Detectado sozinho quando já existe alguma conversa"}
-                value={form.channelId}
-                onChange={(e) => setForm({ ...form, channelId: e.target.value })}
-              />
-            </label>
-            <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
-              {connected && (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(false)} disabled={pending}>
-                  Cancelar
-                </button>
-              )}
-              <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
-                {pending ? "Conectando…" : connected ? "Salvar e testar" : "Conectar Deskcomm"}
-              </button>
             </div>
-          </form>
-        ) : (
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setEditing(true)}>
-              Trocar endereço ou token
+          )}
+          <div>
+            <label className="label">
+              Chave de acesso <Help>Fornecida pelo suporte na hora de configurar o WhatsApp.</Help>
+            </label>
+            <input
+              className="field"
+              type="password"
+              autoComplete="off"
+              placeholder={connected ? "Deixe em branco para manter a atual" : "Cole a chave"}
+              value={form.token}
+              onChange={(e) => setForm({ ...form, token: e.target.value })}
+              required={!connected}
+            />
+          </div>
+          <details className="fold">
+            <summary>Opções avançadas</summary>
+            <div className="fold-body">
+              <div>
+                <label className="label">
+                  Identificador do número <Help>Só para o suporte. Normalmente o número é reconhecido sozinho quando a primeira conversa chega.</Help>
+                </label>
+                <input
+                  className="field"
+                  placeholder={channelId ?? "Reconhecido sozinho"}
+                  value={form.channelId}
+                  onChange={(e) => setForm({ ...form, channelId: e.target.value })}
+                />
+              </div>
+            </div>
+          </details>
+          <div className="form-actions">
+            <button type="submit" className="btn-solid" disabled={pending}>
+              {pending ? "Conectando…" : connected ? "Salvar e testar" : "Conectar"}
             </button>
-            {!confirming ? (
-              <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setConfirming(true)}>
-                <IconLogout size={15} /> Desconectar
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-danger btn-sm"
-                style={{ flex: 1 }}
-                disabled={pending}
-                onClick={() =>
-                  start(async () => {
-                    await disconnectDeskcomm();
-                    setConfirming(false);
-                    setMessage(null);
-                  })
-                }
-              >
-                {pending ? "Desconectando…" : "Confirmar"}
+            {connected && (
+              <button type="button" className="btn-text" onClick={() => setEditing(false)} disabled={pending}>
+                Cancelar
               </button>
             )}
           </div>
-        )}
-      </section>
+        </form>
+      )}
 
       {connected && (
-        <>
-          <div className="card channel-options" style={{ overflow: "hidden", marginTop: 10 }}>
-            <div className="setting-row">
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontWeight: 700 }}>A secretária pode usar o WhatsApp</span>
-                <span className="tiny faint">Só com quem já respondeu ou abriu seus e-mails. Desligado, ela só responde quem escrever por lá.</span>
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={rules.enabled}
-                aria-label="A secretária pode usar o WhatsApp"
-                className="switch switch-light"
-                onClick={() => saveRules({ ...rules, enabled: !rules.enabled })}
-              />
-            </div>
-            {rules.enabled && (
-              <div className="setting-row">
-                <label htmlFor="dailyWhatsappLimit" style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontWeight: 700 }}>Mensagens por dia</span>
-                  <span className="tiny faint">Retomadas param no limite; respostas a quem escreveu sempre saem.</span>
-                </label>
-                <Stepper id="dailyWhatsappLimit" name="dailyWhatsappLimit" value={rules.dailyLimit} min={1} max={60} onChange={(v) => saveRules({ ...rules, dailyLimit: v })} />
-              </div>
-            )}
+        <div className="settings">
+          <div className="setting">
+            <span className="setting-text">
+              <b>
+                Usar o WhatsApp <Help>Só com quem já respondeu ou abriu seus e-mails. Desligado, o assistente só responde quem escrever por lá.</Help>
+              </b>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={rules.enabled}
+              aria-label="Usar o WhatsApp"
+              className="switch"
+              onClick={() => saveRules({ ...rules, enabled: !rules.enabled })}
+            />
           </div>
-          <p className="tiny faint channel-foot">
-            Hoje: {sentToday} de {rules.dailyLimit} mensagens. No Deskcomm, deixe a IA automática desligada nesse número — quem responde é a
-            secretária daqui.
+          {rules.enabled && (
+            <div className="setting">
+              <label htmlFor="dailyWhatsappLimit" className="setting-text">
+                <b>
+                  Mensagens por dia <Help>Retomadas param no limite. Respostas a quem escreveu sempre saem.</Help>
+                </b>
+              </label>
+              <Stepper id="dailyWhatsappLimit" name="dailyWhatsappLimit" value={rules.dailyLimit} min={1} max={60} onChange={(v) => saveRules({ ...rules, dailyLimit: v })} />
+            </div>
+          )}
+          <p className="hint">
+            Hoje: {sentToday} de {rules.dailyLimit} mensagens.
           </p>
-        </>
+        </div>
       )}
-    </>
+    </div>
   );
 }

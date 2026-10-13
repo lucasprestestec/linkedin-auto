@@ -1,9 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
-import { IconPlus, IconX } from "./Icons";
 
-// Campo de várias entradas: digite e aperte Enter (ou vírgula) pra virar uma
+// Campo de várias entradas: digite e aperte Enter (ou vírgula) para virar uma
 // etiqueta; o × tira. Sugestões aparecem como atalhos abaixo. É o bloco de
 // qualquer filtro com mais de um valor (cargos, cidades, empresas...).
 export function TagInput({
@@ -39,13 +38,13 @@ export function TagInput({
   const pending = suggestions.filter((s) => !values.some((v) => v.toLowerCase() === s.toLowerCase())).slice(0, 6);
 
   return (
-    <div className="tag-input">
+    <div className="stack" style={{ gap: 8 }}>
       <label htmlFor={id} className="tag-box">
         {values.map((v) => (
-          <span key={v} className="tag-pill">
+          <span key={v} className="tag">
             {v}
             <button type="button" onClick={() => remove(v)} aria-label={`Remover ${v}`}>
-              <IconX size={12} strokeWidth={2.6} />
+              ×
             </button>
           </span>
         ))}
@@ -82,10 +81,10 @@ export function TagInput({
         />
       </label>
       {pending.length > 0 && (
-        <div className="tag-suggestions">
+        <div className="row wrap" style={{ gap: 6 }}>
           {pending.map((s) => (
-            <button key={s} type="button" onClick={() => add(s)}>
-              <IconPlus size={12} strokeWidth={2.6} /> {s}
+            <button key={s} type="button" className="pill" onClick={() => add(s)} style={{ border: 0, cursor: "pointer" }}>
+              + {s}
             </button>
           ))}
         </div>

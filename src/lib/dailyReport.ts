@@ -70,7 +70,7 @@ export async function dailyReport(since = startOfLocalDay()): Promise<DailyRepor
       timeline.push({ at: m.createdAt, kind: "reply", leadId: m.lead.id, name, text: `respondeu pelo ${CHANNEL[m.channel]}` });
     } else if (m.sender === "AGENT") {
       sent[m.channel]++;
-      timeline.push({ at: m.createdAt, kind: "sent", leadId: m.lead.id, name, text: `a secretária escreveu pelo ${CHANNEL[m.channel]}` });
+      timeline.push({ at: m.createdAt, kind: "sent", leadId: m.lead.id, name, text: `o assistente escreveu pelo ${CHANNEL[m.channel]}` });
     } else {
       sentByYou++;
     }
@@ -141,10 +141,10 @@ export function reportHeadline(r: DailyReport): string {
 
 // Texto do e-mail de resumo (vai pra caixa do próprio corretor).
 export function reportText(r: DailyReport, ownerFirstName: string | null, appUrl: string | null): string {
-  const lines: string[] = [`Oi${ownerFirstName ? `, ${ownerFirstName}` : ""}! Aqui vai o resumo do dia da sua secretária.`, ""];
+  const lines: string[] = [`Oi${ownerFirstName ? `, ${ownerFirstName}` : ""}! Aqui vai o resumo do dia do seu assistente.`, ""];
   lines.push(`• Convites enviados no LinkedIn: ${r.invites}`);
   if (r.accepted) lines.push(`• Aceitaram o convite: ${r.accepted}`);
-  lines.push(`• Mensagens da secretária: ${r.sent.LINKEDIN} no LinkedIn, ${r.sent.EMAIL} por e-mail, ${r.sent.WHATSAPP} no WhatsApp`);
+  lines.push(`• Mensagens do assistente: ${r.sent.LINKEDIN} no LinkedIn, ${r.sent.EMAIL} por e-mail, ${r.sent.WHATSAPP} no WhatsApp`);
   if (r.replies.length) lines.push(`• Responderam: ${names(r.replies, 6)}`);
   if (r.opens.length) lines.push(`• Abriram seu e-mail: ${names(r.opens, 6)}`);
   if (r.qualified.length) lines.push(`• Viraram oportunidade: ${names(r.qualified, 6)}`);

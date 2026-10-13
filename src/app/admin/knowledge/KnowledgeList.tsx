@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import type { KnowledgeMode } from "@prisma/client";
 import { deleteSection, setSectionMode, updateSection } from "./actions";
-import { IconChevronDown, IconTrash } from "@/components/Icons";
 
 interface Section {
   id: string;
@@ -20,7 +19,7 @@ const MODE_LABEL: Record<KnowledgeMode, string> = {
 
 export function KnowledgeList({ sections }: { sections: Section[] }) {
   return (
-    <div className="card kb-list">
+    <div className="know-list">
       {sections.map((s) => (
         <SectionRow key={s.id} section={s} />
       ))}
@@ -41,18 +40,20 @@ function SectionRow({ section }: { section: Section }) {
   const own = cut > 0 ? section.title.slice(cut + 3) : section.title;
 
   return (
-    <div className={`kb-row kb-${section.mode.toLowerCase()}`}>
-      <div className="kb-head">
-        <button type="button" className="kb-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
-          <IconChevronDown size={16} style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform .15s" }} />
-          <span className="kb-title">
+    <div className={`know-row know-${section.mode.toLowerCase()}`}>
+      <div className="know-head">
+        <button type="button" className="know-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span className="know-caret" aria-hidden="true">
+            {open ? "▾" : "▸"}
+          </span>
+          <span className="know-title">
             {parent && <small>{parent}</small>}
             <span>{own}</span>
           </span>
         </button>
-        <span className="tiny faint kb-size">{(section.content.length / 1000).toFixed(1)} mil</span>
+        <span className="know-size">{(section.content.length / 1000).toFixed(1)} mil</span>
         <select
-          className="input kb-mode"
+          className="field know-mode"
           value={section.mode}
           disabled={pending}
           aria-label={`Modo da seção ${section.title}`}
@@ -69,24 +70,24 @@ function SectionRow({ section }: { section: Section }) {
         </select>
       </div>
       {open && (
-        <div className="stack kb-body" style={{ gap: 8 }}>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Título da seção" />
-          <textarea className="textarea" rows={14} value={content} onChange={(e) => setContent(e.target.value)} style={{ resize: "vertical", fontSize: 13.5 }} />
-          {error && <p className="error-text">{error}</p>}
-          <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+        <div className="form know-body" style={{ gap: 8 }}>
+          <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Título da seção" />
+          <textarea className="field" rows={14} value={content} onChange={(e) => setContent(e.target.value)} style={{ fontSize: 13.5 }} />
+          <div className="form-actions" style={{ justifyContent: "space-between" }}>
             <button
               type="button"
-              className="btn btn-secondary btn-sm"
+              className="btn-danger-line btn-sm"
               disabled={pending}
               onClick={() => {
                 if (window.confirm(`Apagar a seção "${section.title}"?`)) startTransition(() => deleteSection(section.id));
               }}
             >
-              <IconTrash size={15} /> Apagar
+              Apagar
             </button>
+            {error && <span className="field-error">{error}</span>}
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn-solid btn-sm"
               disabled={!dirty || pending}
               onClick={() =>
                 startTransition(async () => {

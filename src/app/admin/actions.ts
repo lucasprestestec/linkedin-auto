@@ -92,7 +92,6 @@ export async function setWithdrawAfterDays(days: number) {
   revalidatePath("/admin");
 }
 
-
 export async function updateAssistantIdentity(_prevState: unknown, formData: FormData) {
   await requireAdmin();
   const assistantName = String(formData.get("assistantName") ?? "").trim().slice(0, 40);

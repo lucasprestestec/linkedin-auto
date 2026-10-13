@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
-import { IconArrowLeft, IconUserSearch } from "@/components/Icons";
 import { emailEnabled } from "@/lib/email";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { activeIdentityIdOrNull } from "@/lib/identity";
@@ -9,8 +8,8 @@ import { ContactForm } from "./ContactForm";
 
 export const dynamic = "force-dynamic";
 
-// Adicionar alguém que o corretor já conhece — indicação, evento, cliente
-// antigo —, com ou sem LinkedIn. Buscar gente nova continua em Prospectar.
+// Adicionar alguém que o corretor já conhece (indicação, evento, cliente
+// antigo), com ou sem LinkedIn. Buscar gente nova continua em Prospectar.
 export default async function NewContactPage() {
   const [settings, campaigns, email, identity] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
@@ -20,29 +19,26 @@ export default async function NewContactPage() {
   ]);
 
   return (
-    <main className="page account">
+    <main className="page">
       <MobileHeader />
-      <Link href="/conversations" className="back-link">
-        <IconArrowLeft size={18} /> Conversas
+      <Link href="/conversations" className="btn-text" style={{ alignSelf: "flex-start" }}>
+        ← Conversas
       </Link>
-      <header className="page-hero rise">
-        <h1 className="display page-title">
-          Adicionar <span className="name-grad">contato.</span>
-        </h1>
-        <p className="hero-sub">Alguém que você já conhece ou que chegou por indicação. Precisa só do nome e de um jeito de falar com a pessoa.</p>
-        <p className="small muted" style={{ marginTop: 8 }}>
-          <IconUserSearch size={15} /> Quer encontrar gente nova no LinkedIn?{" "}
-          <Link href="/prospect" className="link-btn brand">
-            Prospectar
-          </Link>
-        </p>
+      <header className="p-head">
+        <div>
+          <h1 className="t-title">Adicionar contato</h1>
+          <p className="t-sub">
+            Alguém que você já conhece ou que chegou por indicação. Precisa só do nome e de um jeito de falar com a pessoa. Quer encontrar gente nova?{" "}
+            <Link href="/prospect" className="btn-text">
+              Prospectar
+            </Link>
+          </p>
+        </div>
       </header>
-      <div className="account-col">
-        <ContactForm
-          campaigns={campaigns}
-          ready={{ LINKEDIN: Boolean(identity) && !settings.linkedinNeedsReconnect, EMAIL: email, WHATSAPP: deskcommConfigOf(settings) !== null }}
-        />
-      </div>
+      <ContactForm
+        campaigns={campaigns}
+        ready={{ LINKEDIN: Boolean(identity) && !settings.linkedinNeedsReconnect, EMAIL: email, WHATSAPP: deskcommConfigOf(settings) !== null }}
+      />
     </main>
   );
 }

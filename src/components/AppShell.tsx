@@ -1,11 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import type { ShellData } from "@/lib/shell";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
-import { DesktopTopbar } from "./DesktopTopbar";
 import { ShellProvider } from "./ShellContext";
 
 export function AppShell({ children, data }: { children: React.ReactNode; data: ShellData | null }) {
@@ -18,14 +16,9 @@ export function AppShell({ children, data }: { children: React.ReactNode; data: 
 
   return (
     <ShellProvider value={data}>
-      <div className="app">
+      <div className="frame">
         <Sidebar />
-        <div className="shell">
-          <Suspense>
-            <DesktopTopbar />
-          </Suspense>
-          {children}
-        </div>
+        <div className="frame-main">{children}</div>
         {!hideBottomNav && <BottomNav />}
       </div>
     </ShellProvider>

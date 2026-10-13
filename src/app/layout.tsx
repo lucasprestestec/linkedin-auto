@@ -1,50 +1,40 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Fraunces, Inter } from "next/font/google";
+import { Big_Shoulders, Onest } from "next/font/google";
 import { cookies } from "next/headers";
-import "./globals.css";
-import "./theme.css";
-import "./ui.css";
-import "./lux.css";
+import "./ds.css";
 import { AppShell } from "@/components/AppShell";
 import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
 import { getShellData } from "@/lib/shell";
+import { PREFS_SCRIPT } from "@/lib/prefs";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-// Títulos: Archivo condensada e pesada (eixo de largura), como nos mockups.
-const archivo = Archivo({
+// Uma fonte só em todo o sistema.
+const display = Big_Shoulders({
   subsets: ["latin"],
   variable: "--font-display",
-  axes: ["wdth"],
+  weight: ["700", "800"],
   display: "swap",
 });
 
-// Títulos grandes (saudação, nome das telas): serifada de alto contraste.
-const fraunces = Fraunces({
+const body = Onest({
   subsets: ["latin"],
-  variable: "--font-serif",
-  axes: ["opsz"],
+  variable: "--font-onest",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "LinkedIn Leads",
-  description: "Conversas e leads do LinkedIn",
+  title: "Central Dors",
+  description: "Conversas, acompanhamento e reuniões com seus contatos, por LinkedIn, e-mail e WhatsApp.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Leads",
+    title: "Central Dors",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0c0f",
+  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f5f6fa" }, { media: "(prefers-color-scheme: dark)", color: "#0e1016" }],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -56,7 +46,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const shell = authed ? await getShellData() : null;
 
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${archivo.variable} ${fraunces.variable}`}>
+    <html lang="pt-BR" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
+      </head>
       <body>
         <AppShell data={shell}>{children}</AppShell>
       </body>
