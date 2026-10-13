@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { sendPush } from "@/lib/push";
 import { readableReason } from "@/lib/format";
+import { notifyTeam } from "@/lib/team";
 
 // Passa o lead pro corretor ("Precisa de você") e avisa por push. Um único
 // lugar pra isso: resposta da IA, follow-up, abertura e anexo usam daqui.
 // silent: não manda push (mensagem automática do outro lado; fica na lista "Precisa de você" com o motivo).
-export async function markNeedsHuman(leadId: string, rawReason: string, opts: { silent?: boolean } = {}) {
+// urgent: sinistro, reclamação, jurídico, cancelamento — a equipe marcada pra urgências também é avisada.
+export async function markNeedsHuman(leadId: string, rawReason: string, opts: { silent?: boolean; urgent?: boolean } = {}) {
   const reason = readableReason(rawReason);
   if (reason !== rawReason.trim()) console.error(`[handoff] lead=${leadId} motivo completo:`, rawReason);
   const lead = await prisma.lead.update({
@@ -16,7 +18,8 @@ export async function markNeedsHuman(leadId: string, rawReason: string, opts: { 
   if (opts.silent) return;
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Um lead";
   // Notificação é acessória: falha nela não pode desfazer o handoff.
-  await sendPush({ title: `${name} precisa de você`, body: reason, url: `/leads/${lead.id}`, tag: `lead-${lead.id}` }).catch((err) =>
+  await sendPush({ title: `${opts.urgent ? "Urgente: " : ""}${name} precisa de você`, body: reason, url: `/leads/${lead.id}`, tag: `lead-${lead.id}` }).catch((err) =>
     console.error("Falha ao notificar handoff", err),
   );
+  await notifyTeam(opts.urgent ? "urgent" : "handoff", { title: `${opts.urgent ? "Urgente: " : ""}${name} precisa de atendimento`, body: reason, leadId: lead.id });
 }

@@ -346,7 +346,8 @@ export type AgentDecision = (
   | { action: "reply"; message: string; qualified: boolean; declined: boolean; proposedSlots: Date[]; audioOk: boolean; unsure: boolean }
   | { action: "book"; message: string; slotStart: Date }
   // silent: passou pro corretor sem acordá-lo por push (era uma mensagem automática, não uma pessoa).
-  | { action: "handoff"; reason: string; silent?: boolean }
+  // urgent: sinistro, reclamação, jurídico, cancelamento (a equipe de urgência é avisada).
+  | { action: "handoff"; reason: string; silent?: boolean; urgent?: boolean }
 ) & { analysis: string; model: string; usage: Usage; attempts: number; checkIssues: string[] };
 
 const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
@@ -375,6 +376,10 @@ const RESPOND_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           description: "true se você tem uma resposta razoável mas NÃO tem segurança total (ver EM DÚVIDA). A mensagem vai pro corretor aprovar antes de sair. Só com action = reply.",
         },
         handoff_reason: { type: "string", description: "Motivo curto e específico (obrigatório se action = handoff)." },
+        urgent: {
+          type: "boolean",
+          description: "Só com action = handoff: true se for sinistro, morte ou doença grave, reclamação (inclusive SUSEP, ANS, Procon), assunto jurídico (processo, advogado) ou pedido de cancelamento.",
+        },
         proposed_slots: {
           type: "array",
           items: { type: "string" },
@@ -500,12 +505,13 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
       proposed_slots?: unknown;
       slot_start?: unknown;
       handoff_reason?: string;
+      urgent?: boolean;
     };
     lastAnalysis = out.analysis?.trim() ?? "";
     const base = { analysis: lastAnalysis, model, usage, attempts: attempt };
 
     if (out.action !== "reply" && out.action !== "book") {
-      return { action: "handoff", reason: out.handoff_reason?.trim() || "O agente não soube responder.", ...base, checkIssues: lastIssues };
+      return { action: "handoff", reason: out.handoff_reason?.trim() || "O agente não soube responder.", urgent: Boolean(out.urgent), ...base, checkIssues: lastIssues };
     }
 
     // Quis responder mas esqueceu o texto (alguns modelos põem no content):

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { LeadStatus } from "@prisma/client";
-import { leadAction, markMeeting, type LeadActionKind } from "./actions";
+import { leadAction, markMeeting, markNoShow, type LeadActionKind } from "./actions";
 
 // Botão principal (marcar como oportunidade) e "Mais". Marcar tira a pessoa da
 // automação de abordagem; assumir faz o assistente parar de responder até você devolver.
@@ -78,6 +78,22 @@ export function LeadActions({ leadId, status, profileUrl }: { leadId: string; st
                   Confirmar
                 </button>
               </div>
+            )}
+            {meeting && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  if (!window.confirm("A pessoa faltou? O assistente manda o \"senti sua falta\" e pergunta se quer remarcar.")) return;
+                  startTransition(async () => {
+                    const r = await markNoShow(leadId);
+                    if (r.error) window.alert(r.error);
+                  });
+                }}
+              >
+                Faltou à reunião
+              </button>
             )}
             {(status === "QUALIFIED" || meeting) && (
               <button type="button" role="menuitem" onClick={() => run("handback")}>

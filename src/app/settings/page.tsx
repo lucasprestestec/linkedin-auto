@@ -13,6 +13,9 @@ import { MobileHeader } from "@/components/MobileHeader";
 import { ExclusionListForm } from "./ExclusionListForm";
 import { DailySummaryToggle } from "./DailySummaryToggle";
 import { CalendarForm } from "./CalendarForm";
+import { MeetingRemindersForm } from "./MeetingRemindersForm";
+import { TeamForm } from "./TeamForm";
+import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
 import { googleConfigured } from "@/lib/gmail";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
@@ -108,6 +111,7 @@ export default async function SettingsPage() {
   const voice = parseVoiceSettings(settings.voiceSettings);
   // As sugestões são um extra: se falharem, a tela abre do mesmo jeito.
   const suggestions = await loadSuggestions(style).catch(() => []);
+  const team = await prisma.teamMember.findMany({ orderBy: { createdAt: "asc" } });
 
   return (
     <main className="page page-roomy">
@@ -150,6 +154,32 @@ export default async function SettingsPage() {
             calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
             configured={googleConfigured()}
             workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
+          />
+        </SettingItem>
+        <SettingItem
+          title="Lembretes da reunião"
+          summary={settings.meetingRemindersEnabled ? "Na véspera, 5h e 1h antes, no canal da conversa" : "Desligados"}
+        >
+          <MeetingRemindersForm
+            enabled={settings.meetingRemindersEnabled}
+            texts={{ day: settings.reminderDayText ?? "", h5: settings.reminder5hText ?? "", h1: settings.reminder1hText ?? "", noShow: settings.noShowText ?? "" }}
+            defaults={{ day: DEFAULT_REMINDERS.day, h5: DEFAULT_REMINDERS["5h"], h1: DEFAULT_REMINDERS["1h"], noShow: DEFAULT_REMINDERS.noShow }}
+          />
+        </SettingItem>
+        <SettingItem
+          title="Equipe"
+          summary={team.length ? `${team.length} pessoa${team.length > 1 ? "s" : ""} recebe${team.length > 1 ? "m" : ""} avisos por e-mail/WhatsApp` : "Só você recebe os avisos"}
+        >
+          <TeamForm
+            members={team.map((m) => ({
+              id: m.id,
+              name: m.name,
+              email: m.email ?? "",
+              phone: m.phone ?? "",
+              notifyUrgent: m.notifyUrgent,
+              notifyMeetings: m.notifyMeetings,
+              notifyHandoffs: m.notifyHandoffs,
+            }))}
           />
         </SettingItem>
         <SettingItem

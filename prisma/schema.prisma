@@ -105,6 +105,9 @@ model Lead {
   slotsProposedAt   DateTime?
   // Ela já perguntou "conseguiu ver um horário?" (uma vez só).
   bookingNudgedAt   DateTime?
+  // Lembretes da reunião já resolvidos ("day", "5h", "1h"): enviados ou pulados.
+  // Zera quando a reunião é marcada de novo.
+  meetingReminders  String[]  @default([])
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -293,6 +296,13 @@ model Settings {
   approvalMode        Boolean @default(true)
   // Campanha nova: toda mensagem dela passa por aprovação até completar os dois
   // (dias desde a criação E mensagens enviadas), mesmo com a aprovação desligada.
+  // Lembretes da reunião pro lead (véspera, 5h e 1h antes) e o texto de "faltou".
+  // Texto vazio = o padrão do sistema.
+  meetingRemindersEnabled Boolean @default(true)
+  reminderDayText         String? @db.Text
+  reminder5hText          String? @db.Text
+  reminder1hText          String? @db.Text
+  noShowText              String? @db.Text
   campaignReview         Boolean @default(true)
   campaignReviewDays     Int     @default(14)
   campaignReviewMessages Int     @default(50)
@@ -413,4 +423,20 @@ model CampaignStep {
   notify     Boolean         @default(false)
 
   @@unique([campaignId, position])
+}
+
+// Pessoas da equipe que recebem avisos por e-mail e/ou WhatsApp (além do push
+// do corretor): urgências (sinistro, reclamação, jurídico, cancelamento),
+// reuniões marcadas e avisos de ligação, ou todo "precisa de você".
+model TeamMember {
+  id                     String   @id @default(cuid())
+  name                   String
+  email                  String?
+  phone                  String?
+  // Conversa no Deskcomm reaproveitada pros próximos avisos.
+  whatsappConversationId String?
+  notifyUrgent           Boolean  @default(true)
+  notifyMeetings         Boolean  @default(false)
+  notifyHandoffs         Boolean  @default(false)
+  createdAt              DateTime @default(now())
 }

@@ -17,6 +17,8 @@ import { PROACTIVE_STATUSES } from "@/lib/status";
 import { followUpRuleFor } from "@/lib/followupPolicy";
 import { CHANNEL_LABEL } from "@/lib/channels";
 import { sendPush } from "@/lib/push";
+import { notifyTeam } from "@/lib/team";
+import { sendMeetingReminders } from "@/lib/meetingReminders";
 import { MAX_PENDING_DRAFTS, OPEN_DRAFT_FILTER, deliver, expireDrafts, flushApprovedDrafts, pendingDraftCount } from "@/lib/outbox";
 
 // Parte proativa do cron: o agente fala primeiro e retoma conversas paradas.
@@ -36,6 +38,7 @@ export interface ProactiveResult {
   introEmailsSent: number;
   firstContactsSent: number;
   cadenceStepsSent: number;
+  meetingRemindersSent: number;
   followUpsSent: number;
   waiting: number;
   markedLost: number;
@@ -529,6 +532,7 @@ async function sendCadenceSteps(
       sent++;
       // Passo com aviso (ex.: "tentaremos contato por telefone"): o corretor fica sabendo.
       if (next.notify) {
+        await notifyTeam("meeting", { title: `Hora de ligar para ${name}`, body: `A cadência "${cadenceName}" avisou que vamos ligar.`, leadId: lead.id });
         await sendPush({
           title: `Hora de ligar para ${name}`,
           body: result === "sent" ? "O aviso de ligação foi enviado pela cadência." : "O aviso de ligação está esperando sua aprovação.",
@@ -630,7 +634,7 @@ async function sendBookingNudges(
 }
 
 export async function runProactive(identityId: string | null): Promise<ProactiveResult> {
-  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, cadenceStepsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0, bookingNudgesSent: 0 };
+  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, cadenceStepsSent: 0, meetingRemindersSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0, bookingNudgesSent: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // Rascunho que ninguém decidiu a tempo perde a validade (a conversa andou).
@@ -658,6 +662,12 @@ export async function runProactive(identityId: string | null): Promise<Proactive
 
   // Aprovado fora do horário sai agora que a janela abriu.
   await flushApprovedDrafts().catch((err) => console.error("Falha ao enviar mensagens aprovadas", err));
+
+  // Lembretes da reunião (véspera, 5h, 1h): texto fixo, antes de qualquer outra iniciativa.
+  result.meetingRemindersSent = await sendMeetingReminders(identityId, settings).catch((err) => {
+    console.error("Falha nos lembretes de reunião", err);
+    return 0;
+  });
 
   // Muita coisa esperando o seu OK: a secretária não gera mais nada até você limpar a fila.
   if ((await pendingDraftCount()) >= MAX_PENDING_DRAFTS) return { ...result, skipped: "aprovações pendentes demais: abra Aprovações" };
