@@ -124,7 +124,7 @@ export function AgendaClient({ payload }: { payload: AgendaPayload }) {
         {payload.upcomingMeetings > 0
           ? `${payload.upcomingMeetings} reunião${payload.upcomingMeetings > 1 ? "ões" : ""} marcada${payload.upcomingMeetings > 1 ? "s" : ""} pela frente. `
           : ""}
-        O assistente oferece horários dentro do seu expediente ({built.workHours}), para reuniões de {built.minutes} minutos, com 4 horas de antecedência e só nos próximos 10 dias. <Link href="/settings">Ajustar</Link>
+        O assistente oferece horários dentro do seu expediente ({built.workHours}), para reuniões de {built.minutes} minutos, {built.notice} e só nos próximos 10 dias. <Link href="/settings">Ajustar</Link>
       </p>
     </div>
   );

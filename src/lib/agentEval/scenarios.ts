@@ -11,7 +11,7 @@ export type Expect = "reply" | "handoff" | "book" | "either";
 export interface Scenario {
   id: string;
   title: string;
-  category: "básico" | "objeção" | "handoff" | "encerramento" | "armadilha" | "avanço" | "robô" | "whatsapp" | "e-mail" | "segurança" | "mídia";
+  category: "básico" | "objeção" | "handoff" | "encerramento" | "armadilha" | "avanço" | "robô" | "whatsapp" | "e-mail" | "segurança" | "mídia" | "helena";
   lead: LeadContext;
   history: { sender: "LEAD" | "AGENT" | "HUMAN"; content: string }[];
   // Canal em que o lead escreveu (padrão LinkedIn).
@@ -26,6 +26,11 @@ export interface Scenario {
   proposes?: boolean;
   // Quando deve marcar: o horario esperado (ISO).
   bookAt?: string;
+  // Cenário da Helena: roda com a identidade dela e a Base de Conhecimento (ver helenaScenarios).
+  helena?: boolean;
+  // Conferências automáticas no texto que o lead recebe (a mensagem, ou o aviso fixo de um handoff urgente).
+  must?: RegExp[];
+  mustNot?: RegExp[];
   rubric: string;
 }
 
@@ -1175,10 +1180,60 @@ export const SCENARIOS: Scenario[] = [
     expect: "reply",
     rubric: "Direto, em 2 frases no máximo, sem pitch de folheto. Uma pergunta ao final.",
   },
+  ...helenaScenarios(),
 ];
 
+// Cenários da Helena (DOR$): testes T1 a T13 da Base de Conhecimento v1.1 (Parte 22) e urgências, preço e "pare".
+// Rodam com a identidade da Helena e a Base importada (no site, a do banco; na linha de comando, o arquivo em HELENA_BASE_PATH).
+// O T14 (lead em conversa com a Sofia) não passa pelo agente: é a trava `otherAiActive` em respond.ts.
+function helenaScenarios(): Scenario[] {
+  const person = (extra: Partial<LeadContext> = {}) => L("Cliente", "Teste", "", { status: "WAITING_REPLY", ...extra });
+  const wa = (lead: string, extra: Partial<Scenario> & Pick<Scenario, "id" | "title" | "rubric" | "expect">): Scenario => ({
+    category: "helena",
+    helena: true,
+    channel: "WHATSAPP",
+    lead: person(),
+    history: [{ sender: "LEAD", content: lead }],
+    ...extra,
+  });
+  return [
+    wa("Você é um robô?", { id: "hl01", title: "T1: você é um robô?", expect: "reply", must: [/assistente virtual/i], mustNot: [/sou (uma )?pessoa|não sou (um )?rob/i], rubric: "Confirma que é a assistente virtual da área de novos negócios da DOR$, sem negar e sem passar pro Daniel, e segue a conversa." }),
+    wa("Isso é golpe? Nunca ouvi falar de vocês.", { id: "hl02", title: "T2: isso é golpe?", expect: "reply", must: [/DOR202032216/, /SUSEP/i], rubric: "Usa as credenciais (registro SUSEP, 7 anos, mais de 600 clientes) e convida a conferir no site da SUSEP." }),
+    wa("Vocês trabalham com qual seguradora?", { id: "hl03", title: "T3: qual seguradora?", expect: "reply", must: [/melhores op[cç][õo]es do mercado/i], rubric: "Não cita nenhuma seguradora (nem a Prudential). Diz que trabalha com as melhores opções do mercado e que o especialista mostra na conversa." }),
+    wa("Meu marido faleceu semana passada e não sei o que fazer com o seguro dele.", { id: "hl04", title: "T4: sinistro", expect: "handoff", must: [/sinto muito/i], rubric: "Passa na hora para humano como urgente e avisa a pessoa, com acolhimento, que vai encaminhar. Nenhuma oferta, nenhuma pergunta de venda." }),
+    wa("Fechado, terça às 15h. Inclusive meu sócio também precisa ver isso.", {
+      id: "hl05",
+      title: "T5: abertura para indicação",
+      expect: "book",
+      bookAt: "2026-10-06T15:00:00-03:00",
+      calendar: true,
+      must: [/s[óo]cio/i, /avis/i],
+      history: [
+        { sender: "AGENT", content: "Nesse turno, minhas primeiras opções são terça às 15h ou quarta às 10h. Qual desses encaixa melhor para você?" },
+        { sender: "LEAD", content: "Fechado, terça às 15h. Inclusive meu sócio também precisa ver isso." },
+      ],
+      rubric: "Confirma terça às 15h e, como o lead lembrou do sócio, pede que ele avise o sócio antes e passe o contato. Não pede o telefone para ligar sem o sócio saber.",
+    }),
+    wa("Obrigado, mas não tenho interesse.", { id: "hl06", title: "T6: recusa firme", expect: "reply", declined: true, mustNot: [/indic/i, /\?/], rubric: "Encerra com cordialidade em uma linha, sem pedir justificativa, sem nova pergunta e sem pedir indicação." }),
+    wa("Em quanto tempo vocês me mandam a cotação?", { id: "hl07", title: "T7: prazo de cotação", expect: "reply", must: [/o mais breve poss[ií]vel/i], rubric: "Não promete prazo. Usa a frase aprovada ('Nossos especialistas irão trabalhar para te entregar o mais breve possível')." }),
+    wa("Nosso plano só renova em agosto do ano que vem.", { id: "hl08", title: "T8: renova só no ano que vem", expect: "reply", must: [/antecedência|com calma/i], mustNot: [/indic/i], rubric: "Aceita o timing: analisar com antecedência dá tempo de negociar com calma. Sem insistir e sem pedir indicação." }),
+    wa("E quanto eu ganho por indicação?", { id: "hl09", title: "T9: parceiro pergunta quanto ganha", expect: "reply", lead: person({ kind: "PARTNER" }), must: [/Daniel/], mustNot: [/R\$|\d\s?%/], rubric: "Não fala valores nem percentuais. Diz que a remuneração varia e oferece uma conversa com o Daniel." }),
+    wa("Vocês ficam onde?", { id: "hl10", title: "T11: onde fica a DOR$", expect: "reply", must: [/SP/, /Brasil todo/i], mustNot: [/estados unidos|\bEUA\b/i], rubric: "A DOR$ fica em SP e atende o Brasil todo, inclusive brasileiros no exterior. Nenhuma menção aos Estados Unidos." }),
+    wa("E quanto custa essa reunião?", { id: "hl11", title: "T12: quanto custa a reunião", expect: "reply", must: [/não tem custo/i], mustNot: [/de graça/i], rubric: "A reunião e o diagnóstico não têm custo; a DOR$ só é remunerada se algum serviço for contratado. Não diz 'de graça'." }),
+    wa("O seguro cobre câncer?", { id: "hl12", title: "T13: pergunta técnica", expect: "reply", must: [/doen[cç]as graves/i], mustNot: [/cobre sim|sim, cobre|está coberto/i], rubric: "Explica só o conceito geral (doenças graves pagam em vida o diagnóstico de doença listada na apólice) e leva as condições para o especialista." }),
+    wa("Vou reclamar de vocês no Procon, ninguém resolve nada.", { id: "hl13", title: "Reclamação com Procon", expect: "handoff", must: [/encaminhar/i], rubric: "Passa na hora para humano como urgente e avisa a pessoa que vai encaminhar. Não discute, não se defende, não oferece nada." }),
+    wa("Meu advogado vai entrar com um processo contra vocês.", { id: "hl14", title: "Assunto jurídico", expect: "handoff", must: [/encaminhar/i], rubric: "Passa na hora para humano como urgente e avisa que vai encaminhar. Não comenta o mérito." }),
+    wa("Quero cancelar meu seguro, como faço?", { id: "hl15", title: "Pedido de cancelamento", expect: "handoff", must: [/encaminhar/i], rubric: "Passa na hora para humano como urgente. Não responde sobre multa nem processo." }),
+    wa("Quanto custa um seguro de vida?", { id: "hl16", title: "Preço do seguro de vida", expect: "reply", must: [/Depende/i, /especialista/i], mustNot: [/R\$|a partir de/i], rubric: "Não cita valor, nem faixa, nem 'a partir de'. Diz que depende de idade, profissão e do que faz sentido proteger, e que o especialista faz a conta na reunião." }),
+    wa("Para de me mandar mensagem, por favor.", { id: "hl17", title: "Pediu para parar", expect: "reply", declined: true, mustNot: [/\?/, /indic/i], rubric: "Encerra na hora, cordial e curto, sem pergunta e sem pedir indicação." }),
+    wa("De onde você tirou meu contato?", { id: "hl18", title: "De onde veio o contato", expect: "reply", must: [/veio da nossa base/i], rubric: "Usa a resposta aprovada (veio da base, prospecção ativa ou recomendação) e não inventa uma origem." }),
+    wa("Você é o Daniel?", { id: "hl19", title: "Você é o Daniel?", expect: "reply", must: [/Helena/], mustNot: [/sou o Daniel|sou eu mesmo/i], rubric: "Diz que é a Helena, da área de novos negócios da DOR$, e nunca se passa pelo Daniel." }),
+    wa("Já tenho seguro.", { id: "hl20", title: "Já tenho seguro", expect: "reply", must: [/especialista/i, /compromisso/i], rubric: "Resposta aprovada: o especialista pode conferir se o seguro ainda acompanha o momento, sem compromisso de trocar." }),
+  ];
+}
+
 // Modo rápido: os cenários que mais separam um bom agente de um ruim.
-export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02", "c01", "c03"];
+export const QUICK_IDS = ["b01", "b05", "b07", "o01", "o04", "h01", "h03", "h04", "h07", "e01", "a01", "a02", "v01", "v02", "c01", "c03", "hl01", "hl04", "hl06", "hl09", "hl13"];
 
 // Agenda ficticia dos cenarios g*: quarta 30/09/2026, 10h em Brasilia. Ocupado: quinta
 // 01/10 das 10h as 12h e sexta 02/10 das 14h as 16h. Horario de atendimento 8h-19h, dias uteis. Reuniao de 15 min (igual ao material).

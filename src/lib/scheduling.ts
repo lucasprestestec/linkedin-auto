@@ -16,12 +16,15 @@ export interface BookingPlan {
   minutes: number;
 }
 
-export function meetingRules(settings: Pick<Settings, "workStartHour" | "workEndHour" | "workWeekdaysOnly" | "meetingMinutes">): SlotRules {
+export function meetingRules(settings: Pick<Settings, "workStartHour" | "workEndHour" | "workWeekdaysOnly" | "meetingMinutes"> & Partial<Pick<Settings, "assistantName">>): SlotRules {
+  // Assistente com nome próprio (Helena): oferece 2 horários, a partir do próximo dia útil (Base, Parte 6).
+  const named = Boolean(settings.assistantName?.trim());
   return {
     workStartHour: settings.workStartHour,
     workEndHour: settings.workEndHour,
     workWeekdaysOnly: settings.workWeekdaysOnly,
     minutes: settings.meetingMinutes,
+    ...(named ? { fromNextBusinessDay: true, offerCount: 2 } : {}),
   };
 }
 
@@ -29,10 +32,12 @@ export function meetingRules(settings: Pick<Settings, "workStartHour" | "workEnd
 // leitura do Google pra dar pra testar com uma agenda fictícia.
 export function calendarContextFrom(busy: Busy[], now: Date, rules: SlotRules): CalendarContext {
   const starts = freeStarts(busy, now, rules);
+  const offerCount = rules.offerCount ?? 3;
   return {
     minutes: rules.minutes,
+    offerCount,
     windows: describeWindows(starts, rules),
-    suggestions: suggestSlots(starts, 3).map((start) => ({ start, label: formatSlot(start), iso: slotIso(start) })),
+    suggestions: suggestSlots(starts, offerCount).map((start) => ({ start, label: formatSlot(start), iso: slotIso(start) })),
     check: (start) => checkSlot(start, busy, now, rules),
   };
 }
@@ -58,7 +63,7 @@ export async function bookMeeting(lead: Pick<Lead, "firstName" | "lastName" | "e
   const start = new Date(plan.startIso);
   const busy = await listBusy(new Date(start.getTime() - DAY_MS), new Date(start.getTime() + DAY_MS));
   // Aqui a antecedência mínima não vale: o corretor pode ter aprovado em cima da hora.
-  const check = checkSlot(start, busy, new Date(), { ...meetingRules(settings), minutes: plan.minutes, noticeHours: 0 });
+  const check = checkSlot(start, busy, new Date(), { ...meetingRules(settings), minutes: plan.minutes, noticeHours: 0, fromNextBusinessDay: false });
   if (!check.ok) throw new Error(`O horário ${formatSlot(start)} não está mais livre (${check.reason}). Combine outro com a pessoa.`);
 
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "contato";

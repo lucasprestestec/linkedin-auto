@@ -25,6 +25,7 @@ import { StyleOverview } from "./StyleOverview";
 import { VoiceOverview } from "./VoiceOverview";
 import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
 import { fishConfigured } from "@/lib/voice/fish";
+import { noticeLabel } from "@/lib/slots";
 import type { Tone } from "@/components/IconChip";
 import { IconCalendar, IconChevronRight, IconLayers, IconSparkles, IconTarget } from "@/components/Icons";
 
@@ -154,6 +155,7 @@ export default async function SettingsPage() {
             calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
             configured={googleConfigured()}
             workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
+            notice={noticeLabel({ fromNextBusinessDay: Boolean(settings.assistantName?.trim()) })}
           />
         </SettingItem>
         <SettingItem

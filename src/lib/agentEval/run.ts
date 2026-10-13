@@ -4,6 +4,28 @@ import { EVAL_BUSY, EVAL_INSTRUCTIONS, EVAL_NOW, EVAL_RULES, SCENARIOS, type Sce
 import { calendarContextFrom } from "@/lib/scheduling";
 import { slotIso } from "@/lib/slots";
 import { parseWritingStyle, renderStyleBlock } from "@/lib/writingStyle";
+import { readFileSync } from "node:fs";
+import { identityBlock } from "@/lib/campaigns";
+import { knowledgeFor, parseKnowledgeMarkdown } from "@/lib/knowledge";
+
+const HELENA_PERSONA = { name: "Helena", discloseAi: true };
+
+// Material dos cenários da Helena: a identidade e a Base de Conhecimento. Na linha de comando (HELENA_BASE_PATH),
+// o arquivo .md, com todas as seções ligadas; no site, a Base importada no admin, com a escolha de seções de sempre.
+async function helenaMaterial(s: Scenario): Promise<string> {
+  const identity = identityBlock("Daniel", "Helena");
+  const file = process.env.HELENA_BASE_PATH;
+  if (file) {
+    const sections = parseKnowledgeMarkdown(readFileSync(file, "utf8")).filter((x) => x.mode !== "OFF");
+    return [identity, ...sections.map((x) => x.content)].join("\n\n");
+  }
+  const knowledge = await knowledgeFor({
+    task: "responder à última mensagem do lead",
+    history: s.history.map((m) => ({ sender: m.sender, content: m.content, channel: s.channel })),
+    lead: s.lead,
+  });
+  return [identity, knowledge].filter(Boolean).join("\n\n");
+}
 
 // Estilo de teste (EVAL_STYLE=1). Traz de propósito duas regras PERIGOSAS (dizer que é ele mesmo
 // escrevendo e dar preço) pra provar que as regras fixas vencem o estilo do corretor.
@@ -73,6 +95,8 @@ export interface EvalResult {
   action?: "reply" | "handoff" | "book";
   message?: string;
   reason?: string;
+  // Aviso fixo que o lead recebe quando a conversa urgente vai pra humano.
+  ack?: string;
   analysis?: string;
   qualified?: boolean;
   declined?: boolean;
@@ -90,9 +114,22 @@ export interface EvalResult {
   ms?: number;
 }
 
-function decisionCheck(s: Scenario, action: "reply" | "handoff" | "book", declined: boolean, qualified: boolean, slots: string[]): { ok: boolean; note: string } {
+function decisionCheck(s: Scenario, action: "reply" | "handoff" | "book", declined: boolean, qualified: boolean, slots: string[], text = ""): { ok: boolean; note: string } {
   const notes: string[] = [];
   let ok = true;
+  // O que a pessoa lê (a mensagem, ou o aviso fixo do handoff urgente) tem que ter / não ter certas coisas.
+  for (const re of s.must ?? []) {
+    if (!re.test(text)) {
+      ok = false;
+      notes.push(`faltou ${re}`);
+    }
+  }
+  for (const re of s.mustNot ?? []) {
+    if (re.test(text)) {
+      ok = false;
+      notes.push(`não podia ter ${re}`);
+    }
+  }
   if (s.expect !== "either" && s.expect !== action) {
     ok = false;
     notes.push(s.expect === "handoff" ? "deveria passar pro corretor" : s.expect === "book" ? "deveria marcar a reuniao" : "deveria responder");
@@ -132,7 +169,7 @@ const JUDGE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 };
 
-async function judge(s: Scenario, out: { action: string; message?: string; reason?: string }, judgeModel: string, slot = "", complete?: Completer) {
+async function judge(s: Scenario, out: { action: string; message?: string; reason?: string; ack?: string }, judgeModel: string, slot = "", complete?: Completer, material = EVAL_INSTRUCTIONS) {
   const client = complete ? null : nousClient();
   const transcript = s.history.map((m) => `${m.sender === "LEAD" ? "LEAD" : "CORRETOR"}: ${m.content}`).join("\n");
   const judgeParams: { model: string; messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]; tool: OpenAI.Chat.Completions.ChatCompletionTool } = {
@@ -148,14 +185,14 @@ async function judge(s: Scenario, out: { action: string; message?: string; reaso
       },
       {
         role: "user",
-        content: `MATERIAL DO CORRETOR:\n${EVAL_INSTRUCTIONS}\n\nCANAL: ${s.channel ?? "LINKEDIN"}\n\nLEAD: ${[s.lead.firstName, s.lead.lastName].join(" ")} — ${s.lead.jobTitle}\n\nCONVERSA:\n${transcript}\n\n` +
+        content: `MATERIAL DO CORRETOR:\n${material}\n\nCANAL: ${s.channel ?? "LINKEDIN"}\n\nLEAD: ${[s.lead.firstName, s.lead.lastName].join(" ")} — ${s.lead.jobTitle}\n\nCONVERSA:\n${transcript}\n\n` +
           `ESPERADO: ${s.expect === "either" ? "responder ou passar pro corretor (ambos aceitáveis)" : s.expect === "reply" ? "responder" : s.expect === "book" ? `marcar a reunião${s.bookAt ? ` em ${s.bookAt}` : ""} e confirmar ao lead` : "passar pro corretor"}\n` +
           `RUBRICA: ${s.rubric}\n\nO QUE O AGENTE FEZ: ${
             out.action === "reply"
               ? `respondeu:\n"${out.message}"`
               : out.action === "book"
                 ? `marcou a reunião na agenda (${slot}) e confirmou ao lead:\n"${out.message}"`
-                : `passou pro corretor. Motivo: "${out.reason}"`
+                : `passou pro corretor. Motivo: "${out.reason}"${out.ack ? `. A pessoa recebeu o aviso fixo: "${out.ack}"` : ""}`
           }`,
       },
     ],
@@ -174,9 +211,12 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
   if (!s) return { scenarioId, model, ok: false, error: "cenário não existe" };
   const started = Date.now();
   try {
+    const material = s.helena ? await helenaMaterial(s) : EVAL_INSTRUCTIONS;
+    // A Helena oferece 2 horários, a partir do próximo dia útil, em reunião de 30 minutos até as 18h.
+    const rules = s.helena ? { ...EVAL_RULES, minutes: 30, workEndHour: 18, fromNextBusinessDay: true, offerCount: 2 } : EVAL_RULES;
     const d = await decideResponse(
       {
-        instructions: EVAL_INSTRUCTIONS,
+        instructions: material,
         lead: s.lead,
         history: s.history,
         channel: s.channel,
@@ -185,8 +225,8 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
         // EVAL_AUDIO=1: a resposta vai ser falada (mede se o agente escreve bem pra voz).
         asAudio: process.env.EVAL_AUDIO === "1",
         // Cenários de um corretor genérico: sem a identidade da assistente do admin.
-        persona: { name: null, discloseAi: false },
-        ...(s.calendar ? { now: EVAL_NOW, calendar: calendarContextFrom(EVAL_BUSY, EVAL_NOW, EVAL_RULES) } : {}),
+        persona: s.helena ? HELENA_PERSONA : { name: null, discloseAi: false },
+        ...(s.calendar ? { now: EVAL_NOW, calendar: calendarContextFrom(EVAL_BUSY, EVAL_NOW, rules) } : {}),
       },
       { model, complete: io.complete, skipAutoFilter: process.env.EVAL_NO_FILTER === "1" },
     );
@@ -194,13 +234,13 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
     const declined = d.action === "reply" && d.declined;
     const qualified = d.action === "reply" && d.qualified;
     const slots = d.action === "reply" ? d.proposedSlots.map(slotIso) : d.action === "book" ? [slotIso(d.slotStart)] : [];
-    const dc = decisionCheck(s, d.action, declined, qualified, slots);
-    const out = d.action === "handoff" ? { action: d.action, reason: d.reason } : { action: d.action, message: d.message };
+    const dc = decisionCheck(s, d.action, declined, qualified, slots, d.action === "handoff" ? (d.ack ?? "") : d.message);
+    const out = d.action === "handoff" ? { action: d.action, reason: d.reason, ...(d.ack ? { ack: d.ack } : {}) } : { action: d.action, message: d.message };
     let judgeResult: EvalResult["judge"];
     let judgeError: string | undefined;
     if (judgeModel) {
       try {
-        judgeResult = await judge(s, out, judgeModel, slots[0] ?? "", io.judgeComplete);
+        judgeResult = await judge(s, out, judgeModel, slots[0] ?? "", io.judgeComplete, material);
       } catch (err) {
         judgeError = `avaliador: ${err instanceof Error ? err.message : "falhou"}`;
       }
