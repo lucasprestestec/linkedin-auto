@@ -184,6 +184,8 @@ export async function runScenario(scenarioId: string, model: string, judgeModel:
         style: evalStyle(),
         // EVAL_AUDIO=1: a resposta vai ser falada (mede se o agente escreve bem pra voz).
         asAudio: process.env.EVAL_AUDIO === "1",
+        // Cenários de um corretor genérico: sem a identidade da assistente do admin.
+        persona: { name: null, discloseAi: false },
         ...(s.calendar ? { now: EVAL_NOW, calendar: calendarContextFrom(EVAL_BUSY, EVAL_NOW, EVAL_RULES) } : {}),
       },
       { model, complete: io.complete, skipAutoFilter: process.env.EVAL_NO_FILTER === "1" },

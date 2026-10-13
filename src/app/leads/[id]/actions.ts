@@ -147,7 +147,7 @@ export async function suggestLeadReply(leadId: string, channel: MessageChannel =
   try {
     const lead = await leadWithHistory(leadId);
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-    return { text: await suggestReply(await instructionsFor(lead, settings), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN") };
+    return { text: await suggestReply(await instructionsFor(lead, settings, { task: "sugerir a próxima resposta ao lead", history: lead.messages }), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN") };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
   }

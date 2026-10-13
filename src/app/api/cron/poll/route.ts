@@ -27,11 +27,13 @@ export async function GET(request: Request) {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const canReplyNow = settings.automationPaused || isWithinWorkHours(settings);
+  // Responder pode ser a qualquer hora (opção do admin); INICIAR conversa
+  // (abertura, retomada) continua preso ao horário, em runProactive.
+  const canReplyNow = settings.automationPaused || settings.replyAnytime || isWithinWorkHours(settings);
   const identityId = await activeIdentityIdOrNull();
 
   // E-mail primeiro (independe do LinkedIn): grava o que chegou e responde pelo
-  // mesmo canal. Fora do horário a resposta espera, como no LinkedIn.
+  // mesmo canal. Fora do horário a resposta espera (salvo "responder a qualquer hora").
   let email: { read: number; saved: number; error?: string } = { read: 0, saved: 0 };
   try {
     const r = await syncEmailInbox();
@@ -73,8 +75,8 @@ export async function GET(request: Request) {
 
       // Uma resposta por conversa, depois de gravar tudo que chegou — o agente
       // lê o histórico completo, então vê todas as mensagens novas de uma vez.
-      // Fora do horário de trabalho a resposta espera: runProactive responde
-      // quando a janela abrir. Pausado responde na hora (marca pra você).
+      // Fora do horário de trabalho (sem "responder a qualquer hora") a resposta
+      // espera: runProactive responde quando a janela abrir. Pausado marca pra você.
       if (result.shouldRespond && canReplyNow) {
         await handleIncomingMessage(result.lead, identityId);
       }

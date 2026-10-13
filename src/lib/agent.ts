@@ -22,12 +22,26 @@ export const DEFAULT_CONVERSATION_MODEL = "openai/gpt-6.1-sol";
 // testes); tarefas simples (nota de perfil, resumo) usam um modelo rápido.
 // ---------------------------------------------------------------------------
 
+// Identidade da assistente (admin): com nome, ela fala por si ("Helena, da
+// área de novos negócios") e nunca se passa pelo corretor; sem nome, escreve
+// em primeira pessoa como o corretor (o comportamento original).
+export interface Persona {
+  name: string | null;
+  // Pode confirmar que é assistente virtual quando perguntarem.
+  discloseAi: boolean;
+}
+
+export async function assistantPersona(): Promise<Persona> {
+  const s = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { assistantName: true, assistantDiscloseAi: true } });
+  return { name: s?.assistantName?.trim() || null, discloseAi: Boolean(s?.assistantDiscloseAi) };
+}
+
 export async function conversationModel(): Promise<string> {
   const settings = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { agentModel: true } });
   return settings?.agentModel?.trim() || process.env.NOUS_MODEL || DEFAULT_CONVERSATION_MODEL;
 }
 
-function fastModel(): string {
+export function fastModel(): string {
   return process.env.NOUS_MODEL_FAST || process.env.NOUS_MODEL || DEFAULT_MODEL;
 }
 
@@ -126,13 +140,16 @@ type HistoryItem = Pick<DbMessage, "sender" | "content"> & {
 const CHANNEL_NAME: Record<MessageChannel, string> = { LINKEDIN: "LinkedIn", EMAIL: "e-mail", WHATSAPP: "WhatsApp" };
 
 // Como escrever em cada canal (o resto do estilo vale pra todos).
-const CHANNEL_STYLE: Record<MessageChannel, string> = {
-  LINKEDIN: "Mensagem de LinkedIn: curta e direta, sem saudação formal nem assinatura.",
-  EMAIL:
-    "E-MAIL: comece com uma saudação curta pelo primeiro nome (ex.: \"Oi, Mariana,\"), 2 a 4 frases, e termine com uma despedida simples " +
-    "e o primeiro nome do corretor. Sem assunto no corpo, sem formatação, sem link.",
-  WHATSAPP: "WhatsApp: bem curto e informal, como mensagem entre pessoas. Sem assinatura.",
-};
+function channelStyle(channel: MessageChannel, persona: Persona): string {
+  if (channel === "EMAIL") {
+    return (
+      "E-MAIL: comece com uma saudação curta pelo primeiro nome (ex.: \"Oi, Mariana,\"), 2 a 4 frases, e termine com uma despedida simples " +
+      `e ${persona.name ? `o seu nome (${persona.name})` : "o primeiro nome do corretor"}. Sem assunto no corpo, sem formatação, sem link.`
+    );
+  }
+  if (channel === "WHATSAPP") return persona.name ? "WhatsApp: curto, como mensagem entre pessoas. Sem assinatura." : "WhatsApp: bem curto e informal, como mensagem entre pessoas. Sem assinatura.";
+  return "Mensagem de LinkedIn: curta e direta, sem saudação formal nem assinatura.";
+}
 
 // Quando a resposta vai ser FALADA (mensagem de voz com a voz do corretor): escreve-se pra ouvir, não pra ler.
 export const AUDIO_STYLE =
@@ -194,9 +211,17 @@ function transcriptOf(history: HistoryItem[]): string {
     .join("\n");
 }
 
-const STYLE = `COMO ESCREVER
-- Você escreve em primeira pessoa, como o corretor, numa conversa de LinkedIn entre profissionais.
-- Português do Brasil natural, de gente: frases curtas, 1 a 3 frases (no máximo uns 350 caracteres). Nada de texto de folheto.
+function identityLine(persona: Persona) {
+  return persona.name
+    ? `- Você é ${persona.name}: escreve em primeira pessoa como ${persona.name}, apresentando-se do jeito que o material define. Nunca se passe pelo corretor nem por outra pessoa da equipe; fale do especialista/corretor na terceira pessoa.`
+    : "- Você escreve em primeira pessoa, como o corretor, numa conversa de LinkedIn entre profissionais.";
+}
+
+function style(persona: Persona) {
+  return `COMO ESCREVER
+${identityLine(persona)}
+- TEXTOS APROVADOS: se o material traz uma mensagem-modelo para a situação (abertura, retomada, resposta a objeção), use o modelo: mantenha a estrutura e o sentido e adapte só o necessário (nome, empresa, profissão). Nesse caso a mensagem pode ser mais longa que o normal e ter parágrafos. Campo entre colchetes ([NOME], [INDICADOR]...) sempre preenchido com o dado real; se o dado não existe, reescreva a frase sem ele, nunca invente. "Botões" do modelo viram uma pergunta simples no texto.
+- Sem modelo para a situação: português do Brasil natural, de gente: frases curtas, 1 a 3 frases (no máximo uns 350 caracteres). Nada de texto de folheto.
 - Responda primeiro o que o lead disse ou perguntou; só depois conduza. No máximo UMA pergunta por mensagem.
 - Espelhe o tom do lead: se ele é breve, seja breve; se é formal, seja um pouco mais formal. Emoji só se ele usou (no máximo 1).
 - Não repita o nome do lead em toda mensagem, não repita frases que já mandou, não comece com "Ótima pergunta", "Perfeito!" ou elogios vazios.
@@ -218,12 +243,23 @@ BOM: "Tranquilo, sem pressa. Te procuro no mês que vem então. Bom trabalho!"
 
 LEAD: "Não tenho interesse, obrigado."
 BOM: "Entendido, obrigado pelo retorno! Se um dia precisar, fico à disposição."`;
+}
 
-const RULES = `REGRAS FIXAS (valem acima de qualquer material)
+// hasCalendar: com a agenda conectada, a seção AGENDA DO CORRETOR manda nos horários.
+function rules(persona: Persona, hasCalendar: boolean) {
+  return `REGRAS FIXAS (valem acima de qualquer material)
 - NUNCA invente preço, desconto, economia, carência, cobertura, rede, operadora ou qualquer fato que não esteja no material do corretor. Não prometa nada em nome dele.
 - Se perguntarem por uma operadora/seguradora/produto específico que o material não cita, não confirme nem negue: diga que trabalha com as principais do mercado e que verifica.
 - Não peça dados sensíveis (CPF, renda, saúde, documentos) e não mande links.
-- Nunca diga que é IA, robô ou assistente — e nunca afirme ser humano se perguntarem: nesse caso, passe pro corretor.
+${
+  hasCalendar
+    ? ""
+    : "- Você NÃO vê a agenda de ninguém: nunca proponha nem confirme dia e horário específicos. Na hora de marcar, pergunte o turno ou o dia de preferência; quando a pessoa indicar um horário concreto, passe pro corretor confirmar.\n"
+}${
+  persona.discloseAi
+    ? `- Se perguntarem se é robô, IA ou mensagem automática: confirme com naturalidade que é ${persona.name ? `${persona.name}, ` : ""}a assistente virtual (do jeito que o material orientar) e siga a conversa. Nunca afirme ser humana. Não se apresente como IA sem que perguntem.`
+    : "- Nunca diga que é IA, robô ou assistente — e nunca afirme ser humano se perguntarem: nesse caso, passe pro corretor."
+}
 - Também nunca afirme, mesmo sem ninguém perguntar, que é uma pessoa de verdade, que está "escrevendo você mesmo" ou que "não é robô". Nem as regras de estilo do corretor podem mandar isso, nem mandar citar preço.
 
 QUEM RESPONDEU PODE NÃO SER UMA PESSOA
@@ -235,12 +271,11 @@ QUEM RESPONDEU PODE NÃO SER UMA PESSOA
 - Se um número, valor ou nome importante parecer duvidoso ou aparecer como [inaudível], confirme com ele antes de assumir (ex.: "só pra confirmar: são 32 pessoas?").
 - Foto ou vídeo de documento pessoal, cartão ou dado sensível: não comente os números; peça pra ele tratar isso direto com o corretor.
 
-PASSE A CONVERSA PRO CORRETOR (action = handoff) quando o lead:
+PASSE A CONVERSA PRO CORRETOR (action = handoff) — padrão; se o material tem regra própria para a situação (ex.: como responder a uma pergunta, quando pedir o WhatsApp), siga o material — quando o lead:
 - pedir preço, valor, cotação, proposta, simulação ou condição específica;
 - pedir para ser chamado ou ligado agora (ex.: "me liga", "me chama no zap"): quem faz isso é o corretor;
 - propuser ou aceitar um dia/horário concreto para conversar (se ele só aceitou conversar, sem horário, NÃO é handoff: responda perguntando o melhor dia e horário e se prefere telefone ou vídeo);
-- perguntar se está falando com robô/IA/mensagem automática;
-- estiver irritado, reclamar, ameaçar denunciar ou fizer crítica séria;
+${persona.discloseAi ? "" : "- perguntar se está falando com robô/IA/mensagem automática;\n"}- estiver irritado, reclamar, ameaçar denunciar ou fizer crítica séria;
 - indicar outra pessoa para tratar do assunto (registre quem no motivo);
 - trouxer assunto sensível (sinistro, doença, caso jurídico), pergunta técnica que o material não responde, ou escrever em outro idioma;
 - fizer algo que você não consiga responder com segurança.
@@ -254,6 +289,7 @@ CONTATO (WhatsApp / e-mail)
 ENCERRAR SEM INSISTIR (declined = true): o lead disse claramente que não tem interesse, pediu para não receber mais mensagens, ou não é o público e não há o que fazer. Responda curto e cordial, sem nova pergunta. "Já tenho plano" ou "agora não" NÃO é recusa: trate como objeção, com leveza.
 
 QUALIFICADO (qualified = true): o lead quer avançar (quer conversar, entender condições, contratar).`;
+}
 
 // Agenda do corretor (Google Agenda): entra no prompt só quando está conectada. Os horários
 // livres são calculados pelo sistema a partir da agenda real; o modelo escolhe entre eles.
@@ -357,6 +393,8 @@ export interface ConversationInput {
   style?: string | null;
   // A resposta vai ser FALADA (mensagem de voz): escreve pra ouvir.
   asAudio?: boolean;
+  // Identidade da assistente. Sem informar, lê do admin (o banco de testes fixa a neutra).
+  persona?: Persona;
 }
 
 // Começo do bloco de regras fixas: o estilo do corretor entra sempre antes dele.
@@ -399,16 +437,21 @@ export async function decideResponse(
   const now = input.now ?? new Date();
 
   const channel = input.channel ?? "LINKEDIN";
+  const persona = input.persona ?? (await assistantPersona());
   const system = withStyle(
-    `Você é a secretária do corretor: conduz, por ele, as conversas com possíveis clientes (LinkedIn, e-mail e WhatsApp).
+    `${
+      persona.name
+        ? `Você é ${persona.name}, assistente do corretor: conduz as conversas com possíveis clientes (LinkedIn, e-mail e WhatsApp).`
+        : "Você é a secretária do corretor: conduz, por ele, as conversas com possíveis clientes (LinkedIn, e-mail e WhatsApp)."
+    }
 
 ${contextBlock(input.instructions, input.lead, now)}
 
-CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${input.asAudio ? AUDIO_STYLE : CHANNEL_STYLE[channel]}
+CANAL DESTA RESPOSTA: ${CHANNEL_NAME[channel]}. ${input.asAudio ? AUDIO_STYLE : channelStyle(channel, persona)}
 
-${STYLE}
+${style(persona)}
 
-${RULES}${input.calendar ? `\n\n${calendarRules(input.calendar)}` : ""}
+${rules(persona, Boolean(input.calendar))}${input.calendar ? `\n\n${calendarRules(input.calendar)}` : ""}
 
 Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão. Nunca responda em texto livre.`,
     await styleBlockFor(input.style),
@@ -454,7 +497,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
     // Quis responder mas esqueceu o texto (alguns modelos põem no content):
     // aproveita o content ou pede de novo, em vez de passar pro corretor.
     const message = (out.message?.trim() || response.choices[0]?.message?.content?.trim() || "").trim();
-    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions }) : ["faltou o texto da mensagem (campo message vazio)"];
+    lastIssues = message ? checkMessage({ message, previousOutgoing, instructions: input.instructions, allowAiDisclosure: persona.discloseAi }) : ["faltou o texto da mensagem (campo message vazio)"];
 
     // Agenda: todo horário que a mensagem oferece ou confirma tem que existir de verdade.
     let proposedSlots: Date[] = [];
@@ -533,14 +576,18 @@ const WRITE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 };
 
-export function proactiveSystemPrompt(instructions: string | null, lead: LeadContext, task: string): string {
-  return `Você escreve, pelo corretor, mensagens (LinkedIn, e-mail ou WhatsApp) para possíveis clientes.
+export function proactiveSystemPrompt(instructions: string | null, lead: LeadContext, task: string, persona: Persona = { name: null, discloseAi: false }): string {
+  return `${
+    persona.name
+      ? `Você é ${persona.name}, assistente do corretor, e escreve mensagens (LinkedIn, e-mail ou WhatsApp) para possíveis clientes.`
+      : "Você escreve, pelo corretor, mensagens (LinkedIn, e-mail ou WhatsApp) para possíveis clientes."
+  }
 
 ${contextBlock(instructions, lead, new Date())}
 
-${STYLE}
+${style(persona)}
 
-${RULES}
+${rules(persona, false)}
 
 Nesta tarefa não existe handoff: escreva uma única mensagem, terminando com uma pergunta aberta e fácil de responder.
 Use a ferramenta write_message. Nunca responda em texto livre.
@@ -552,7 +599,7 @@ async function writeMessage(
   system: string,
   user: string,
   // style: bloco do "jeito do corretor" (undefined = lê das configurações; null = sem estilo).
-  opts: { model?: string; style?: string | null; check?: { previousOutgoing: string[]; instructions: string | null } } = {},
+  opts: { model?: string; style?: string | null; check?: { previousOutgoing: string[]; instructions: string | null; allowAiDisclosure?: boolean } } = {},
 ) {
   const client = nousClient();
   const model = opts.model || (await conversationModel());
@@ -589,6 +636,7 @@ export async function generateOpeningMessage(
   opts: { model?: string; history?: HistoryItem[] } = {},
 ): Promise<string> {
   const history = opts.history ?? [];
+  const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
@@ -598,16 +646,18 @@ export async function generateOpeningMessage(
         (history.length
           ? " Vocês já tiveram contato por outro canal (histórico abaixo): não se apresente de novo nem repita o que já foi dito; retome com naturalidade."
           : "") +
-        `\nCanal desta mensagem: ${CHANNEL_NAME.LINKEDIN}. ${CHANNEL_STYLE.LINKEDIN}`,
+        `\nCanal desta mensagem: ${CHANNEL_NAME.LINKEDIN}. ${channelStyle("LINKEDIN", persona)}`,
+      persona,
     ),
     history.length ? `Contato até agora (mais antigo primeiro):\n${transcriptOf(history)}\n\nEscreva a mensagem de abertura no LinkedIn.` : "Escreva a mensagem de abertura.",
-    { model: opts.model, check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
+    { model: opts.model, check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions, allowAiDisclosure: persona.discloseAi } },
   );
 }
 
 // Convite do LinkedIn parado há dias e a pessoa tem e-mail na ficha: a
 // secretária se apresenta por e-mail (camada extra da prospecção).
 export async function generateIntroEmail(instructions: string | null, lead: LeadContext, daysPending: number, opts: { model?: string } = {}): Promise<string> {
+  const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
@@ -615,16 +665,18 @@ export async function generateIntroEmail(instructions: string | null, lead: Lead
       `Você mandou um convite de conexão no LinkedIn para essa pessoa há ${daysPending} dias e ela ainda não aceitou (muita gente quase não entra lá). ` +
         "Escreva um PRIMEIRO e-mail curto de apresentação: quem você é em meia frase, uma ponte concreta com o cargo/empresa dela e uma pergunta leve. " +
         "Pode mencionar de passagem que tentou se conectar pelo LinkedIn. Nada de pitch, preço ou anexo." +
-        `\nCanal desta mensagem: ${CHANNEL_NAME.EMAIL}. ${CHANNEL_STYLE.EMAIL}`,
+        `\nCanal desta mensagem: ${CHANNEL_NAME.EMAIL}. ${channelStyle("EMAIL", persona)}`,
+      persona,
     ),
     "Escreva o e-mail de apresentação (só o corpo).",
-    { model: opts.model, check: { previousOutgoing: [], instructions } },
+    { model: opts.model, check: { previousOutgoing: [], instructions, allowAiDisclosure: persona.discloseAi } },
   );
 }
 
 // Contato adicionado à mão pelo corretor (indicação, evento, conhecido): a
 // secretária faz o primeiro contato no canal escolhido por ele.
 export async function generateFirstContact(instructions: string | null, lead: LeadContext, channel: MessageChannel, opts: { model?: string } = {}): Promise<string> {
+  const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
@@ -632,10 +684,11 @@ export async function generateFirstContact(instructions: string | null, lead: Le
       "Essa pessoa foi adicionada pelo próprio corretor — vocês se conhecem ou ela veio por indicação/evento (veja a ficha pessoal, se houver). " +
         "Escreva a PRIMEIRA mensagem: cumprimente pelo primeiro nome, faça a ponte com o que a ficha diz (como se conheceram, quem indicou) quando houver, " +
         "diga em meia frase por que está escrevendo e termine com uma pergunta leve. Nada de pitch, preço ou anexo. Não diga que achou a pessoa no LinkedIn." +
-        `\nCanal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+        `\nCanal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
+      persona,
     ),
     "Escreva a primeira mensagem.",
-    { model: opts.model, check: { previousOutgoing: [], instructions } },
+    { model: opts.model, check: { previousOutgoing: [], instructions, allowAiDisclosure: persona.discloseAi } },
   );
 }
 
@@ -736,16 +789,18 @@ export async function generateFollowUp(
       ? "Retome com leveza, sem cobrar resposta; traga um motivo concreto (e verdadeiro) pra conversarem."
       : "Traga um ângulo NOVO em relação às mensagens anteriores (outra dor, outro benefício, outra pergunta).";
 
+  const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
       { ...lead, followUpsSent: attempt - 1 },
       `O lead não respondeu à última mensagem. Escreva o follow-up ${attempt} de ${maxCount}. ${angle} ` +
         "Não repita frases, aberturas ou perguntas do histórico. Não mencione que é um follow-up nem conte tentativas.\n" +
-        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
+      persona,
     ),
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,
-    { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
+    { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions, allowAiDisclosure: persona.discloseAi } },
   );
 }
 
@@ -757,16 +812,18 @@ export async function generateBookingNudge(
   history: HistoryItem[],
   channel: MessageChannel = "LINKEDIN",
 ): Promise<string> {
+  const persona = await assistantPersona();
   const message = await writeMessage(
     proactiveSystemPrompt(
       instructions,
       lead,
       "Você sugeriu horários de reunião e a pessoa ainda não respondeu. Escreva UMA mensagem leve perguntando se algum dos horários serviu " +
         "ou se prefere sugerir outro dia. NÃO cite dia, data nem hora, não cobre, não invente. Não mencione que é um lembrete.\n" +
-        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
+      persona,
     ),
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(vazia)"}`,
-    { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions } },
+    { check: { previousOutgoing: history.filter((m) => m.sender !== "LEAD").map((m) => m.content), instructions, allowAiDisclosure: persona.discloseAi } },
   );
   const issues = checkTimesMentioned(message, []);
   if (issues.length) throw new Error(`o lembrete citou horário (${issues[0]})`);
@@ -875,13 +932,15 @@ export async function suggestReply(
   history: HistoryItem[],
   channel: MessageChannel = "LINKEDIN",
 ): Promise<string> {
+  const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
       lead,
       "Escreva a PRÓXIMA mensagem do corretor nesta conversa, respondendo ao que o lead disse por último. " +
         "O corretor vai revisar antes de enviar, então aqui você pode sugerir mesmo quando seria caso de handoff. Não repita frases do histórico.\n" +
-        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${CHANNEL_STYLE[channel]}`,
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
+      persona,
     ),
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
   );

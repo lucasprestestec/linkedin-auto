@@ -69,7 +69,8 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   // Mensagem de voz: depende da escolha do usuario (so texto / quando o lead manda audio / sempre),
   // de a voz estar criada e autorizada e do servico de voz configurado.
   const lastInbound = [...history].reverse().find((m) => m.sender === "LEAD");
-  const wantsAudio = decideAudio({
+  // Assistente com nome próprio (ex.: Helena) não fala com a voz do corretor: seria se passar por ele.
+  const wantsAudio = !settings.assistantName?.trim() && decideAudio({
     settings: parseVoiceSettings(settings.voiceSettings),
     channel,
     inboundKind: lastInbound?.mediaKind,
@@ -79,7 +80,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   let decision;
   try {
     decision = await decideResponse({
-      instructions: await instructionsFor(lead, settings),
+      instructions: await instructionsFor(lead, settings, { task: `responder à última mensagem do lead (canal ${channel})`, history }),
       history,
       channel,
       lead: { ...lead, campaignName: campaign?.name ?? null },

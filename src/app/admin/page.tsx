@@ -1,9 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { adminEnabled, isAdmin } from "@/lib/admin";
 import { AdminLogin } from "./AdminLogin";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
+import { AssistantIdentityForm } from "./AssistantIdentityForm";
+import { approxTokens } from "@/lib/knowledge";
 import { LimitsForm } from "./LimitsForm";
 import { WorkHoursForm } from "./WorkHoursForm";
 import { EngagementForm } from "./EngagementForm";
@@ -35,6 +38,9 @@ export default async function AdminPage() {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const knowledge = await prisma.knowledgeSection.findMany({ where: { mode: { not: "OFF" } }, select: { mode: true, content: true } });
+  const kbAlways = knowledge.filter((k) => k.mode === "ALWAYS").reduce((n, k) => n + k.content.length, 0);
+  const kbCount = await prisma.knowledgeSection.count();
   const email = await emailConnection();
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
@@ -63,6 +69,30 @@ export default async function AdminPage() {
 
       <section className="sec">
         <div className="setting-text">
+          <h2 className="t-label">Identidade da assistente</h2>
+          <small>Com um nome (ex.: Helena), ela se apresenta como ela mesma e nunca como você. Vazio: escreve como o corretor.</small>
+        </div>
+        <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
+      </section>
+
+      <section className="sec">
+        <div className="sec-head">
+          <div className="setting-text">
+            <h2 className="t-label">Base de conhecimento</h2>
+            <small>
+              {kbCount
+                ? `${kbCount} seções · ~${approxTokens(kbAlways).toLocaleString("pt-BR")} tokens em toda mensagem · o resto entra quando o assunto aparece`
+                : "Nenhuma base importada. Importe o manual (.md): fichas de produto, textos aprovados, objeções."}
+            </small>
+          </div>
+          <Link href="/admin/knowledge" className="btn-line btn-sm">
+            {kbCount ? "Abrir" : "Importar"}
+          </Link>
+        </div>
+      </section>
+
+      <section className="sec">
+        <div className="setting-text">
           <h2 className="t-label">Agente de IA: instruções gerais</h2>
           <small>Valem para todas as conversas. O texto de cada campanha é somado a estas instruções.</small>
         </div>
@@ -76,7 +106,12 @@ export default async function AdminPage() {
 
       <section className="sec">
         <h2 className="t-label">Horário de trabalho</h2>
-        <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} />
+        <WorkHoursForm
+          start={settings.workStartHour}
+          end={settings.workEndHour}
+          weekdaysOnly={settings.workWeekdaysOnly}
+          replyAnytime={settings.replyAnytime}
+        />
       </section>
 
       <section className="sec">

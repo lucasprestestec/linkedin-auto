@@ -8,9 +8,13 @@ export interface CheckInput {
   previousOutgoing: string[];
   // Material do corretor: um valor em R$ só é aceito se estiver escrito ali.
   instructions: string | null;
+  // A assistente pode confirmar que é assistente virtual (admin).
+  allowAiDisclosure?: boolean;
 }
 
 const MAX_CHARS = 600;
+// Texto aprovado do material (abertura, cadência) pode ser maior, até aqui.
+const MAX_CHARS_APPROVED = 1500;
 const MAX_QUESTIONS = 2;
 const MAX_EMOJIS = 2;
 
@@ -31,19 +35,40 @@ function sentences(s: string) {
     .filter((x) => x.length >= 30);
 }
 
-export function checkMessage({ message, previousOutgoing, instructions }: CheckInput): string[] {
+// A mensagem segue um texto do material? Mede quantos trechos de 5 palavras
+// dela aparecem no material (nome e empresa trocados não atrapalham).
+function followsMaterial(text: string, material: string | null): boolean {
+  if (!material) return false;
+  const words = normalize(text).split(" ");
+  if (words.length < 12) return false;
+  const haystack = ` ${normalize(material)} `;
+  let total = 0;
+  let found = 0;
+  for (let i = 0; i + 5 <= words.length; i += 2) {
+    total++;
+    if (haystack.includes(` ${words.slice(i, i + 5).join(" ")} `)) found++;
+  }
+  return total > 0 && found / total >= 0.5;
+}
+
+export function checkMessage({ message, previousOutgoing, instructions, allowAiDisclosure }: CheckInput): string[] {
   const issues: string[] = [];
   const text = message.trim();
   if (!text) return ["mensagem vazia"];
 
-  if (text.length > MAX_CHARS) issues.push(`longa demais (${text.length} caracteres; máximo ${MAX_CHARS})`);
+  const approved = followsMaterial(text, instructions);
+  const maxChars = approved ? MAX_CHARS_APPROVED : MAX_CHARS;
+  if (text.length > maxChars) issues.push(`longa demais (${text.length} caracteres; máximo ${maxChars})`);
   if (/https?:\/\/|www\.|\b[a-z0-9-]+\.(com|com\.br|net|org|io)\b/i.test(text)) issues.push("contém link ou site");
   if (/\[[^\]]{1,40}\]|\{[^}]{1,40}\}|<[^>]{1,40}>/.test(text)) issues.push("tem um campo não preenchido (ex.: [Nome])");
-  if (/\*\*|__|^#{1,6}\s|^\s*([-*•]|\d+[.)])\s/m.test(text)) issues.push("usa formatação/lista, não parece mensagem de LinkedIn");
+  if (/\*\*|__|^#{1,6}\s/m.test(text) || (!approved && /^\s*([-*•]|\d+[.)])\s/m.test(text))) {
+    issues.push("usa formatação/lista, não parece mensagem de conversa");
+  }
 
   if (
+    !allowAiDisclosure &&
     // (?![\p{L}\p{N}]) no lugar de \b: o \b do JavaScript não trata "ô" como letra e deixava passar "robô".
-    /\b(sou|como)\s+(uma?\s+)?(ia|intelig[eê]ncia artificial|assistente virtual|chatbot|bot|rob[oô]|modelo de linguagem)(?![\p{L}\p{N}])/iu.test(text) ||
+    /\b(sou|como)\s+((uma?|a|o)\s+)?(ia|intelig[eê]ncia artificial|assistente virtual|chatbot|bot|rob[oô]|modelo de linguagem)(?![\p{L}\p{N}])/iu.test(text) ||
     /\bmodelo de linguagem\b/i.test(text)
   ) {
     issues.push("se apresenta como IA/robô");
@@ -73,7 +98,7 @@ export function checkMessage({ message, previousOutgoing, instructions }: CheckI
 
 
   const questions = (text.match(/\?/g) ?? []).length;
-  if (questions > MAX_QUESTIONS) issues.push(`perguntas demais numa mensagem só (${questions})`);
+  if (questions > MAX_QUESTIONS && !approved) issues.push(`perguntas demais numa mensagem só (${questions})`);
 
   const emojis = (text.match(/\p{Extended_Pictographic}/gu) ?? []).length;
   if (emojis > MAX_EMOJIS) issues.push(`emojis demais (${emojis})`);
