@@ -706,6 +706,33 @@ export async function generateFirstContact(instructions: string | null, lead: Le
   );
 }
 
+// Passo de cadência com texto aprovado que não deu pra preencher sozinho (dado
+// faltando, "o(a)", "Dr(a)."): a IA ajusta o mínimo, sem acrescentar nada.
+export async function adaptTemplate(
+  instructions: string | null,
+  lead: LeadContext,
+  template: string,
+  channel: MessageChannel,
+  previousOutgoing: string[] = [],
+): Promise<string> {
+  const persona = await assistantPersona();
+  return writeMessage(
+    proactiveSystemPrompt(
+      instructions,
+      lead,
+      "Esta é uma mensagem APROVADA da cadência. Devolva o MESMO texto, mudando só o necessário:\n" +
+        "- campos entre colchetes: preencha com o dado real do lead; se o dado não existe, reescreva só aquele trecho sem ele (nunca invente nome, empresa ou quem indicou);\n" +
+        "- concordância de gênero (o(a), ele(a), Dr(a).): escolha pela forma do nome; se não der pra saber, reescreva o trecho de um jeito neutro;\n" +
+        "- linhas de \"Botões: [Sim] [Não]\": tire (a pergunta do texto já basta).\n" +
+        "Não acrescente nem tire frases, não mude o tom, mantenha as quebras de parágrafo. A regra de no máximo uma pergunta não vale aqui.\n" +
+        `Canal desta mensagem: ${CHANNEL_NAME[channel]}.\n\nTEXTO APROVADO:\n<<<\n${template}\n>>>`,
+      persona,
+    ),
+    "Devolva a mensagem pronta para enviar.",
+    { check: { previousOutgoing, instructions: `${instructions ?? ""}\n\n${template}`, allowAiDisclosure: persona.discloseAi } },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Próximo passo: com mais de um canal possível, a secretária decide se insiste,
 // por onde, ou se para. Os sinais (convite, aberturas de e-mail, tentativas)

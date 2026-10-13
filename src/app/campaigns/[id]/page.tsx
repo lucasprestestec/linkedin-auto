@@ -9,6 +9,7 @@ import { ConversationRow } from "@/components/ConversationRow";
 import { describeRule } from "@/lib/followupPolicy";
 import { CampaignMenu } from "../CampaignMenu";
 import { reviewStateOf } from "@/lib/campaignReview";
+import { describeCadence } from "@/lib/cadence";
 import { ReleaseReviewButton } from "@/app/approvals/ReleaseReviewButton";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
   const [campaign, conversations, settings] = await Promise.all([
     prisma.campaign.findUnique({
       where: { id },
-      include: { leads: { select: { status: true, messages: { select: { sender: true } } } } },
+      include: { leads: { select: { status: true, messages: { select: { sender: true } } } }, steps: { orderBy: { position: "asc" } } },
     }),
     getConversationItems(),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true, campaignReview: true, campaignReviewDays: true, campaignReviewMessages: true } }),
@@ -93,6 +94,15 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
           </Link>
         </div>
         <dl className="kv" style={{ gridTemplateColumns: "130px 1fr" }}>
+          <dt>Cadência</dt>
+          <dd>
+            {campaign.steps.length
+              ? `${describeCadence(campaign.steps.some((st) => st.position === 0) ? campaign.steps : [{ day: 0, position: 0 }, ...campaign.steps])} · texto fixo pra quem não respondeu`
+              : "sem cadência fixa: o assistente escreve as retomadas"}{" "}
+            <Link href={`/campaigns/${campaign.id}/cadence`} className="btn-text">
+              {campaign.steps.length ? "Editar" : "Montar"}
+            </Link>
+          </dd>
           <dt>Acompanhamento</dt>
           <dd>
             {campaign.followUpMaxCount != null && campaign.followUpDelayHours != null

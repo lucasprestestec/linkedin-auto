@@ -11,10 +11,12 @@ import { isExcluded, parseExclusionList } from "@/lib/exclusion";
 import { handleIncomingMessage } from "@/lib/respond";
 import { runEngagement, type EngagementResult } from "@/lib/engagement";
 import { instructionsFor } from "@/lib/campaigns";
+import { campaignSteps, describeCadence, initialStep, renderStep, stepDueAt } from "@/lib/cadence";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { PROACTIVE_STATUSES } from "@/lib/status";
 import { followUpRuleFor } from "@/lib/followupPolicy";
 import { CHANNEL_LABEL } from "@/lib/channels";
+import { sendPush } from "@/lib/push";
 import { MAX_PENDING_DRAFTS, OPEN_DRAFT_FILTER, deliver, expireDrafts, flushApprovedDrafts, pendingDraftCount } from "@/lib/outbox";
 
 // Parte proativa do cron: o agente fala primeiro e retoma conversas paradas.
@@ -33,6 +35,7 @@ export interface ProactiveResult {
   openingsSent: number;
   introEmailsSent: number;
   firstContactsSent: number;
+  cadenceStepsSent: number;
   followUpsSent: number;
   waiting: number;
   markedLost: number;
@@ -107,6 +110,10 @@ const IN_ACTIVE_CAMPAIGN = { OR: [{ campaignId: null }, { campaign: { status: "A
 // com outra IA (ex.: a Sofia) — essa só volta quando o corretor desmarcar.
 const CAN_APPROACH = { doNotContact: false, otherAiActive: false };
 
+// Na cadência de texto fixo: campanha com passos de retomada e pessoa que nunca
+// respondeu. Respondeu, sai da cadência e volta pro acompanhamento normal da IA.
+const IN_CADENCE = { campaign: { steps: { some: { position: { gt: 0 } } } }, messages: { none: { sender: "LEAD" as const } } };
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Quando a secretária decide esperar, ela volta a olhar esse lead depois disso.
 const WAIT_MS = DAY_MS;
@@ -164,11 +171,12 @@ async function sendOpenings(identityId: string, settings: Settings, budget: Budg
   let sent = 0;
   for (const lead of eligible) {
     try {
-      const content = await generateOpeningMessage(
-        await instructionsFor(lead, settings, { task: "primeira mensagem no LinkedIn depois que a pessoa aceitou o convite de conexão", history: lead.messages }),
-        lead,
-        { history: lead.messages },
-      );
+      const instructions = await instructionsFor(lead, settings, { task: "primeira mensagem no LinkedIn depois que a pessoa aceitou o convite de conexão", history: lead.messages });
+      // Campanha com cadência: a mensagem inicial é o texto aprovado (D0).
+      const initial = await initialStep(lead.campaignId);
+      const content = initial
+        ? (await renderStep(initial, lead, "LINKEDIN", instructions, lead.messages.filter((m) => m.sender !== "LEAD").map((m) => m.content))).text
+        : await generateOpeningMessage(instructions, lead, { history: lead.messages });
       await deliver(lead, "LINKEDIN", content, {
         identityId,
         kind: "OPENING",
@@ -255,11 +263,11 @@ async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WH
     if (!ready[channel] || budget[channel] <= 0) continue;
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
     try {
-      const content = await generateFirstContact(
-        await instructionsFor(lead, settings, { task: `primeira mensagem (${channel === "EMAIL" ? "e-mail" : "WhatsApp"}) para um contato que o corretor adicionou, por indicação ou conhecido` }),
-        lead,
-        channel,
-      );
+      const instructions = await instructionsFor(lead, settings, {
+        task: `primeira mensagem (${channel === "EMAIL" ? "e-mail" : "WhatsApp"}) para um contato que o corretor adicionou, por indicação ou conhecido`,
+      });
+      const initial = await initialStep(lead.campaignId);
+      const content = initial ? (await renderStep(initial, lead, channel, instructions, [])).text : await generateFirstContact(instructions, lead, channel);
       await deliver(lead, channel, content, {
         subject: channel === "EMAIL" ? `Tudo bem, ${lead.firstName ?? ""}?`.replace(" ?", "?") : undefined,
         kind: "FIRST_CONTACT",
@@ -332,6 +340,8 @@ async function sendFollowUps(
         // INVITE_SENT entra só se já recebeu e-mail (apresentação): segue por lá.
         OR: [{ status: { in: PROACTIVE_STATUSES } }, { status: "INVITE_SENT", messages: { some: {} } }],
         ...CAN_APPROACH,
+        // Quem está na cadência de texto fixo segue por ela (sendCadenceSteps).
+        NOT: IN_CADENCE,
         AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER, { OR: [{ nextStepAt: null }, { nextStepAt: { lte: new Date(now) } }] }],
       },
       include: {
@@ -440,6 +450,99 @@ async function sendFollowUps(
   return { sent, lost, waiting };
 }
 
+// Cadência com texto fixo: no dia de cada passo (contado da mensagem inicial),
+// o texto aprovado sai no canal do passo. Acabaram os passos sem resposta:
+// espera uns dias e encerra. Os canais valem se estiverem conectados (foi o
+// corretor quem montou a cadência), dentro dos limites do dia.
+const CADENCE_END_WAIT_MS = 3 * DAY_MS;
+// Passo atrasado (ex.: fim de semana) não sai colado no anterior.
+const CADENCE_MIN_GAP_MS = 20 * 60 * 60 * 1000;
+
+async function sendCadenceSteps(
+  identityId: string | null,
+  settings: Settings,
+  ready: { EMAIL: boolean; WHATSAPP: boolean },
+  budget: Budget,
+): Promise<{ sent: number; lost: number }> {
+  const now = Date.now();
+  const leads = await prisma.lead.findMany({
+    where: {
+      OR: [{ status: { in: PROACTIVE_STATUSES } }, { status: "INVITE_SENT", messages: { some: {} } }],
+      ...CAN_APPROACH,
+      ...IN_CADENCE,
+      AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER, { OR: [{ nextStepAt: null }, { nextStepAt: { lte: new Date(now) } }] }],
+    },
+    include: { messages: { orderBy: { deliveredAt: "asc" }, select: HISTORY_SELECT }, campaign: { select: { name: true } } },
+  });
+  const rules = parseExclusionList(settings.exclusionList);
+  const stepsByCampaign = new Map<string, Awaited<ReturnType<typeof campaignSteps>>>();
+  let sent = 0;
+  let lost = 0;
+
+  for (const lead of leads) {
+    if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
+    const outgoing = lead.messages.filter((m) => m.sender !== "LEAD");
+    const first = outgoing[0];
+    const last = outgoing.at(-1);
+    if (!first || !last) continue;
+    const campaignId = lead.campaignId!;
+    if (!stepsByCampaign.has(campaignId)) stepsByCampaign.set(campaignId, await campaignSteps(campaignId));
+    const steps = stepsByCampaign.get(campaignId)!;
+    const cadenceName = lead.campaign?.name ?? "campanha";
+
+    const next = steps.find((st) => st.position === lead.followUpsSent + 1);
+    if (!next) {
+      if (now - last.deliveredAt.getTime() >= CADENCE_END_WAIT_MS) {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: "LOST", nextStep: `A cadência de "${cadenceName}" terminou sem resposta; encerrei.`, nextStepAt: null },
+        });
+        lost++;
+      }
+      continue;
+    }
+    if (stepDueAt(next, first.deliveredAt).getTime() > now || now - last.deliveredAt.getTime() < CADENCE_MIN_GAP_MS) continue;
+    if (budget.total <= 0) break;
+
+    const can = (c: MessageChannel) =>
+      c === "LINKEDIN" ? Boolean(identityId && lead.linkedinConnected) : c === "EMAIL" ? ready.EMAIL && Boolean(lead.email) : ready.WHATSAPP && Boolean(lead.phone);
+    // Canal do passo; sem ele (ou indisponível), o mesmo da última mensagem.
+    const channel = next.channel && can(next.channel) ? next.channel : last.channel;
+    if (!can(channel) || budget[channel] <= 0) continue;
+
+    try {
+      const instructions = await instructionsFor(lead, settings, {
+        task: `passo ${next.position} da cadência de texto fixo (D+${next.day}); a pessoa ainda não respondeu`,
+        history: lead.messages,
+      });
+      const { text } = await renderStep(next, lead, channel, instructions, outgoing.map((m) => m.content));
+      const reason = `Cadência "${cadenceName}": passo ${next.position} de ${steps.filter((st) => st.position > 0).length} (${describeCadence([next])}).`;
+      const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "o lead";
+      const result = await deliver(lead, channel, text, {
+        identityId,
+        kind: "FOLLOW_UP",
+        reason,
+        approval: settings.approvalMode,
+        effects: { followUpsSent: next.position, nextStep: next.notify ? `Aviso de ligação enviado: hora de ligar para ${name}.` : reason, nextStepAt: null },
+      });
+      spend(budget, channel);
+      sent++;
+      // Passo com aviso (ex.: "tentaremos contato por telefone"): o corretor fica sabendo.
+      if (next.notify) {
+        await sendPush({
+          title: `Hora de ligar para ${name}`,
+          body: result === "sent" ? "O aviso de ligação foi enviado pela cadência." : "O aviso de ligação está esperando sua aprovação.",
+          url: `/leads/${lead.id}`,
+          tag: `call-${lead.id}`,
+        }).catch((err) => console.error("Falha ao avisar ligação", err));
+      }
+    } catch (err) {
+      await markNeedsHuman(lead.id, `Falha no passo ${next.position} da cadência: ${errorMessage(err)}`);
+    }
+  }
+  return { sent, lost };
+}
+
 // Lead escreveu fora do horário: a resposta não saiu na hora (ver cron). Aqui,
 // já dentro da janela, a IA responde quem está esperando — a última mensagem
 // da conversa é do lead e ninguém respondeu ainda.
@@ -527,7 +630,7 @@ async function sendBookingNudges(
 }
 
 export async function runProactive(identityId: string | null): Promise<ProactiveResult> {
-  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0, bookingNudgesSent: 0 };
+  const result: ProactiveResult = { acceptedInvites: 0, repliesSent: 0, openingsSent: 0, introEmailsSent: 0, firstContactsSent: 0, cadenceStepsSent: 0, followUpsSent: 0, waiting: 0, markedLost: 0, bookingNudgesSent: 0 };
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // Rascunho que ninguém decidiu a tempo perde a validade (a conversa andou).
@@ -585,7 +688,10 @@ export async function runProactive(identityId: string | null): Promise<Proactive
     { EMAIL: await emailEnabled(), WHATSAPP: deskcommConfigOf(settings) !== null },
     firstBudget,
   );
-  // O que saiu no primeiro contato conta pro resto da rodada.
+  // Cadências de texto fixo: canais conectados valem (foi o corretor quem montou).
+  const cadence = await sendCadenceSteps(identityId, settings, { EMAIL: await emailEnabled(), WHATSAPP: deskcommConfigOf(settings) !== null }, firstBudget);
+  result.cadenceStepsSent = cadence.sent;
+  // O que saiu no primeiro contato e na cadência conta pro resto da rodada.
   budget.total = firstBudget.total;
   if (emailReady) budget.EMAIL = firstBudget.EMAIL;
   if (whatsappReady) budget.WHATSAPP = firstBudget.WHATSAPP;
@@ -593,7 +699,7 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   const followUps = await sendFollowUps(identityId, settings, emailReady, whatsappReady, budget);
   result.followUpsSent = followUps.sent;
   result.waiting = followUps.waiting;
-  result.markedLost = followUps.lost;
+  result.markedLost = followUps.lost + cadence.lost;
 
   result.bookingNudgesSent = await sendBookingNudges(identityId, settings, { LINKEDIN: Boolean(identityId), EMAIL: emailReady, WHATSAPP: whatsappReady }, budget);
 
