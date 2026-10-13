@@ -8,6 +8,8 @@ import { CampaignStatus } from "@/components/CampaignStatus";
 import { ConversationRow } from "@/components/ConversationRow";
 import { describeRule } from "@/lib/followupPolicy";
 import { CampaignMenu } from "../CampaignMenu";
+import { reviewStateOf } from "@/lib/campaignReview";
+import { ReleaseReviewButton } from "@/app/approvals/ReleaseReviewButton";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +22,12 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
       include: { leads: { select: { status: true, messages: { select: { sender: true } } } } },
     }),
     getConversationItems(),
-    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true } }),
+    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true, campaignReview: true, campaignReviewDays: true, campaignReviewMessages: true } }),
   ]);
   if (!campaign) notFound();
 
   const n = campaignNumbers(campaign.leads);
+  const review = await reviewStateOf(campaign, settings);
   const people = conversations.filter((c) => c.campaignId === campaign.id);
   const active = campaign.status === "ACTIVE";
   const full = campaign.maxLeads != null && n.leads >= campaign.maxLeads;
@@ -61,6 +64,17 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
         </div>
         <CampaignMenu id={campaign.id} name={campaign.name} status={campaign.status} leads={n.leads} />
       </header>
+
+      {review.inReview && (
+        <div className="note note-warn row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <span>
+            <b>Campanha em revisão.</b> Tudo o que o assistente escrever nela passa pela sua aprovação até {review.messages} mensagens (
+            {Math.min(review.sent, review.messages)} até agora) e pelo menos até{" "}
+            {review.until.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}.
+          </span>
+          <ReleaseReviewButton campaignId={campaign.id} name={campaign.name} />
+        </div>
+      )}
 
       <div className="h-stats">
         {stats.map((s) => (

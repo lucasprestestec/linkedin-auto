@@ -4,6 +4,9 @@ import { approvalStats } from "@/lib/outbox";
 import { loadApprovalItems } from "@/lib/approvalItems";
 import { ApprovalCard } from "./ApprovalCard";
 import { ApprovalToggle } from "./ApprovalToggle";
+import { CampaignReviewForm } from "./CampaignReviewForm";
+import { ReleaseReviewButton } from "./ReleaseReviewButton";
+import { reviewStateOf } from "@/lib/campaignReview";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +16,26 @@ const TRUST_MIN_RATE = 0.9;
 
 export default async function ApprovalsPage() {
   const [settings, items, waiting, stats] = await Promise.all([
-    prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { approvalMode: true, workStartHour: true, workEndHour: true } }),
+    prisma.settings.findUniqueOrThrow({
+      where: { id: "singleton" },
+      select: { approvalMode: true, workStartHour: true, workEndHour: true, campaignReview: true, campaignReviewDays: true, campaignReviewMessages: true },
+    }),
     loadApprovalItems({ status: "PENDING" }),
     prisma.draft.count({ where: { status: "APPROVED" } }),
     approvalStats(),
   ]);
+
+  // Campanhas ativas ainda em revisão (com a revisão ligada).
+  const reviewing = settings.campaignReview
+    ? (
+        await Promise.all(
+          (await prisma.campaign.findMany({ where: { status: "ACTIVE", reviewReleasedAt: null }, orderBy: { createdAt: "desc" } })).map(async (c) => ({
+            campaign: c,
+            state: await reviewStateOf(c, settings),
+          })),
+        )
+      ).filter((r) => r.state.inReview)
+    : [];
 
   const rate = stats.decided ? stats.untouched / stats.decided : 0;
   const trusted = stats.decided >= TRUST_MIN_DECIDED && rate >= TRUST_MIN_RATE;
@@ -31,7 +49,7 @@ export default async function ApprovalsPage() {
           <p className="t-sub">
             {settings.approvalMode
               ? "O assistente escreve, você dá o OK. Nada sai sem a sua aprovação."
-              : "Aprovação desligada: o assistente envia sozinho."}
+              : "Aprovação desligada: o assistente envia sozinho, menos campanha nova em revisão e resposta em que ele ficou em dúvida."}
           </p>
         </div>
       </header>
@@ -50,6 +68,30 @@ export default async function ApprovalsPage() {
           </span>
           <ApprovalToggle on={settings.approvalMode} />
         </div>
+      </section>
+
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Campanha nova</h2>
+          <small>Nas primeiras semanas de cada campanha, tudo o que o assistente escreve nela passa por você.</small>
+        </div>
+        <CampaignReviewForm on={settings.campaignReview} days={settings.campaignReviewDays} messages={settings.campaignReviewMessages} />
+        {reviewing.length > 0 && (
+          <ul className="list">
+            {reviewing.map(({ campaign, state }) => (
+              <li key={campaign.id} className="item">
+                <div className="item-main">
+                  <span className="item-title">{campaign.name}</span>
+                  <span className="item-sub">
+                    Em revisão: {Math.min(state.sent, state.messages)} de {state.messages} mensagens · prazo até{" "}
+                    {state.until.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}
+                  </span>
+                </div>
+                <ReleaseReviewButton campaignId={campaign.id} name={campaign.name} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {waiting > 0 && (

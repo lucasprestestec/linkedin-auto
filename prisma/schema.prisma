@@ -131,6 +131,9 @@ model Campaign {
   // Pausada/finalizada: sem convites novos, aberturas nem follow-ups.
   status       CampaignStatus @default(ACTIVE)
   createdAt    DateTime       @default(now())
+  // Revisão de campanha nova (Settings.campaignReview): liberada antes do prazo
+  // pelo corretor. Sem isso, sai da revisão sozinha (dias E mensagens).
+  reviewReleasedAt DateTime?
   leads        Lead[]
 }
 
@@ -286,6 +289,11 @@ model Settings {
   automationPaused    Boolean @default(true)
   // Modo piloto: a secretária escreve, mas nada sai sem o seu OK (aba Aprovações).
   approvalMode        Boolean @default(true)
+  // Campanha nova: toda mensagem dela passa por aprovação até completar os dois
+  // (dias desde a criação E mensagens enviadas), mesmo com a aprovação desligada.
+  campaignReview         Boolean @default(true)
+  campaignReviewDays     Int     @default(14)
+  campaignReviewMessages Int     @default(50)
   // Google Agenda: a conexão do Google já tinha e-mail; aqui, se o corretor também
   // liberou a agenda (escopo calendar.events). Só então a secretária marca reunião.
   googleCalendarEnabled Boolean @default(false)
