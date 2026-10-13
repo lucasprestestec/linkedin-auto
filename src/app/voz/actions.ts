@@ -5,7 +5,8 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { VoiceError } from "@/lib/voice/fish";
-import { listVoices, type CatalogVoice } from "@/lib/voice/elevenlabs";
+import { listVoices, synthesizeEleven, type CatalogVoice } from "@/lib/voice/elevenlabs";
+import { storeOutgoingAudio } from "@/lib/voice/outgoingAudio";
 import { removeVoice } from "@/lib/voice/engine";
 import { ensureAudio } from "@/lib/voice/send";
 import { EMPTY_VOICE, parseVoiceSettings, type AudioMode } from "@/lib/voice/settings";
@@ -60,12 +61,26 @@ export async function deleteMyVoice(): Promise<{ error?: string }> {
 }
 
 // Lista de vozes prontas para escolher (cada uma com um trecho para ouvir).
-export async function loadCatalogVoices(): Promise<{ voices?: CatalogVoice[]; error?: string }> {
+export async function loadCatalogVoices(): Promise<{ voices?: CatalogVoice[]; onlyPortuguese?: boolean; error?: string }> {
   await requireSession();
   try {
-    return { voices: await listVoices() };
+    return await listVoices();
   } catch (err) {
     return { error: err instanceof VoiceError ? err.message : "Não consegui carregar as vozes agora." };
+  }
+}
+
+// Ouvir uma voz da lista falando uma frase em português, ANTES de escolher (gasta uns créditos do mês).
+export async function previewCatalogVoice(voiceId: string): Promise<{ url?: string; error?: string }> {
+  await requireSession();
+  if (!/^[A-Za-z0-9]{10,40}$/.test(voiceId)) return { error: "Voz inválida." };
+  const { assistantName } = await current();
+  const text = `Oi, tudo bem? ${assistantName ? `Aqui é a ${assistantName}. ` : ""}Recebi a sua mensagem e já te respondo com calma. Qualquer coisa, é só me chamar.`;
+  try {
+    const audio = await synthesizeEleven(text, voiceId);
+    return { url: `/api/audio/${await storeOutgoingAudio(audio.bytes, audio.mime, { text })}` };
+  } catch (err) {
+    return { error: err instanceof VoiceError ? err.message : "Não consegui gerar o áudio agora." };
   }
 }
 

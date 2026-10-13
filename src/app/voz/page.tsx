@@ -28,7 +28,7 @@ export default async function VoicePage() {
       </header>
       <section className="sec">
         <h2 className="t-label">Escolher uma voz pronta</h2>
-        <VoicePicker currentId={picked?.voiceId ?? null} configured={elevenConfigured()} />
+        <VoicePicker currentId={picked?.voiceId ?? null} currentName={picked?.voiceName ?? null} configured={elevenConfigured()} />
       </section>
       <section className="sec">
         <h2 className="t-label">Gravar a minha voz</h2>

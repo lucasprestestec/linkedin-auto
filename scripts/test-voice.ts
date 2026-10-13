@@ -78,19 +78,30 @@ const restore = () => (globalThis.fetch = realFetch);
     const fake = "teste".repeat(4);
     process.env.ELEVENLABS_API_KEY = fake;
     const { listVoices, synthesizeEleven } = await import("../src/lib/voice/elevenlabs");
+    const rachel = { voice_id: "e1", name: "Rachel", labels: { gender: "female", age: "young", accent: "american" }, preview_url: "https://x/p.mp3" };
+    const bruna = { voice_id: "e2", name: "Bruna", labels: { gender: "female" }, preview_url: "https://x/en.mp3", verified_languages: [{ language: "pt", locale: "pt-BR", accent: "brazilian", preview_url: "https://x/pt-br.mp3" }] };
+    const ines = { voice_id: "e3", name: "Inês", verified_languages: [{ language: "Portuguese", locale: "pt-PT", preview_url: "https://x/pt-pt.mp3" }] };
+    let list: unknown[] = [rachel, ines, bruna];
     mockFetch((url, init) => {
       assert.equal((init.headers as Record<string, string>)["xi-api-key"], fake);
       if (url.includes("/v2/voices")) {
         assert.match(url, /category=premade/);
-        return new Response(JSON.stringify({ voices: [{ voice_id: "e1", name: "Rachel", labels: { gender: "female", age: "young", accent: "american" }, preview_url: "https://x/p.mp3" }] }), { status: 200 });
+        return new Response(JSON.stringify({ voices: list }), { status: 200 });
       }
       assert.match(url, /\/v1\/text-to-speech\/e1\?output_format=mp3_44100_128/);
       assert.equal(JSON.parse(String(init.body)).model_id, "eleven_multilingual_v2");
       return new Response(new Uint8Array(900), { status: 200 });
     });
     try {
-      const voices = await listVoices();
-      assert.deepEqual(voices, [{ id: "e1", name: "Rachel", about: "feminina · jovem · american", previewUrl: "https://x/p.mp3" }]);
+      // Há vozes verificadas em português: só elas, as do Brasil primeiro, com o trecho em português.
+      const pt = await listVoices();
+      assert.equal(pt.onlyPortuguese, true);
+      assert.deepEqual(pt.voices.map((v) => [v.name, v.portuguese, v.previewUrl]), [["Bruna", "pt-BR", "https://x/pt-br.mp3"], ["Inês", "pt", "https://x/pt-pt.mp3"]]);
+      // Nenhuma marcada: devolve todas e avisa.
+      list = [rachel];
+      const all = await listVoices();
+      assert.equal(all.onlyPortuguese, false);
+      assert.deepEqual(all.voices, [{ id: "e1", name: "Rachel", about: "feminina · jovem · american", previewUrl: "https://x/p.mp3", portuguese: null }]);
       const audio = await synthesizeEleven("Olá", "e1");
       assert.equal(audio.mime, "audio/mpeg");
       assert.equal(audio.bytes.length, 900);
