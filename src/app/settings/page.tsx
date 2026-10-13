@@ -25,6 +25,7 @@ import { StyleOverview } from "./StyleOverview";
 import { VoiceOverview } from "./VoiceOverview";
 import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
 import { fishConfigured } from "@/lib/voice/fish";
+import { elevenConfigured } from "@/lib/voice/elevenlabs";
 import { noticeLabel } from "@/lib/slots";
 import type { Tone } from "@/components/IconChip";
 import { IconCalendar, IconChevronRight, IconLayers, IconSparkles, IconTarget } from "@/components/Icons";
@@ -210,7 +211,7 @@ export default async function SettingsPage() {
           <StyleOverview style={style} suggestions={suggestions} />
         </SettingItem>
         <SettingItem id="voz" title="Mensagens de voz" summary={summarizeVoice(voice)}>
-          <VoiceOverview voice={voice} configured={fishConfigured()} />
+          <VoiceOverview voice={voice} configured={fishConfigured() || elevenConfigured()} />
         </SettingItem>
       </Group>
 

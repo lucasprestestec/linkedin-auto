@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { CHANNEL_LABEL } from "@/lib/channels";
 import { clockTime, relativeTime } from "@/lib/format";
 import { hasVoice, parseVoiceSettings } from "@/lib/voice/settings";
-import { fishConfigured } from "@/lib/voice/fish";
+import { voiceServiceReady } from "@/lib/voice/engine";
 import { publicBaseUrl } from "@/lib/voice/outgoingAudio";
 import type { ApprovalItem } from "@/app/approvals/ApprovalCard";
 
@@ -32,7 +32,8 @@ export async function loadApprovalItems(where: Prisma.DraftWhereInput): Promise<
   if (drafts.length === 0) return [];
 
   // Voz criada e autorizada, serviço de voz configurado e endereço público do sistema definido.
-  const audioReady = hasVoice(parseVoiceSettings(settings.voiceSettings)) && fishConfigured() && Boolean(publicBaseUrl());
+  const voice = parseVoiceSettings(settings.voiceSettings);
+  const audioReady = hasVoice(voice) && voiceServiceReady(voice) && Boolean(publicBaseUrl());
 
   const leadIds = [...new Set(drafts.map((d) => d.leadId))];
   const recent = await prisma.message.findMany({

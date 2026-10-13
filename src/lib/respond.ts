@@ -9,7 +9,7 @@ import { loadCalendarContext } from "@/lib/scheduling";
 import { formatSlot, slotIso } from "@/lib/slots";
 import type { Lead } from "@prisma/client";
 import { decideAudio, parseVoiceSettings } from "@/lib/voice/settings";
-import { fishConfigured } from "@/lib/voice/fish";
+import { voiceServiceReady } from "@/lib/voice/engine";
 import { publicBaseUrl } from "@/lib/voice/outgoingAudio";
 
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
@@ -75,13 +75,12 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   // Mensagem de voz: depende da escolha do usuario (so texto / quando o lead manda audio / sempre),
   // de a voz estar criada e autorizada e do servico de voz configurado.
   const lastInbound = [...history].reverse().find((m) => m.sender === "LEAD");
-  // Assistente com nome próprio (ex.: Helena) não fala com a voz do corretor: seria se passar por ele.
-  const wantsAudio = !settings.assistantName?.trim() && decideAudio({
-    settings: parseVoiceSettings(settings.voiceSettings),
-    channel,
-    inboundKind: lastInbound?.mediaKind,
-    serviceReady: fishConfigured() && Boolean(publicBaseUrl()),
-  });
+  // Assistente com nome próprio (ex.: Helena) não fala com a voz clonada do corretor: seria se passar por ele.
+  // Com uma voz pronta da lista (ElevenLabs), pode falar.
+  const voice = parseVoiceSettings(settings.voiceSettings);
+  const wantsAudio =
+    !(settings.assistantName?.trim() && voice.provider === "fish") &&
+    decideAudio({ settings: voice, channel, inboundKind: lastInbound?.mediaKind, serviceReady: voiceServiceReady(voice) && Boolean(publicBaseUrl()) });
 
   let decision;
   try {
