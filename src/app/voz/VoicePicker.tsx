@@ -9,7 +9,6 @@ import { chooseCatalogVoice, loadCatalogVoices, previewCatalogVoice } from "./ac
 export function VoicePicker({ currentId, currentName, configured }: { currentId: string | null; currentName: string | null; configured: boolean }) {
   const router = useRouter();
   const [voices, setVoices] = useState<CatalogVoice[] | null>(null);
-  const [onlyPt, setOnlyPt] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>(currentId ?? "");
   const [inUse, setInUse] = useState<{ id: string | null; name: string | null }>({ id: currentId, name: currentName });
@@ -24,7 +23,6 @@ export function VoicePicker({ currentId, currentName, configured }: { currentId:
       if (r.error) setError(r.error);
       else {
         setVoices(r.voices ?? []);
-        setOnlyPt(r.onlyPortuguese ?? true);
       }
     });
     return () => {
@@ -38,7 +36,16 @@ export function VoicePicker({ currentId, currentName, configured }: { currentId:
   if (voices.length === 0) return <p className="small muted">Nenhuma voz disponível agora.</p>;
 
   const voice = voices.find((v) => v.id === selected) ?? null;
-  const label = (v: CatalogVoice) => `${v.name}${v.portuguese === "pt-BR" ? " · português do Brasil" : v.portuguese ? " · português" : ""}${v.about ? ` · ${v.about}` : ""}`;
+  // Só o nome e a voz (feminina ou masculina): o resto da descrição deixava a lista comprida.
+  const label = (v: CatalogVoice) => [v.name, v.gender, v.portuguese === "pt-BR" ? "Brasil" : null].filter(Boolean).join(" · ");
+  const verified = voices.filter((v) => v.portuguese);
+  const others = voices.filter((v) => !v.portuguese);
+  const options = (list: CatalogVoice[]) =>
+    list.map((v) => (
+      <option key={v.id} value={v.id}>
+        {label(v)}
+      </option>
+    ));
 
   return (
     <div className="stack" style={{ gap: 12 }}>
@@ -46,9 +53,6 @@ export function VoicePicker({ currentId, currentName, configured }: { currentId:
         <p className="small">
           Em uso agora: <b>{inUse.name ?? "voz escolhida"}</b>
         </p>
-      )}
-      {!onlyPt && (
-        <p className="note">A ElevenLabs não marcou nenhuma voz grátis como nativa do português. Estas falam português pelo modelo multilíngue, e o sotaque varia de uma para outra: use “Ouvir em português” antes de escolher.</p>
       )}
       <label>
         <span className="label">Voz</span>
@@ -62,11 +66,8 @@ export function VoicePicker({ currentId, currentName, configured }: { currentId:
           }}
         >
           <option value="">Escolha uma voz…</option>
-          {voices.map((v) => (
-            <option key={v.id} value={v.id}>
-              {label(v)}
-            </option>
-          ))}
+          {verified.length > 0 && <optgroup label="Verificadas em português">{options(verified)}</optgroup>}
+          {others.length > 0 && <optgroup label={verified.length ? "Outras (falam português, sotaque pode variar)" : "Falam português, sotaque pode variar"}>{options(others)}</optgroup>}
         </select>
       </label>
 
