@@ -13,6 +13,7 @@ import { LeadTags } from "./LeadTags";
 import { LeadCampaign } from "./LeadCampaign";
 import { LeadNotes } from "./LeadNotes";
 import { LeadProfile } from "./LeadProfile";
+import { LeadOutreach } from "./LeadOutreach";
 import { LeadActions } from "./LeadActions";
 import { HandoffCard } from "./HandoffCard";
 import { LeadFollowUp } from "./LeadFollowUp";
@@ -80,6 +81,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     lead.status === "MEETING_SCHEDULED" && lead.meetingAt
       ? `${STATUS_LABEL[lead.status]} · ${lead.meetingAt.toLocaleString("pt-BR", WHEN_FORMAT)}`
       : STATUS_LABEL[lead.status];
+  const holdLabel = lead.otherAiActive ? "Em conversa com outra IA" : lead.doNotContact ? "Não quer mais contato" : null;
 
   // Regra de acompanhamento que vale agora pra esta conversa, e a que valeria sem personalizar.
   const rule = followUpRuleFor(lead, lead.campaign, settings);
@@ -112,7 +114,13 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     <>
       {lead.messages.length === 0 && (
         <p className="empty" style={{ textAlign: "center" }}>
-          {lead.status === "INVITE_SENT" ? "Nenhuma mensagem ainda. Quando o convite for aceito, o assistente abre a conversa." : "Conexão aceita. O assistente manda a primeira mensagem na próxima rodada."}
+          {lead.status === "INVITE_SENT"
+            ? "Nenhuma mensagem ainda. Quando o convite for aceito, o assistente abre a conversa."
+            : lead.status === "NEW"
+              ? lead.firstContactChannel
+                ? `Nenhuma mensagem ainda. O assistente se apresenta por ${lead.firstContactChannel === "EMAIL" ? "e-mail" : "WhatsApp"} no próximo horário de trabalho.`
+                : "Nenhuma mensagem ainda. Você começa a conversa quando quiser; depois o assistente acompanha."
+              : "Conexão aceita. O assistente manda a primeira mensagem na próxima rodada."}
         </p>
       )}
       <ThreadView messages={threadMessages} leadFirst={lead.firstName} leadLast={lead.lastName} leadPhoto={lead.avatarUrl} ownerName={author === "você" ? "Você" : author}>
@@ -128,11 +136,20 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const about = (
     <div className="stack" style={{ gap: 28 }}>
       <section className="sec">
-        <p className="status-text">{statusLabel}</p>
+        <p className="status-text">{holdLabel ? `${statusLabel} · ${holdLabel}` : statusLabel}</p>
         <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
       </section>
 
-      <LeadProfile leadId={lead.id} firstName={firstName} email={lead.email} phone={lead.phone} personal={lead.personal} />
+      <LeadProfile
+        leadId={lead.id}
+        firstName={firstName}
+        email={lead.email}
+        phone={lead.phone}
+        personal={lead.personal}
+        kind={lead.kind}
+        referredBy={lead.referredBy}
+      />
+      <LeadOutreach leadId={lead.id} otherAiActive={lead.otherAiActive} doNotContact={lead.doNotContact} />
       <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
       <LeadTags leadId={lead.id} tags={lead.tags} knownTags={knownTags} />
       <LeadCampaign

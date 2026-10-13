@@ -21,6 +21,12 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   // O lead escreveu: qualquer mensagem que esperava aprovação ficou velha.
   await supersedeDrafts(lead.id);
 
+  // Outra IA (ex.: a Sofia) está com essa pessoa: a secretária não entra em nenhum canal.
+  if (lead.otherAiActive) {
+    await markNeedsHuman(lead.id, "Está em conversa com outra IA (ex.: Sofia): a secretária não responde");
+    return;
+  }
+
   // Reunião já marcada: remarcar, cancelar ou qualquer assunto novo é com o corretor.
   if (lead.status === "MEETING_SCHEDULED") {
     await markNeedsHuman(lead.id, "Escreveu depois de a reunião ser marcada");
@@ -133,6 +139,8 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
         nextStep: proposed ? "Sugeri horários de reunião; aguardando o lead escolher." : null,
         nextStepAt: null,
         ...(proposed ? { slotsProposedAt: new Date() } : {}),
+        // Recusou ou pediu pra parar: não volta a ser abordado, nem em campanha nova.
+        ...(decision.declined ? { doNotContact: true } : {}),
       },
     });
   } catch (err) {

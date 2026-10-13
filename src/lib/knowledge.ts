@@ -1,5 +1,6 @@
 import type OpenAI from "openai";
-import type { KnowledgeMode, KnowledgeSection, MessageChannel, MessageSender } from "@prisma/client";
+import type { KnowledgeMode, KnowledgeSection, LeadKind, MessageChannel, MessageSender } from "@prisma/client";
+import { LEAD_KIND_PROMPT } from "@/lib/leadKind";
 import { prisma } from "@/lib/prisma";
 import { completeWithTool, fastModel, nousClient } from "@/lib/agent";
 
@@ -104,7 +105,15 @@ export interface KnowledgeFocus {
   // O que a assistente vai fazer (responder, abrir conversa, retomar...).
   task: string;
   history?: { sender: MessageSender; content: string; channel?: MessageChannel }[];
-  lead?: { firstName?: string | null; lastName?: string | null; jobTitle?: string | null; personal?: string | null; tags?: string[] };
+  lead?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    jobTitle?: string | null;
+    personal?: string | null;
+    tags?: string[];
+    kind?: LeadKind | null;
+    referredBy?: string | null;
+  };
   campaignName?: string | null;
   campaignInstructions?: string | null;
 }
@@ -145,6 +154,8 @@ export async function pickSections(candidates: Pick<KnowledgeSection, "id" | "ti
     ? [
         [lead.firstName, lead.lastName].filter(Boolean).join(" "),
         lead.jobTitle,
+        lead.kind ? `tipo: ${LEAD_KIND_PROMPT[lead.kind]}` : "",
+        lead.referredBy ? `indicado por ${lead.referredBy}` : "",
         lead.tags?.length ? `etiquetas: ${lead.tags.join(", ")}` : "",
         lead.personal ? `ficha: ${lead.personal.slice(0, 300)}` : "",
       ]

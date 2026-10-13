@@ -9,6 +9,7 @@ import type { MessageChannel } from "@prisma/client";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
 import { validFollowUp } from "@/lib/settings-ranges";
+import { parseLeadKind } from "@/lib/leadKind";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
 import { recordFeedback } from "@/lib/agentFeedback";
 import { requireSession } from "@/lib/session";
@@ -166,15 +167,29 @@ export async function updateLeadFollowUp(leadId: string, value: { count: number;
 
 // Ficha pessoal: canais (e-mail, WhatsApp) e o que o corretor sabe da pessoa.
 // O assistente usa isso pra escolher o canal e personalizar as mensagens.
-export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string }) {
+export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string; kind: string; referredBy: string }) {
   const e = parseEmail(data.email);
   if ("error" in e) return { error: e.error };
   const p = parsePhone(data.phone);
   if ("error" in p) return { error: p.error };
   await prisma.lead.update({
     where: { id: leadId },
-    data: { email: e.email, phone: p.phone, personal: data.personal.trim().slice(0, 2000) || null },
+    data: {
+      email: e.email,
+      phone: p.phone,
+      personal: data.personal.trim().slice(0, 2000) || null,
+      kind: parseLeadKind(data.kind),
+      referredBy: data.referredBy.trim().slice(0, 120) || null,
+    },
   });
   revalidatePath(`/leads/${leadId}`);
   return { saved: true };
+}
+
+// Abordagem: "em conversa com outra IA" (a secretária não entra) e "não quer
+// mais contato" (nada automático sai mais pra essa pessoa).
+export async function setLeadOutreach(leadId: string, field: "otherAiActive" | "doNotContact", value: boolean) {
+  if (field !== "otherAiActive" && field !== "doNotContact") return;
+  await prisma.lead.update({ where: { id: leadId }, data: { [field]: value } });
+  revalidatePath(`/leads/${leadId}`);
 }

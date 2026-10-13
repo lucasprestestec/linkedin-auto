@@ -17,6 +17,13 @@ enum LeadStatus {
   LOST             // sem resposta / recusou
 }
 
+enum LeadKind {
+  PERSON    // pessoa física, profissional, família
+  BUSINESS  // empresa (benefícios, saúde, vida em grupo)
+  CANDIDATE // candidato a trabalhar com o corretor (ex.: preposto)
+  PARTNER   // parceiro / indicador
+}
+
 enum MessageChannel {
   LINKEDIN
   EMAIL
@@ -67,6 +74,15 @@ model Lead {
   // Ficha pessoal: o que o corretor sabe da pessoa (família, time, aniversário,
   // como se conheceram...). A IA usa pra personalizar as mensagens.
   personal          String?   @db.Text
+  // Que tipo de contato é (muda o gancho e quem atende) e quem indicou (a
+  // assistente cita na primeira mensagem; nunca diz que quem indicou é cliente).
+  kind              LeadKind?
+  referredBy        String?
+  // Outra IA (ex.: a Sofia) está conversando com a pessoa: a secretária não
+  // aborda nem responde em nenhum canal até isso ser desmarcado.
+  otherAiActive     Boolean   @default(false)
+  // Recusou ou pediu pra parar: nada automático sai mais, nem em campanha nova.
+  doNotContact      Boolean   @default(false)
   // CRM: anotações livres do corretor (só ele vê) e etiquetas.
   notes             String?   @db.Text
   tags              String[]  @default([])

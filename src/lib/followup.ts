@@ -103,6 +103,10 @@ function errorMessage(err: unknown) {
 // recebe abertura nem follow-up (respostas a quem escrever continuam normais).
 const IN_ACTIVE_CAMPAIGN = { OR: [{ campaignId: null }, { campaign: { status: "ACTIVE" as const } }] };
 
+// Quem a secretária pode abordar: não pediu pra parar e não está conversando
+// com outra IA (ex.: a Sofia) — essa só volta quando o corretor desmarcar.
+const CAN_APPROACH = { doNotContact: false, otherAiActive: false };
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Quando a secretária decide esperar, ela volta a olhar esse lead depois disso.
 const WAIT_MS = DAY_MS;
@@ -143,6 +147,7 @@ async function sendOpenings(identityId: string, settings: Settings, budget: Budg
       linkedinConnected: true,
       linkedinThreadId: null,
       messages: { none: { channel: "LINKEDIN" } },
+      ...CAN_APPROACH,
       ...IN_ACTIVE_CAMPAIGN,
       ...OPEN_DRAFT_FILTER,
     },
@@ -200,6 +205,7 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
       email: { not: null },
       messages: { none: {} },
       OR: [{ invitedAt: { lte: cutoff } }, { invitedAt: null, createdAt: { lte: cutoff } }],
+      ...CAN_APPROACH,
       AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER],
     },
     orderBy: { createdAt: "asc" },
@@ -238,7 +244,7 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
 async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WHATSAPP: boolean }, budget: Budget): Promise<number> {
   if (budget.total <= 0) return 0;
   const leads = await prisma.lead.findMany({
-    where: { status: "NEW", firstContactChannel: { in: ["EMAIL", "WHATSAPP"] }, messages: { none: {} }, ...IN_ACTIVE_CAMPAIGN, ...OPEN_DRAFT_FILTER },
+    where: { status: "NEW", firstContactChannel: { in: ["EMAIL", "WHATSAPP"] }, messages: { none: {} }, ...CAN_APPROACH, ...IN_ACTIVE_CAMPAIGN, ...OPEN_DRAFT_FILTER },
     orderBy: { createdAt: "asc" },
   });
   const rules = parseExclusionList(settings.exclusionList);
@@ -325,6 +331,7 @@ async function sendFollowUps(
       where: {
         // INVITE_SENT entra só se já recebeu e-mail (apresentação): segue por lá.
         OR: [{ status: { in: PROACTIVE_STATUSES } }, { status: "INVITE_SENT", messages: { some: {} } }],
+        ...CAN_APPROACH,
         AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER, { OR: [{ nextStepAt: null }, { nextStepAt: { lte: new Date(now) } }] }],
       },
       include: {
@@ -438,7 +445,7 @@ async function sendFollowUps(
 // da conversa é do lead e ninguém respondeu ainda.
 async function answerPendingReplies(identityId: string | null): Promise<number> {
   const leads = await prisma.lead.findMany({
-    where: { status: { in: ["CONVERSATION_OPEN", "QUALIFIED"] }, ...OPEN_DRAFT_FILTER },
+    where: { status: { in: ["CONVERSATION_OPEN", "QUALIFIED"] }, otherAiActive: false, ...OPEN_DRAFT_FILTER },
     include: { messages: { orderBy: { deliveredAt: "desc" }, take: 1 } },
   });
   const pending = leads
@@ -480,6 +487,7 @@ async function sendBookingNudges(
       meetingAt: null,
       bookingNudgedAt: null,
       slotsProposedAt: { lt: new Date(Date.now() - BOOKING_NUDGE_DELAY_MS) },
+      ...CAN_APPROACH,
       AND: [IN_ACTIVE_CAMPAIGN, OPEN_DRAFT_FILTER],
     },
     orderBy: { slotsProposedAt: "asc" },

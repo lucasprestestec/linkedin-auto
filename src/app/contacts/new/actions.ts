@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { parseLeadKind } from "@/lib/leadKind";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
 import { normalizeLinkedinUrl } from "@/lib/linkedin";
 import { findLeadByProfileUrl } from "@/lib/leads";
@@ -27,6 +28,8 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
   const lastName = field(formData, "lastName").slice(0, 80);
   const jobTitle = field(formData, "jobTitle").slice(0, 200);
   const personal = field(formData, "personal").slice(0, 2000);
+  const referredBy = field(formData, "referredBy").slice(0, 120);
+  const kind = parseLeadKind(field(formData, "kind"));
   const campaignId = field(formData, "campaignId") || null;
   const firstContact = (field(formData, "firstContact") || "ME") as FirstContact;
 
@@ -82,6 +85,8 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
       email: e.email,
       phone: p.phone,
       personal: personal || null,
+      referredBy: referredBy || null,
+      kind,
       linkedinProfileUrl,
       campaignId,
       status: firstContact === "LINKEDIN" ? "INVITE_SENT" : "NEW",

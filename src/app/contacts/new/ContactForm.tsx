@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { LeadKind } from "@prisma/client";
+import { LEAD_KIND_LABEL } from "@/lib/leadKind";
 import { startTransition, useActionState, useState } from "react";
 import { Help } from "@/components/Help";
 import { createContact, type ContactFormState } from "./actions";
@@ -72,6 +74,25 @@ export function ContactForm({
         <div>
           <label className="label">Cargo e empresa</label>
           <input className="field" name="jobTitle" autoComplete="off" placeholder="Diretora de RH · Grupo Vértice" />
+        </div>
+        <div className="row" style={{ gap: 10, alignItems: "flex-start" }}>
+          <div className="grow">
+            <label className="label">Tipo de contato</label>
+            <select className="field" name="kind" defaultValue="">
+              <option value="">Não definido</option>
+              {(Object.keys(LEAD_KIND_LABEL) as LeadKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {LEAD_KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grow">
+            <label className="label">
+              Quem indicou <Help>O assistente cita essa pessoa na primeira mensagem (&ldquo;fulano recomendou falar com você&rdquo;).</Help>
+            </label>
+            <input className="field" name="referredBy" autoComplete="off" placeholder="Ex.: Bruno Alves" />
+          </div>
         </div>
         <div className="row" style={{ gap: 10, alignItems: "flex-start" }}>
           <div className="grow">
