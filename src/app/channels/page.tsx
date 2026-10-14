@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ChannelTitle } from "@/components/ChannelBadge";
@@ -5,6 +6,7 @@ import { Help } from "@/components/Help";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { fixedDeskcommUrl } from "@/lib/deskcomm";
+import { emailLeftToday } from "@/lib/mailboxes";
 import { WhatsappCard } from "./WhatsappCard";
 import { EmailCard } from "../settings/EmailCard";
 import { EmailChannelOptions } from "./EmailChannelOptions";
@@ -26,13 +28,15 @@ async function emailWeek() {
 export default async function ChannelsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const emailResult = (await searchParams).email;
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [status, email, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }] = await Promise.all([
+  const [status, email, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, emailLeft] = await Promise.all([
     linkedinStatus(settings),
     emailConnection(),
     messagesSentToday(),
     emailsSentToday(),
     whatsappSentToday(),
     emailWeek(),
+    prisma.mailbox.count({ where: { status: "ACTIVE" } }),
+    emailLeftToday(settings),
   ]);
 
   return (
@@ -65,11 +69,17 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
           fallbackAddress={email?.provider === "password" ? email.address : null}
           result={typeof emailResult === "string" ? emailResult : null}
         />
-        {email && (
+        <p className="hint">
+          Caixas de envio da prospecção: {activeBoxes > 0 ? `${activeBoxes} ${activeBoxes === 1 ? "ativa" : "ativas"}` : "nenhuma ainda"}.{" "}
+          <Link href="/channels/caixas" className="btn-text">
+            Gerenciar caixas
+          </Link>
+        </p>
+        {(email || activeBoxes > 0) && (
           <>
             <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
             <p className="hint">
-              Hoje: {emailToday} de {settings.dailyEmailLimit} e-mails · últimos 7 dias: {openedWeek} de {sentWeek} abertos
+              Hoje: {emailToday} enviados, ainda cabem {emailLeft} · últimos 7 dias: {openedWeek} de {sentWeek} abertos
             </p>
           </>
         )}

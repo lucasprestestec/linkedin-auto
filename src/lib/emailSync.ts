@@ -1,6 +1,7 @@
 import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fetchNewEmails } from "@/lib/email";
+import { fetchNewEmails, type IncomingEmail } from "@/lib/email";
+import { fetchAllMailboxEmails, handleBounceEmail, type MailboxEmail } from "@/lib/mailboxes";
 import { markNeedsHuman } from "@/lib/handoff";
 import { captureContactsSafely } from "@/lib/contactCapture";
 
@@ -9,7 +10,17 @@ import { captureContactsSafely } from "@/lib/contactCapture";
 // lead é ignorado: a caixa é pessoal, não uma fila de atendimento.
 // Devolve os leads que escreveram, pra secretária responder.
 export async function syncEmailInbox(): Promise<{ read: number; saved: number; leads: Lead[] }> {
-  const emails = await fetchNewEmails();
+  const mailboxEmails = await fetchAllMailboxEmails().catch((err) => {
+    console.error("Falha ao ler as caixas de envio", err);
+    return [] as MailboxEmail[];
+  });
+  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...(await fetchNewEmails()), ...mailboxEmails];
+  // E-mail devolvido: trata e tira da fila (não é conversa).
+  const emails: typeof all = [];
+  for (const e of all) {
+    if (e.mailbox && (await handleBounceEmail(e as MailboxEmail))) continue;
+    emails.push(e);
+  }
   if (emails.length === 0) return { read: 0, saved: 0, leads: [] };
 
   const addresses = [...new Set(emails.map((e) => e.from))];
@@ -29,7 +40,7 @@ export async function syncEmailInbox(): Promise<{ read: number; saved: number; l
       continue;
     }
     await prisma.message.create({
-      data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, emailThreadId: e.threadId, deliveredAt: e.date },
+      data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, emailThreadId: e.threadId, deliveredAt: e.date, mailboxId: e.mailbox?.id ?? null },
     });
     saved++;
     await captureContactsSafely(lead.id, e.text);
