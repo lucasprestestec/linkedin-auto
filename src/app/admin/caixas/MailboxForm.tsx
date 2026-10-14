@@ -6,6 +6,55 @@ import { addMailbox, type MailboxInput } from "./actions";
 
 const EMPTY: MailboxInput = { address: "", password: "", displayName: "", dailyLimit: 25, smtpHost: "", smtpPort: 465, imapHost: "", imapPort: 993 };
 
+const GOOGLE_PAGES = {
+  etapas: "https://myaccount.google.com/signinoptions/twosv",
+  appLink: "https://myaccount.google.com/apppasswords",
+  conta: "https://myaccount.google.com/security",
+};
+
+function ext(href: string, label: string) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer noopener">
+      {label}
+    </a>
+  );
+}
+
+// Onde achar cada informação pedida no formulário.
+function Guide({ address }: { address: string }) {
+  const domain = address.split("@")[1]?.toLowerCase() ?? "";
+  const gmail = domain === "gmail.com" || domain === "googlemail.com";
+  return (
+    <details className="fold" open={gmail || undefined}>
+      <summary>Onde encontro a senha e os servidores?</summary>
+      <div className="fold-body">
+        {gmail || !domain ? (
+          <ol className="small muted" style={{ paddingLeft: 18, display: "grid", gap: 6, margin: 0 }}>
+            <li>
+              A conta precisa da <b>verificação em duas etapas</b> ligada: {ext(GOOGLE_PAGES.etapas, "abrir verificação em duas etapas")}.
+            </li>
+            <li>
+              Crie uma <b>senha de app</b> (dê o nome &quot;Central Dors&quot;): {ext(GOOGLE_PAGES.appLink, "abrir senhas de app")}. O Google mostra 16 letras; copie e cole
+              aqui, sem espaços. <b>Não é a senha do seu Gmail.</b>
+            </li>
+            <li>Os servidores do Gmail já vêm preenchidos abaixo (envio smtp.gmail.com, porta 465; leitura imap.gmail.com, porta 993).</li>
+            <li>
+              Se o Google disser que a opção de senha de app não está disponível, confira a segurança da conta: {ext(GOOGLE_PAGES.conta, "abrir segurança da conta")}. Em
+              contas de empresa (Workspace), o administrador pode ter desligado as senhas de app.
+            </li>
+          </ol>
+        ) : (
+          <p className="small muted">
+            Domínio próprio: o endereço, a senha e os servidores de envio (SMTP) e de leitura (IMAP) aparecem no painel do provedor onde a caixa foi criada, geralmente em
+            &quot;configurar no programa de e-mail&quot; ou &quot;IMAP/SMTP&quot;. Use a senha da caixa ou, se o provedor oferecer, uma senha de app. As portas mais comuns são 465 para
+            envio e 993 para leitura.
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 // Cadastra uma caixa nova. Gmail e Outlook vêm com os servidores preenchidos; nos demais, repete os servidores da última
 // caixa cadastrada (todas costumam ser do mesmo provedor).
 export function MailboxForm({ defaults }: { defaults?: Partial<MailboxInput> }) {
@@ -46,6 +95,7 @@ export function MailboxForm({ defaults }: { defaults?: Partial<MailboxInput> }) 
         });
       }}
     >
+      <Guide address={form.address} />
       <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
         <label className="grow" style={{ minWidth: 220 }}>
           <span className="label">Endereço da caixa</span>
