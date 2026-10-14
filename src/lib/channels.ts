@@ -3,6 +3,7 @@ import type { Lead, MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
 import { sendEmail } from "@/lib/email";
+import { unsubscribeUrl } from "@/lib/unsubscribe";
 import { sendWhatsapp, WhatsappNotSentError } from "@/lib/deskcomm";
 
 // Um lugar só pra "mandar uma mensagem pra essa pessoa por este canal" e
@@ -48,7 +49,7 @@ export async function sendOnChannel(
     const subject = opts.subject?.trim() || thread.subject;
     // Código único da imagem invisível: quando ela carrega, o e-mail foi aberto.
     const openToken = randomBytes(18).toString("base64url");
-    const r = await sendEmail({ to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken });
+    const r = await sendEmail({ to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken, unsubscribeUrl: unsubscribeUrl(lead.id) });
     return prisma.message.create({
       data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date },
     });
