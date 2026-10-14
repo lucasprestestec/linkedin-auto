@@ -96,7 +96,7 @@ export default async function AdminPage() {
         <div className="sec-head">
           <div className="setting-text">
             <h2 className="t-label">Acessos ao painel</h2>
-            <small>Cada pessoa da equipe entra com o próprio e-mail e a própria senha, escolhida por um link de convite.</small>
+            <small>Cada pessoa da equipe entra com o próprio login e a própria senha, escolhida por um link de convite.</small>
           </div>
           <Link href="/admin/acessos" className="btn-line btn-sm">
             Abrir

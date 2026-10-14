@@ -495,13 +495,14 @@ model Mailbox {
   messages    Message[]
 }
 
-// Acesso individual ao painel (cada pessoa entra com o próprio e-mail e a própria senha).
+// Acesso individual ao painel (cada pessoa entra com o próprio login e a própria senha).
 // A senha nasce de um link de convite gerado no /admin: ninguém digita a senha de outra pessoa.
 model PanelUser {
   id           String   @id @default(cuid())
   createdAt    DateTime @default(now())
   name         String
-  email        String   @unique
+  // Nome de entrada (ex.: "maria"), sempre em minúsculas e sem acento.
+  login        String   @unique
   // scrypt$sal$hash; nulo até a pessoa abrir o link de convite e escolher a senha.
   passwordHash String?
   active       Boolean  @default(true)

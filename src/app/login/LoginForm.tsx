@@ -11,7 +11,7 @@ export function LoginForm({ individual }: { individual: boolean }) {
       <form action={formAction} className="solo-form">
         <h1 className="t-title">Entrar</h1>
         {individual && (
-          <input className="field" type="email" name="email" placeholder="Seu e-mail" aria-label="E-mail" autoComplete="username" autoFocus required />
+          <input className="field" type="text" name="login" placeholder="Seu login (ex.: maria)" aria-label="Login" autoComplete="username" autoCapitalize="none" autoCorrect="off" autoFocus required />
         )}
         <input
           className="field"

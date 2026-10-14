@@ -6,7 +6,7 @@ process.env.SESSION_SECRET = "x".repeat(32);
 
 async function main() {
   const { createUserToken, isValidSessionToken, parseUserToken } = await import("../src/lib/auth");
-  const { createInviteToken, fingerprint, hashPassword, readInviteToken, verifyPassword } = await import("../src/lib/panelUsers");
+  const { createInviteToken, fingerprint, hashPassword, normalizeLogin, readInviteToken, verifyPassword } = await import("../src/lib/panelUsers");
 
   const phrase = "frase-longa-de-teste";
   const h = hashPassword(phrase);
@@ -26,11 +26,14 @@ async function main() {
   assert.equal(readInviteToken("lixo", now), null);
   assert.notEqual(fingerprint(null), fingerprint(h)); // depois de escolher a senha, o link antigo não confere mais
 
+  assert.equal(normalizeLogin("  Maria Eduarda "), "maria.eduarda");
+  assert.equal(normalizeLogin("JÚLIA"), "julia");
+
   // Sessão individual.
   const tok = createUserToken("abc123", fingerprint(h));
   assert.deepEqual(parseUserToken(tok), { id: "abc123", fp: fingerprint(h) });
   assert.equal(isValidSessionToken(tok), true);
-  assert.equal(parseUserToken(tok.slice(0, -1) + "0"), null);
+  assert.equal(parseUserToken(tok.slice(0, -1) + (tok.endsWith("0") ? "1" : "0")), null);
   assert.equal(isValidSessionToken("u.abc123.aaaa.bbbb"), false);
   assert.equal(parseUserToken(createUserToken("abc123", "x").replace("abc123", "outro")), null);
 
