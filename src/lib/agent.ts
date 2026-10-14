@@ -23,8 +23,8 @@ export const DEFAULT_CONVERSATION_MODEL = "openai/gpt-6.1-sol";
 // testes); tarefas simples (nota de perfil, resumo) usam um modelo rápido.
 // ---------------------------------------------------------------------------
 
-// Identidade da assistente (admin): com nome, ela fala por si ("Helena, da
-// área de novos negócios") e nunca se passa pelo corretor; sem nome, escreve
+// Identidade da assistente (admin): com nome, ela fala por si ("Helena, responsável
+// de novos negócios da DOR$") e nunca se passa pelo corretor; sem nome, escreve
 // em primeira pessoa como o corretor (o comportamento original).
 export interface Persona {
   name: string | null;
