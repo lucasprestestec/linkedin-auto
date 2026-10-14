@@ -27,7 +27,7 @@ export default async function AccessPage() {
           <p className="t-sub">
             {withPassword === 0
               ? "Hoje todos entram com a senha única. Quando a primeira pessoa escolher a própria senha, a senha única deixa de valer."
-              : "A senha única já não vale: cada pessoa entra com o próprio e-mail e a própria senha."}
+              : "A senha única já não vale: cada pessoa entra com o próprio login e a própria senha."}
           </p>
         </div>
       </header>
@@ -41,7 +41,7 @@ export default async function AccessPage() {
                   <span className="item-title">
                     {u.name} · {u.active ? (u.passwordHash ? "Com acesso" : "Aguardando escolher a senha") : "Desativada"}
                   </span>
-                  <span className="item-sub">{u.email}</span>
+                  <span className="item-sub">login: {u.login}</span>
                 </div>
                 <UserActions id={u.id} active={u.active} />
               </div>
@@ -53,7 +53,7 @@ export default async function AccessPage() {
       <section className="sec">
         <UserForm />
         <p className="hint" style={{ margin: 0 }}>
-          Depois de cadastrar, gere o link de senha e envie à pessoa. Ela abre o link e escolhe a senha: você nunca vê nem digita a senha de ninguém. Quem esqueceu a senha usa o mesmo caminho: novo link.
+          Depois de cadastrar, gere o link de senha e envie à pessoa. Ela abre o link e escolhe a senha: você nunca vê nem digita a senha de ninguém. Quem esqueceu a senha usa o mesmo caminho: novo link. O login é o nome de entrada (ex.: maria), sem acento.
         </p>
       </section>
     </main>

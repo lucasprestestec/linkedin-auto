@@ -3,7 +3,7 @@ import { COOKIE_NAME, isValidSessionToken, parseUserToken } from "@/lib/auth";
 import { fingerprint } from "@/lib/panelUsers";
 import { prisma } from "@/lib/prisma";
 
-export type Session = { kind: "legacy" } | { kind: "user"; user: { id: string; name: string; email: string } };
+export type Session = { kind: "legacy" } | { kind: "user"; user: { id: string; name: string; login: string } };
 
 // Já existe alguém com senha própria? Daí em diante a senha única deixa de valer.
 export async function hasIndividualAccess(): Promise<boolean> {
@@ -18,7 +18,7 @@ export async function getSession(): Promise<Session | null> {
   if (parsed) {
     const user = await prisma.panelUser.findUnique({ where: { id: parsed.id } });
     if (!user || !user.active || fingerprint(user.passwordHash) !== parsed.fp) return null;
-    return { kind: "user", user: { id: user.id, name: user.name, email: user.email } };
+    return { kind: "user", user: { id: user.id, name: user.name, login: user.login } };
   }
   return (await hasIndividualAccess()) ? null : { kind: "legacy" };
 }

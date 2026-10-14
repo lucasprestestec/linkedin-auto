@@ -4,6 +4,17 @@ import { signWith } from "@/lib/auth";
 // Acesso individual ao painel: senha guardada só como hash (scrypt) e link de convite assinado.
 
 export const MIN_PASSWORD = 10;
+
+// "Maria Eduarda" -> "maria.eduarda": minúsculas, sem acento, sem espaço. Vale no cadastro e no login.
+export function normalizeLogin(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ".")
+    .replace(/[^a-z0-9._@-]/g, "");
+}
 const INVITE_DAYS = 7;
 
 export function hashPassword(pw: string): string {
