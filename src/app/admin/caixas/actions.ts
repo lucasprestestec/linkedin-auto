@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { MailboxStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/admin";
 import { parseEmail } from "@/lib/contactFields";
 import { seal } from "@/lib/secretBox";
 import { testServers } from "@/lib/email";
@@ -25,7 +25,7 @@ const port = (v: number) => (Number.isInteger(v) && v > 0 && v < 65536 ? v : nul
 
 // Cadastra uma caixa. Antes de guardar, confere se o envio e a leitura funcionam com os dados informados.
 export async function addMailbox(data: MailboxInput): Promise<{ error?: string }> {
-  await requireSession();
+  await requireAdmin();
   const e = parseEmail(data.address);
   if ("error" in e) return { error: e.error };
   if (!e.email) return { error: "Informe o endereço da caixa." };
@@ -58,33 +58,33 @@ export async function addMailbox(data: MailboxInput): Promise<{ error?: string }
   if (problem) return { error: `Não consegui entrar nessa caixa. ${problem}` };
 
   await prisma.mailbox.create({ data: { ...fields, passwordEnc: seal(data.password) } });
-  revalidatePath("/channels/caixas");
+  revalidatePath("/admin/caixas");
   revalidatePath("/channels");
   return {};
 }
 
 // Pausa (não envia, mas continua lendo as respostas), retoma ou aposenta a caixa. Aposentada fica no histórico.
 export async function setMailboxStatus(id: string, status: MailboxStatus) {
-  await requireSession();
+  await requireAdmin();
   if (status !== "ACTIVE" && status !== "PAUSED" && status !== "RETIRED") return;
   await prisma.mailbox.update({ where: { id }, data: { status } });
-  revalidatePath("/channels/caixas");
+  revalidatePath("/admin/caixas");
   revalidatePath("/channels");
 }
 
 export async function setMailboxLimit(id: string, dailyLimit: number) {
-  await requireSession();
+  await requireAdmin();
   await prisma.mailbox.update({ where: { id }, data: { dailyLimit: Math.min(100, Math.max(1, Math.round(dailyLimit) || 25)) } });
-  revalidatePath("/channels/caixas");
+  revalidatePath("/admin/caixas");
 }
 
 // Confere a conexão da caixa agora.
 export async function testMailbox(id: string): Promise<{ error?: string }> {
-  await requireSession();
+  await requireAdmin();
   const mb = await prisma.mailbox.findUnique({ where: { id } });
   if (!mb) return { error: "Caixa não encontrada." };
   const problem = await testServers(mailboxConfig(mb));
   await prisma.mailbox.update({ where: { id }, data: problem ? { lastError: problem.slice(0, 300), lastErrorAt: new Date() } : { lastError: null } });
-  revalidatePath("/channels/caixas");
+  revalidatePath("/admin/caixas");
   return problem ? { error: problem } : {};
 }

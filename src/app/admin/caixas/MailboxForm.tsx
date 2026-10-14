@@ -6,10 +6,12 @@ import { addMailbox, type MailboxInput } from "./actions";
 
 const EMPTY: MailboxInput = { address: "", password: "", displayName: "", dailyLimit: 25, smtpHost: "", smtpPort: 465, imapHost: "", imapPort: 993 };
 
-// Cadastra uma caixa nova. Gmail e Outlook vêm com os servidores preenchidos; domínio próprio, o usuário informa.
-export function MailboxForm() {
+// Cadastra uma caixa nova. Gmail e Outlook vêm com os servidores preenchidos; nos demais, repete os servidores da última
+// caixa cadastrada (todas costumam ser do mesmo provedor).
+export function MailboxForm({ defaults }: { defaults?: Partial<MailboxInput> }) {
+  const base: MailboxInput = { ...EMPTY, ...defaults };
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<MailboxInput>(EMPTY);
+  const [form, setForm] = useState<MailboxInput>(base);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -39,7 +41,7 @@ export function MailboxForm() {
         start(async () => {
           const r = await addMailbox(form);
           if (r.error) return setError(r.error);
-          setForm(EMPTY);
+          setForm(base);
           setOpen(false);
         });
       }}
