@@ -1,24 +1,25 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { checkPassword, createSessionToken, COOKIE_NAME } from "@/lib/auth";
+import { checkPassword, createSessionToken, createUserToken } from "@/lib/auth";
+import { fingerprint, verifyPassword } from "@/lib/panelUsers";
+import { prisma } from "@/lib/prisma";
+import { hasIndividualAccess, startSession } from "@/lib/session";
 
 export async function login(_prevState: { error?: string } | undefined, formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
-  if (!checkPassword(password)) {
-    return { error: "Senha incorreta." };
+  if (await hasIndividualAccess()) {
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const user = email ? await prisma.panelUser.findUnique({ where: { email } }) : null;
+    // Confere a senha mesmo sem achar a pessoa, para não revelar quais e-mails existem.
+    const ok = verifyPassword(password, user?.passwordHash ?? null);
+    if (!user || !user.active || !ok) return { error: "E-mail ou senha incorretos." };
+    await startSession(createUserToken(user.id, fingerprint(user.passwordHash)));
+  } else {
+    if (!checkPassword(password)) return { error: "Senha incorreta." };
+    await startSession(createSessionToken());
   }
-
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, createSessionToken(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
 
   redirect("/");
 }

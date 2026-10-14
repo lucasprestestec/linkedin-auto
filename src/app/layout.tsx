@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Big_Shoulders, Onest } from "next/font/google";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import "./ds.css";
 import { AppShell } from "@/components/AppShell";
-import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
+import { COOKIE_NAME } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { getShellData } from "@/lib/shell";
 import { PREFS_SCRIPT } from "@/lib/prefs";
 
@@ -42,8 +44,13 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   // Os dados do menu (nome, notificações) só vão pra quem está logado.
-  const authed = isValidSessionToken((await cookies()).get(COOKIE_NAME)?.value);
-  const shell = authed ? await getShellData() : null;
+  const session = await getSession();
+  // Cookie assinado, mas a pessoa foi desativada (ou trocou a senha): volta ao login.
+  const path = (await headers()).get("x-path") ?? "";
+  const open = path === "/login" || path.startsWith("/convite/") || ["/sobre", "/privacidade", "/termos"].includes(path);
+  if (!session && !open && path && (await cookies()).get(COOKIE_NAME)) redirect("/login");
+  const base = session ? await getShellData() : null;
+  const shell = base && session?.kind === "user" ? { ...base, ownerName: session.user.name } : base;
 
   return (
     <html lang="pt-BR" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>

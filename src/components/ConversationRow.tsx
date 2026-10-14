@@ -8,6 +8,7 @@ import { ChannelBadge } from "./ChannelBadge";
 function preview(c: ConvItem): string {
   if (c.status === "NEEDS_HUMAN" && c.needsHumanReason) return c.needsHumanReason;
   if (c.lastMessage) return `${c.lastMessage.sender === "AGENT" ? "Assistente: " : c.lastMessage.sender === "HUMAN" ? "Você: " : ""}${c.lastMessage.content}`;
+  if (c.status === "NEW") return "Novo contato, ainda sem mensagem";
   return c.status === "INVITE_SENT" ? "Aguardando aceite do convite" : "Conexão aceita";
 }
 

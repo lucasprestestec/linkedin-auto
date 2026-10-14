@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
 
+// O layout precisa saber a página atual para mandar quem perdeu o acesso de volta ao login.
+function pass(request: NextRequest) {
+  const headers = new Headers(request.headers);
+  headers.set("x-path", request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers } });
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -16,13 +23,15 @@ export function proxy(request: NextRequest) {
     // Áudio que vai por WhatsApp: o Deskcomm baixa daqui (código impossível de adivinhar, vence em 24 h).
     pathname.startsWith("/api/audio/") ||
     pathname === "/login" ||
+    // Convite de acesso: a pessoa ainda não tem senha. O código é assinado e vale uma vez.
+    pathname.startsWith("/convite/") ||
     // Páginas públicas exigidas pelo Google na tela de consentimento do OAuth.
     pathname === "/sobre" ||
     pathname === "/privacidade" ||
     pathname === "/termos" ||
     pathname.startsWith("/_next")
   ) {
-    return NextResponse.next();
+    return pass(request);
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
@@ -31,7 +40,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return pass(request);
 }
 
 export const config = {
