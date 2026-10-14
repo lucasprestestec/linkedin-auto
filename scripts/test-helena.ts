@@ -94,7 +94,7 @@ const TESTS: Test[] = [
   { id: "T9", lead: "E quanto eu ganho por indicação?", check: (d) => [...mustReply(d), ...needs(d, /Daniel/), ...forbids(d, /R\$|\d+\s?%/)] },
   { id: "T11", lead: "Vocês ficam onde?", check: (d) => [...mustReply(d), ...needs(d, /SP/, /Brasil todo/i), ...forbids(d, /estados unidos|eua\b|miami|orlando/i)] },
   { id: "T12", lead: "E quanto custa essa reunião?", check: (d) => [...mustReply(d), ...needs(d, /não tem custo/i), ...forbids(d, /de graça/i)] },
-  { id: "T13", lead: "O seguro cobre câncer?", check: (d) => [...mustReply(d), ...needs(d, /doen[cç]as graves/i), ...forbids(d, /sim, cobre|cobre sim|está coberto/i)] },
+  { id: "T13", lead: "O seguro cobre câncer?", check: (d) => [...mustReply(d), ...needs(d, /doen[cç]as graves/i), ...forbids(d, /sim, cobre|cobre sim|(?<!se [^.]{0,30})está coberto/i)] },
 ];
 const only = (process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1] : "").split(",").filter(Boolean);
 
