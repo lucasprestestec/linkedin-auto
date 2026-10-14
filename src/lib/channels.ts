@@ -3,6 +3,7 @@ import type { Lead, MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
 import { sendEmail } from "@/lib/email";
+import { pickMailboxFor, sendViaMailbox } from "@/lib/mailboxes";
 import { unsubscribeUrl } from "@/lib/unsubscribe";
 import { sendWhatsapp, WhatsappNotSentError } from "@/lib/deskcomm";
 
@@ -45,13 +46,18 @@ export async function sendOnChannel(
   }
   if (channel === "EMAIL") {
     if (!lead.email) throw new Error("Essa pessoa não tem e-mail na ficha.");
+    if (lead.emailBouncedAt) throw new Error("O e-mail dessa pessoa foi devolvido (o endereço não existe). Corrija o e-mail na ficha.");
     const thread = await replyThread(lead.id);
     const subject = opts.subject?.trim() || thread.subject;
     // Código único da imagem invisível: quando ela carrega, o e-mail foi aberto.
     const openToken = randomBytes(18).toString("base64url");
-    const r = await sendEmail({ to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken, unsubscribeUrl: unsubscribeUrl(lead.id) });
+    const input = { to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken, unsubscribeUrl: unsubscribeUrl(lead.id) };
+    // Com caixas de envio ativas, sai por uma delas (a mesma da conversa, se já houver); senão, pela caixa única.
+    const { mailbox, configured } = await pickMailboxFor(lead.id);
+    if (configured && !mailbox) throw new Error("Todas as caixas de envio chegaram ao limite de hoje. O e-mail sai amanhã.");
+    const r = mailbox ? await sendViaMailbox(mailbox, input) : await sendEmail(input);
     return prisma.message.create({
-      data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date },
+      data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date, mailboxId: mailbox?.id ?? null },
     });
   }
   if (channel === "WHATSAPP") {

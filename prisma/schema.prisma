@@ -84,6 +84,8 @@ model Lead {
   // Recusou ou pediu pra parar: nada automático sai mais, nem em campanha nova.
   doNotContact      Boolean   @default(false)
   // Quem da equipe atende este contato (os avisos de reunião e "precisa de você" vão pra essa pessoa).
+  // E-mail devolvido (caixa inexistente etc.): não tentamos de novo.
+  emailBouncedAt    DateTime?
   assignee          TeamMember? @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
   assigneeId        String?
   // CRM: anotações livres do corretor (só ele vê) e etiquetas.
@@ -273,6 +275,9 @@ model Message {
   linkedinMessageId String? @unique
   // E-mail: Message-ID (dedupe e resposta na mesma thread) e assunto.
   emailMessageId String? @unique
+  // Caixa de envio por onde o e-mail saiu (ou chegou). Sem valor = a caixa única de antes.
+  mailbox   Mailbox? @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  mailboxId String?
   subject   String?
   // Gmail: conversa (thread) em que a mensagem está, pra responder nela.
   emailThreadId String?
@@ -451,4 +456,41 @@ model TeamMember {
   // Contatos de que esta pessoa é a responsável.
   leads                  Lead[]
   createdAt              DateTime @default(now())
+}
+
+enum MailboxStatus {
+  ACTIVE
+  PAUSED
+  RETIRED
+}
+
+// Caixa de e-mail usada na prospecção (várias, em rodízio). Cada uma tem limite por dia que
+// sobe aos poucos (aquecimento), pra proteger a reputação do domínio.
+model Mailbox {
+  id          String        @id @default(cuid())
+  createdAt   DateTime      @default(now())
+  address     String        @unique
+  // Nome que aparece no "De:" (vazio = nome da assistente ou do corretor).
+  displayName String?
+  status      MailboxStatus @default(ACTIVE)
+  smtpHost    String
+  smtpPort    Int
+  smtpSecure  Boolean
+  imapHost    String
+  imapPort    Int
+  imapSecure  Boolean
+  // Senha guardada cifrada (ver lib/secretBox.ts).
+  passwordEnc String
+  // Teto de e-mails por dia depois do aquecimento.
+  dailyLimit  Int           @default(25)
+  // Dia em que a caixa começou a enviar: o limite do dia sobe a partir dele.
+  startedAt   DateTime      @default(now())
+  // Leitura da caixa de entrada (IMAP): até onde já foi lida.
+  imapLastUid      Int?
+  imapUidValidity  String?
+  bounces     Int           @default(0)
+  lastCheckedAt DateTime?
+  lastError   String?
+  lastErrorAt DateTime?
+  messages    Message[]
 }

@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import type { LeadKind, TeamMember } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { emailEnabled, sendEmail } from "@/lib/email";
+import { internalEmailEnabled, sendEmail } from "@/lib/email";
 import { deskcommConfig, sendWhatsapp } from "@/lib/deskcomm";
 
 // Avisos pra equipe (além do push no celular do corretor), pelos canais que já
@@ -43,7 +43,7 @@ export async function noticeToMember(member: TeamMember, notice: { title: string
   const text = [notice.body, link].filter(Boolean).join("\n\n");
   const done: string[] = [];
 
-  if (member.email && member.viaEmail && (await emailEnabled())) {
+  if (member.email && member.viaEmail && (await internalEmailEnabled())) {
     try {
       await sendEmail({ to: member.email, subject: notice.title, text });
       done.push("e-mail");

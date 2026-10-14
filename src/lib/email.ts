@@ -55,7 +55,7 @@ function passwordConfig() {
   return { address, password, smtp, imap };
 }
 
-type PasswordConfig = NonNullable<ReturnType<typeof passwordConfig>>;
+export type PasswordConfig = NonNullable<ReturnType<typeof passwordConfig>>;
 
 export type EmailConnection = { provider: "google"; address: string } | { provider: "password"; address: string; cfg: PasswordConfig };
 
@@ -67,7 +67,14 @@ export async function emailConnection(): Promise<EmailConnection | null> {
   return cfg ? { provider: "password", address: cfg.address, cfg } : null;
 }
 
+// E-mail de prospecção disponível: alguma caixa de envio ativa ou a caixa única conectada.
 export async function emailEnabled(): Promise<boolean> {
+  return (await internalEmailEnabled()) || (await prisma.mailbox.count({ where: { status: "ACTIVE" } })) > 0;
+}
+
+// Só a caixa única conectada (Google ou senha de app): os avisos internos (equipe, resumo do dia) saem por ela,
+// nunca pelas caixas de prospecção.
+export async function internalEmailEnabled(): Promise<boolean> {
   return (await emailConnection()) !== null;
 }
 
@@ -76,7 +83,7 @@ export function passwordEmailAddress(): string | null {
   return passwordConfig()?.address ?? null;
 }
 
-function smtpTransport(cfg: PasswordConfig) {
+export function smtpTransport(cfg: PasswordConfig) {
   return nodemailer.createTransport({
     host: cfg.smtp.host,
     port: cfg.smtp.port,
@@ -85,7 +92,7 @@ function smtpTransport(cfg: PasswordConfig) {
   });
 }
 
-function imapClient(cfg: PasswordConfig) {
+export function imapClient(cfg: PasswordConfig) {
   return new ImapFlow({
     host: cfg.imap.host,
     port: cfg.imap.port,
@@ -95,7 +102,7 @@ function imapClient(cfg: PasswordConfig) {
   });
 }
 
-const errMessage = (err: unknown) => (err instanceof Error ? err.message : "erro desconhecido");
+export const errMessage = (err: unknown) => (err instanceof Error ? err.message : "erro desconhecido");
 
 // Confere a conexão sem enviar nem ler nada. null = funcionando.
 export async function testEmailConnection(): Promise<{ address: string | null; error: string | null }> {
@@ -109,13 +116,18 @@ export async function testEmailConnection(): Promise<{ address: string | null; e
       return { address: conn.address, error: errMessage(err) };
     }
   }
+  return { address: conn.address, error: await testServers(conn.cfg) };
+}
+
+// Confere envio (SMTP) e leitura (IMAP) de uma caixa com senha, sem enviar nem ler nada. null = funcionando.
+export async function testServers(cfg: PasswordConfig): Promise<string | null> {
   const errors: string[] = [];
   try {
-    await smtpTransport(conn.cfg).verify();
+    await smtpTransport(cfg).verify();
   } catch (err) {
     errors.push(`Envio (SMTP): ${errMessage(err)}`);
   }
-  const client = imapClient(conn.cfg);
+  const client = imapClient(cfg);
   try {
     await client.connect();
   } catch (err) {
@@ -123,13 +135,14 @@ export async function testEmailConnection(): Promise<{ address: string | null; e
   } finally {
     await client.logout().catch(() => {});
   }
-  return { address: conn.address, error: errors.join(" · ") || null };
+  return errors.join(" · ") || null;
 }
 
-async function fromName(): Promise<string | undefined> {
+export async function fromName(): Promise<string | undefined> {
   if (process.env.EMAIL_FROM_NAME) return process.env.EMAIL_FROM_NAME;
-  const s = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { ownerName: true } });
-  return s?.ownerName ?? undefined;
+  // Com assistente de nome próprio (Helena), o e-mail sai no nome dela, nunca no do corretor.
+  const s = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { ownerName: true, assistantName: true } });
+  return s?.assistantName?.trim() || s?.ownerName || undefined;
 }
 
 // Endereço da imagem invisível que marca a abertura. Sem APP_URL, sem rastreio.
@@ -170,7 +183,7 @@ export interface SentEmail {
   date: Date;
 }
 
-export async function sendEmail(input: {
+export interface EmailInput {
   to: string;
   subject: string;
   text: string;
@@ -181,13 +194,13 @@ export async function sendEmail(input: {
   // E-mail para uma pessoa de fora (não aviso interno): leva o rodapé de descadastro. O link vai no rodapé e no
   // cabeçalho que o Gmail usa no botão "cancelar inscrição"; null = sem link (sem APP_URL), o rodapé manda responder.
   unsubscribeUrl?: string | null;
-}): Promise<SentEmail> {
-  const conn = await emailConnection();
-  if (!conn) throw new Error("Nenhum e-mail conectado.");
-  const name = await fromName();
+}
+
+// Monta o e-mail pronto para sair de uma caixa (a conectada ou uma caixa de envio).
+export function composeMail(input: EmailInput, address: string, name: string | undefined): Mail.Options {
   const pixel = input.openToken ? openPixelUrl(input.openToken) : null;
-  const mail: Mail.Options = {
-    from: name ? { name, address: conn.address } : conn.address,
+  return {
+    from: name ? { name, address } : address,
     to: input.to,
     subject: input.subject,
     text: plainBody(input.text, input.unsubscribeUrl),
@@ -196,6 +209,12 @@ export async function sendEmail(input: {
     inReplyTo: input.inReplyTo ?? undefined,
     references: input.references?.length ? input.references : input.inReplyTo ? [input.inReplyTo] : undefined,
   };
+}
+
+export async function sendEmail(input: EmailInput): Promise<SentEmail> {
+  const conn = await emailConnection();
+  if (!conn) throw new Error("Nenhum e-mail conectado.");
+  const mail = composeMail(input, conn.address, await fromName());
 
   if (conn.provider === "google") {
     const raw = await new MailComposer(mail).compile().build();
@@ -236,7 +255,7 @@ export interface IncomingEmail {
   date: Date;
 }
 
-async function parseRaw(raw: Buffer, threadId: string | null): Promise<IncomingEmail | null> {
+export async function parseRaw(raw: Buffer, threadId: string | null): Promise<IncomingEmail | null> {
   const parsed = await simpleParser(raw);
   const from = parsed.from?.value?.[0]?.address?.toLowerCase();
   if (!from || !parsed.messageId) return null;
