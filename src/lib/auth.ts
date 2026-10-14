@@ -12,8 +12,30 @@ export function createSessionToken(): string {
   return sign("authenticated");
 }
 
+// Assina um texto com o segredo do sistema (usado também nos convites de acesso).
+export function signWith(value: string): string {
+  return sign(value);
+}
+
+// Sessão de acesso individual: u.<id da pessoa>.<impressão digital da senha>.<assinatura>.
+export function createUserToken(userId: string, fp: string): string {
+  const body = `u.${userId}.${fp}`;
+  return `${body}.${sign(body)}`;
+}
+
+export function parseUserToken(token: string | undefined): { id: string; fp: string } | null {
+  const parts = (token ?? "").split(".");
+  if (parts.length !== 4 || parts[0] !== "u") return null;
+  const a = Buffer.from(parts[3]);
+  const b = Buffer.from(sign(`u.${parts[1]}.${parts[2]}`));
+  return a.length === b.length && timingSafeEqual(a, b) ? { id: parts[1], fp: parts[2] } : null;
+}
+
+// Só confere a assinatura (o proxy não consulta o banco). Quem pode de fato entrar,
+// ou se a pessoa foi desativada, é decidido por getSession().
 export function isValidSessionToken(token: string | undefined): boolean {
   if (!token) return false;
+  if (parseUserToken(token)) return true;
   const expected = createSessionToken();
   const a = Buffer.from(token);
   const b = Buffer.from(expected);
