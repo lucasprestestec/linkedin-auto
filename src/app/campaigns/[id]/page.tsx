@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { campaignNumbers } from "@/lib/campaignStats";
+import { campaignNumbers, channelNumbers } from "@/lib/campaignStats";
 import { getConversationItems } from "@/lib/conversations";
 import { MobileHeader } from "@/components/MobileHeader";
 import { CampaignStatus } from "@/components/CampaignStatus";
@@ -20,7 +20,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
   const [campaign, conversations, settings] = await Promise.all([
     prisma.campaign.findUnique({
       where: { id },
-      include: { leads: { select: { status: true, messages: { select: { sender: true } } } }, steps: { orderBy: { position: "asc" } } },
+      include: { leads: { select: { status: true, linkedinConnected: true, invitedAt: true, phone: true, doNotContact: true, messages: { select: { sender: true, channel: true, openCount: true } } } }, steps: { orderBy: { position: "asc" } } },
     }),
     getConversationItems(),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true, campaignReview: true, campaignReviewDays: true, campaignReviewMessages: true } }),
@@ -28,6 +28,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
   if (!campaign) notFound();
 
   const n = campaignNumbers(campaign.leads);
+  const ch = channelNumbers(campaign.leads);
   const review = await reviewStateOf(campaign, settings);
   const people = conversations.filter((c) => c.campaignId === campaign.id);
   const active = campaign.status === "ACTIVE";
@@ -85,6 +86,27 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
           </div>
         ))}
       </div>
+
+      <section className="sec">
+        <div className="sec-head">
+          <h2 className="t-label">Por canal</h2>
+        </div>
+        <dl className="kv" style={{ gridTemplateColumns: "110px 1fr" }}>
+          <dt>E-mail</dt>
+          <dd>
+            {ch.email.sent} enviados · {ch.email.opened} abriram · {ch.email.replied} responderam · {ch.email.optedOut} pediram para sair
+          </dd>
+          <dt>LinkedIn</dt>
+          <dd>
+            {ch.linkedin.added} adicionados · {ch.linkedin.accepted} aceitaram · {ch.linkedin.replied} responderam
+          </dd>
+          <dt>WhatsApp</dt>
+          <dd>
+            {ch.whatsapp.have} têm WhatsApp · {ch.whatsapp.replied} responderam
+          </dd>
+        </dl>
+        <p className="small muted">Conta pessoas, uma vez cada. A abertura do e-mail é um sinal aproximado: alguns aplicativos abrem sozinhos e outros bloqueiam a imagem.</p>
+      </section>
 
       <section className="sec">
         <div className="sec-head">
