@@ -32,6 +32,11 @@ export default async function NewContactPage() {
             <Link href="/prospect" className="btn-text">
               Prospectar
             </Link>
+            {" "}
+            Tem uma planilha?{" "}
+            <Link href="/contacts/import" className="btn-text">
+              Importar vários de uma vez
+            </Link>
           </p>
         </div>
       </header>
