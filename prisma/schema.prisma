@@ -7,21 +7,21 @@ datasource db {
 }
 
 enum LeadStatus {
-  NEW // adicionado à mão, ainda sem nenhuma mensagem
-  INVITE_SENT // convite mandado, aguardando aceite
-  WAITING_REPLY // conectado; mandamos mensagem (abertura/follow-up) e o lead ainda não respondeu
+  NEW              // adicionado à mão, ainda sem nenhuma mensagem
+  INVITE_SENT      // convite mandado, aguardando aceite
+  WAITING_REPLY    // conectado; mandamos mensagem (abertura/follow-up) e o lead ainda não respondeu
   CONVERSATION_OPEN // o lead já respondeu pelo menos uma vez — conversa de verdade
-  NEEDS_HUMAN // agente pediu handoff
-  QUALIFIED // pronto para fechar
+  NEEDS_HUMAN      // agente pediu handoff
+  QUALIFIED        // pronto para fechar
   MEETING_SCHEDULED // reunião marcada: a secretária não escreve mais, só o corretor
-  LOST // sem resposta / recusou
+  LOST             // sem resposta / recusou
 }
 
 enum LeadKind {
-  PERSON // pessoa física, profissional, família
-  BUSINESS // empresa (benefícios, saúde, vida em grupo)
+  PERSON    // pessoa física, profissional, família
+  BUSINESS  // empresa (benefícios, saúde, vida em grupo)
   CANDIDATE // candidato a trabalhar com o corretor (ex.: preposto)
-  PARTNER // parceiro / indicador
+  PARTNER   // parceiro / indicador
 }
 
 enum MessageChannel {
@@ -37,114 +37,114 @@ enum MessageSender {
 }
 
 model Lead {
-  id                     String          @id @default(cuid())
+  id                String    @id @default(cuid())
   // Opcional: contato adicionado à mão pode não ter LinkedIn.
-  linkedinProfileUrl     String?         @unique
-  linkedinProfileId      String?
-  firstName              String?
-  lastName               String?
-  jobTitle               String?
+  linkedinProfileUrl String?  @unique
+  linkedinProfileId  String?
+  firstName         String?
+  lastName          String?
+  jobTitle          String?
   // Foto de perfil do LinkedIn (endereço vindo do Edges); sem ela, aparece o bonequinho.
-  avatarUrl              String?
-  status                 LeadStatus      @default(INVITE_SENT)
-  linkedinThreadId       String?         @unique
+  avatarUrl         String?
+  status            LeadStatus @default(INVITE_SENT)
+  linkedinThreadId  String?   @unique
   // Conectado no LinkedIn (dá pra mandar mensagem por lá). Independe do status:
   // a pessoa pode estar conversando por e-mail com o convite ainda pendente.
-  linkedinConnected      Boolean         @default(false)
+  linkedinConnected Boolean   @default(false)
   // Contato adicionado à mão: canal em que a secretária faz o primeiro contato
   // (null = o corretor mesmo começa).
-  firstContactChannel    MessageChannel?
+  firstContactChannel MessageChannel?
   // Quando a conexão no LinkedIn foi detectada (convite aceito etc.).
-  connectedAt            DateTime?
+  connectedAt       DateTime?
   // WhatsApp (via Deskcomm): conversa aberta lá e até onde já foi lida.
-  whatsappConversationId String?         @unique
+  whatsappConversationId String? @unique
   whatsappLastAt         DateTime?
-  needsHumanReason       String?
+  needsHumanReason  String?
   // Quando o convite foi enviado (callback da edges.run). É o que conta pro limite
   // diário de convites — o status muda assim que o convite é aceito.
-  invitedAt              DateTime?
+  invitedAt         DateTime?
   // Follow-ups enviados desde a última resposta do lead (zera quando ele responde).
-  followUpsSent          Int             @default(0)
+  followUpsSent     Int       @default(0)
   // Follow-up próprio desta conversa (null = usa o da campanha ou o da conta).
-  followUpMaxCount       Int?
-  followUpDelayHours     Int?
+  followUpMaxCount   Int?
+  followUpDelayHours Int?
   // Canais além do LinkedIn (a secretária usa o que existir).
-  email                  String?
-  phone                  String?
+  email             String?
+  phone             String?
   // Ficha pessoal: o que o corretor sabe da pessoa (família, time, aniversário,
   // como se conheceram...). A IA usa pra personalizar as mensagens.
-  personal               String?         @db.Text
+  personal          String?   @db.Text
   // Que tipo de contato é (muda o gancho e quem atende) e quem indicou (a
   // assistente cita na primeira mensagem; nunca diz que quem indicou é cliente).
-  kind                   LeadKind?
-  referredBy             String?
+  kind              LeadKind?
+  referredBy        String?
   // Outra IA (ex.: a Sofia) está conversando com a pessoa: a secretária não
   // aborda nem responde em nenhum canal até isso ser desmarcado.
-  otherAiActive          Boolean         @default(false)
+  otherAiActive     Boolean   @default(false)
   // Recusou ou pediu pra parar: nada automático sai mais, nem em campanha nova.
-  doNotContact           Boolean         @default(false)
+  doNotContact      Boolean   @default(false)
   // Quem da equipe atende este contato (os avisos de reunião e "precisa de você" vão pra essa pessoa).
   // E-mail devolvido (caixa inexistente etc.): não tentamos de novo.
-  emailBouncedAt         DateTime?
-  assignee               TeamMember?     @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
-  assigneeId             String?
+  emailBouncedAt    DateTime?
+  assignee          TeamMember? @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId        String?
   // CRM: anotações livres do corretor (só ele vê) e etiquetas.
-  notes                  String?         @db.Text
-  tags                   String[]        @default([])
+  notes             String?   @db.Text
+  tags              String[]  @default([])
   // Nota 0-100 da IA: quanto o perfil combina com o cliente ideal (Settings.targetAudience).
-  icpScore               Int?
-  campaign               Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignId             String?
+  icpScore          Int?
+  campaign          Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId        String?
   // Conversa arquivada no LinkedIn (lead perdido) — evita arquivar de novo.
-  archivedAt             DateTime?
+  archivedAt        DateTime?
   // Próximo passo decidido pela secretária (texto pro corretor acompanhar) e
   // quando ela volta a olhar esse lead (ex.: decidiu esperar).
-  nextStep               String?
-  nextStepAt             DateTime?
+  nextStep          String?
+  nextStepAt        DateTime?
   // Reunião: data marcada e, quando foi a secretária que marcou, o evento no Google
   // Agenda (id, pra remarcar/cancelar) e o link da videochamada.
-  meetingAt              DateTime?
-  googleEventId          String?
-  meetingLink            String?
+  meetingAt         DateTime?
+  googleEventId     String?
+  meetingLink       String?
   // Quando a secretária sugeriu horários e ainda espera o lead escolher.
-  slotsProposedAt        DateTime?
+  slotsProposedAt   DateTime?
   // Ela já perguntou "conseguiu ver um horário?" (uma vez só).
-  bookingNudgedAt        DateTime?
+  bookingNudgedAt   DateTime?
   // Lembretes da reunião já resolvidos ("day", "5h", "1h"): enviados ou pulados.
   // Zera quando a reunião é marcada de novo.
-  meetingReminders       String[]        @default([])
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
-  messages               Message[]
-  drafts                 Draft[]
-  feedbacks              AgentFeedback[]
+  meetingReminders  String[]  @default([])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  messages          Message[]
+  drafts            Draft[]
+  feedbacks         AgentFeedback[]
 }
 
 // Campanha (opcional) = um público com uma oferta própria (ex.: "Saúde
 // empresarial" x "RC profissional"). O texto dela soma às instruções gerais.
 model Campaign {
-  id                 String         @id @default(cuid())
-  name               String
+  id           String         @id @default(cuid())
+  name         String
   // Objetivo, em uma frase — só pra organização do corretor.
-  description        String?
+  description  String?
   // Cargos/setores/empresas: já vêm preenchidos na busca ao adicionar pessoas.
-  audience           String[]       @default([])
+  audience     String[]       @default([])
   // Oferta / mensagem principal: é o que a IA lê.
-  instructions       String?        @db.Text
+  instructions String?        @db.Text
   // Máximo de pessoas na campanha (null = sem limite).
-  maxLeads           Int?
+  maxLeads     Int?
   // Follow-up próprio da campanha (null = usa o padrão da conta).
   followUpMaxCount   Int?
   followUpDelayHours Int?
   // Pausada/finalizada: sem convites novos, aberturas nem follow-ups.
-  status             CampaignStatus @default(ACTIVE)
-  createdAt          DateTime       @default(now())
+  status       CampaignStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now())
   // Revisão de campanha nova (Settings.campaignReview): liberada antes do prazo
   // pelo corretor. Sem isso, sai da revisão sozinha (dias E mensagens).
-  reviewReleasedAt   DateTime?
-  leads              Lead[]
+  reviewReleasedAt DateTime?
+  leads        Lead[]
   // Cadência com texto fixo (aprovado) pra quem ainda não respondeu.
-  steps              CampaignStep[]
+  steps        CampaignStep[]
 }
 
 enum CampaignStatus {
@@ -177,41 +177,41 @@ enum DraftKind {
 }
 
 enum DraftStatus {
-  PENDING // esperando o corretor
-  APPROVED // aprovada; sai assim que a janela de horário permitir
+  PENDING    // esperando o corretor
+  APPROVED   // aprovada; sai assim que a janela de horário permitir
   SENT
-  DISCARDED // corretor descartou, ou o lead respondeu antes
-  EXPIRED // ninguém decidiu a tempo
-  FAILED // aprovada, mas o envio deu erro
+  DISCARDED  // corretor descartou, ou o lead respondeu antes
+  EXPIRED    // ninguém decidiu a tempo
+  FAILED     // aprovada, mas o envio deu erro
 }
 
 model Draft {
-  id              String          @id @default(cuid())
-  lead            Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadId          String
-  kind            DraftKind
-  channel         MessageChannel
-  subject         String?
-  content         String          @db.Text
+  id          String         @id @default(cuid())
+  lead        Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String
+  kind        DraftKind
+  channel     MessageChannel
+  subject     String?
+  content     String         @db.Text
   // Por que a secretária escolheu isso (uma linha, pro corretor decidir rápido).
-  reason          String?
+  reason      String?
   // Atualizações do lead a aplicar quando a mensagem sair (JSON).
-  effects         Json
+  effects     Json
   // Reunião a marcar no Google Agenda quando a mensagem sair (início ISO + minutos).
   // O evento só é criado no envio: rascunho descartado não deixa evento sobrando.
-  booking         Json?
-  status          DraftStatus     @default(PENDING)
-  feedbacks       AgentFeedback[]
+  booking     Json?
+  status      DraftStatus    @default(PENDING)
+  feedbacks   AgentFeedback[]
   // O corretor mudou o texto antes de aprovar (mede a confiança na IA).
-  edited          Boolean         @default(false)
+  edited      Boolean        @default(false)
   // Texto que a secretária escreveu, guardado quando o corretor edita (o content passa
   // a ser o texto dele). A diferença entre os dois mostra o jeito que ele prefere.
-  originalContent String?         @db.Text
+  originalContent String?    @db.Text
   // Sai como mensagem de voz (com a voz do corretor): o content é o que será falado.
-  asAudio         Boolean         @default(false)
-  error           String?
-  createdAt       DateTime        @default(now())
-  decidedAt       DateTime?
+  asAudio     Boolean        @default(false)
+  error       String?
+  createdAt   DateTime       @default(now())
+  decidedAt   DateTime?
 
   @@index([status, createdAt])
   @@index([leadId, status])
@@ -266,133 +266,133 @@ model PushSubscription {
 }
 
 model Message {
-  id                String         @id @default(cuid())
-  lead              Lead           @relation(fields: [leadId], references: [id])
-  leadId            String
-  sender            MessageSender
-  channel           MessageChannel @default(LINKEDIN)
-  content           String
-  linkedinMessageId String?        @unique
+  id        String        @id @default(cuid())
+  lead      Lead          @relation(fields: [leadId], references: [id])
+  leadId    String
+  sender    MessageSender
+  channel   MessageChannel @default(LINKEDIN)
+  content   String
+  linkedinMessageId String? @unique
   // E-mail: Message-ID (dedupe e resposta na mesma thread) e assunto.
-  emailMessageId    String?        @unique
+  emailMessageId String? @unique
   // Caixa de envio por onde o e-mail saiu (ou chegou). Sem valor = a caixa única de antes.
-  mailbox           Mailbox?       @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
-  mailboxId         String?
-  subject           String?
+  mailbox   Mailbox? @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  mailboxId String?
+  subject   String?
   // Gmail: conversa (thread) em que a mensagem está, pra responder nela.
-  emailThreadId     String?
+  emailThreadId String?
   // WhatsApp (Deskcomm): id da mensagem lá — evita gravar duas vezes.
-  whatsappMessageId String?        @unique
+  whatsappMessageId String? @unique
   // Mensagem de áudio, foto ou vídeo: "audio" | "image" | "video". Recebida: o content é o
   // texto que o sistema tirou da mídia (transcrição/descrição). Enviada: o content é o
   // texto falado no áudio.
-  mediaKind         String?
+  mediaKind String?
   // Rastreio de abertura dos e-mails enviados (imagem invisível). Sinal fraco:
   // alguns apps abrem sozinhos (Apple Mail), outros bloqueiam imagens (Outlook).
-  openToken         String?        @unique
-  openCount         Int            @default(0)
-  firstOpenedAt     DateTime?
-  lastOpenedAt      DateTime?
-  deliveredAt       DateTime
-  createdAt         DateTime       @default(now())
+  openToken    String?   @unique
+  openCount    Int       @default(0)
+  firstOpenedAt DateTime?
+  lastOpenedAt  DateTime?
+  deliveredAt DateTime
+  createdAt DateTime      @default(now())
 }
 
 model Settings {
-  id                       String    @id @default("singleton")
-  automationPaused         Boolean   @default(true)
+  id                  String  @id @default("singleton")
+  automationPaused    Boolean @default(true)
   // Modo piloto: a secretária escreve, mas nada sai sem o seu OK (aba Aprovações).
-  approvalMode             Boolean   @default(true)
+  approvalMode        Boolean @default(true)
   // Campanha nova: toda mensagem dela passa por aprovação até completar os dois
   // (dias desde a criação E mensagens enviadas), mesmo com a aprovação desligada.
   // Lembretes da reunião pro lead (véspera, 5h e 1h antes) e o texto de "faltou".
   // Texto vazio = o padrão do sistema.
-  meetingRemindersEnabled  Boolean   @default(true)
-  reminderDayText          String?   @db.Text
-  reminder5hText           String?   @db.Text
-  reminder1hText           String?   @db.Text
-  noShowText               String?   @db.Text
-  campaignReview           Boolean   @default(true)
-  campaignReviewDays       Int       @default(14)
-  campaignReviewMessages   Int       @default(50)
+  meetingRemindersEnabled Boolean @default(true)
+  reminderDayText         String? @db.Text
+  reminder5hText          String? @db.Text
+  reminder1hText          String? @db.Text
+  noShowText              String? @db.Text
+  campaignReview         Boolean @default(true)
+  campaignReviewDays     Int     @default(14)
+  campaignReviewMessages Int     @default(50)
   // Google Agenda: a conexão do Google já tinha e-mail; aqui, se o corretor também
   // liberou a agenda (escopo calendar.events). Só então a secretária marca reunião.
-  googleCalendarEnabled    Boolean   @default(false)
+  googleCalendarEnabled Boolean @default(false)
   // Duração da reunião que a secretária marca, em minutos.
-  meetingMinutes           Int       @default(30)
+  meetingMinutes      Int     @default(30)
   // Como o corretor quer ser chamado no painel ("Boa noite, Lucas.").
-  ownerName                String?
-  dailyInviteLimit         Int       @default(18)
-  dailyMessageLimit        Int       @default(25)
-  linkedinIdentityId       String?
+  ownerName           String?
+  dailyInviteLimit    Int     @default(18)
+  dailyMessageLimit   Int     @default(25)
+  linkedinIdentityId  String?
   // Link de login da identidade ainda não conectada: reaproveitado enquanto
   // válido, pra não criar (e pagar) uma identidade nova a cada clique.
-  linkedinLoginLink        String?
-  linkedinLoginLinkAt      DateTime?
-  agentInstructions        String?   @db.Text
+  linkedinLoginLink   String?
+  linkedinLoginLinkAt DateTime?
+  agentInstructions   String? @db.Text
   // "Meu jeito de escrever": tratamento, emojis, tamanho, regras e exemplos de
   // mensagens do corretor (JSON, ver src/lib/writingStyle.ts).
-  writingStyle             Json?
+  writingStyle        Json?
   // Mensagens de voz: voz clonada do corretor, consentimento e quando mandar áudio
   // (JSON, ver src/lib/voice/settings.ts).
-  voiceSettings            Json?
+  voiceSettings       Json?
   // Modelo do Nous usado nas conversas (escolhido no admin depois do banco de
   // testes). Vazio = NOUS_MODEL do ambiente.
-  agentModel               String?
-  targetAudience           String?   @db.Text
+  agentModel          String?
+  targetAudience      String? @db.Text
   // Follow-up automático: até followUpMaxCount mensagens, uma a cada
   // followUpDelayHours sem resposta. Depois disso o lead vira LOST.
-  followUpMaxCount         Int       @default(2)
-  followUpDelayHours       Int       @default(48)
+  followUpMaxCount    Int     @default(2)
+  followUpDelayHours  Int     @default(48)
   // Última checagem de convites aceitos (lista de conexões) — no máximo 1x/hora.
-  connectionsCheckedAt     DateTime?
+  connectionsCheckedAt DateTime?
   // Janela de envio automático (fuso de São Paulo): fora dela a IA não manda nada.
-  workStartHour            Int       @default(8)
-  workEndHour              Int       @default(19)
-  workWeekdaysOnly         Boolean   @default(true)
+  workStartHour       Int     @default(8)
+  workEndHour         Int     @default(19)
+  workWeekdaysOnly    Boolean @default(true)
   // Responder a qualquer hora: só INICIAR conversa fica preso ao horário.
-  replyAnytime             Boolean   @default(false)
+  replyAnytime        Boolean @default(false)
   // Identidade da assistente (ex.: "Helena"): vazio = escreve como o corretor.
   // discloseAi = pode confirmar que é assistente virtual quando perguntarem.
-  assistantName            String?
-  assistantDiscloseAi      Boolean   @default(false)
+  assistantName       String?
+  assistantDiscloseAi Boolean @default(false)
   // Um item por linha: nome, empresa ou link de perfil que nunca deve ser contatado.
-  exclusionList            String?   @db.Text
+  exclusionList       String? @db.Text
   // Ações Engagement opcionais — desligadas até o corretor ativar.
-  acceptInvitesEnabled     Boolean   @default(false)
-  withdrawInvitesEnabled   Boolean   @default(false)
-  withdrawAfterDays        Int       @default(21)
-  warmupEnabled            Boolean   @default(false)
-  archiveLostEnabled       Boolean   @default(false)
+  acceptInvitesEnabled   Boolean @default(false)
+  withdrawInvitesEnabled Boolean @default(false)
+  withdrawAfterDays      Int     @default(21)
+  warmupEnabled          Boolean @default(false)
+  archiveLostEnabled     Boolean @default(false)
   receivedInvitesCheckedAt DateTime?
   withdrawCheckedAt        DateTime?
   // Canal de e-mail: a secretária pode usar (liga/desliga), limite diário e
   // depois de quantos dias de convite não aceito ela se apresenta por e-mail
   // (null = nunca).
-  emailChannelEnabled      Boolean   @default(true)
+  emailChannelEnabled Boolean @default(true)
   // WhatsApp pelo Deskcomm (MCP): endereço, token (criptografado) e o canal
   // (número) de onde as conversas novas saem. A secretária só usa o WhatsApp
   // com quem já deu sinal de interesse.
-  deskcommUrl              String?
-  deskcommToken            String?   @db.Text
-  deskcommChannelId        String?
-  whatsappChannelEnabled   Boolean   @default(true)
-  dailyWhatsappLimit       Int       @default(15)
+  deskcommUrl         String?
+  deskcommToken       String? @db.Text
+  deskcommChannelId   String?
+  whatsappChannelEnabled Boolean @default(true)
+  dailyWhatsappLimit  Int     @default(15)
   // Resumo do dia no fim do expediente (push + e-mail pra própria caixa) e o
   // dia (AAAA-MM-DD, fuso de SP) em que já foi enviado.
-  dailySummaryEnabled      Boolean   @default(true)
-  dailySummarySentOn       String?
-  dailyEmailLimit          Int       @default(20)
-  emailInviteFallbackDays  Int?      @default(5)
+  dailySummaryEnabled Boolean @default(true)
+  dailySummarySentOn  String?
+  dailyEmailLimit     Int     @default(20)
+  emailInviteFallbackDays Int? @default(5)
   // E-mail conectado com "Entrar com Google": endereço, refresh token
   // (criptografado com SESSION_SECRET) e até onde a caixa já foi lida.
-  googleEmail              String?
-  googleRefreshToken       String?   @db.Text
-  googleHistoryId          String?
+  googleEmail         String?
+  googleRefreshToken  String? @db.Text
+  googleHistoryId     String?
   // Plano B (senha de app via variáveis de ambiente, IMAP): último UID lido.
-  emailLastUid             Int?
-  emailUidValidity         String?
-  linkedinNeedsReconnect   Boolean   @default(false)
-  linkedinReconnectReason  String?
+  emailLastUid        Int?
+  emailUidValidity    String?
+  linkedinNeedsReconnect Boolean @default(false)
+  linkedinReconnectReason String?
 }
 
 // Base de conhecimento importada (markdown dividido por títulos). ALWAYS entra
@@ -437,25 +437,25 @@ model CampaignStep {
 // do corretor): urgências (sinistro, reclamação, jurídico, cancelamento),
 // reuniões marcadas e avisos de ligação, ou todo "precisa de você".
 model TeamMember {
-  id                     String     @id @default(cuid())
+  id                     String   @id @default(cuid())
   name                   String
   email                  String?
   phone                  String?
   // Conversa no Deskcomm reaproveitada pros próximos avisos.
   whatsappConversationId String?
-  notifyUrgent           Boolean    @default(true)
-  notifyMeetings         Boolean    @default(false)
-  notifyHandoffs         Boolean    @default(false)
+  notifyUrgent           Boolean  @default(true)
+  notifyMeetings         Boolean  @default(false)
+  notifyHandoffs         Boolean  @default(false)
   // Função (texto livre: "Especialista", "Preposto", "Recrutamento"...) e de que tipo de contato
   // a pessoa cuida: ela recebe reunião marcada e "precisa de você" desses contatos.
   role                   String?
   handles                LeadKind[] @default([])
   // Por onde os avisos chegam (precisa ter o e-mail / WhatsApp preenchido).
-  viaEmail               Boolean    @default(true)
-  viaWhatsapp            Boolean    @default(true)
+  viaEmail               Boolean  @default(true)
+  viaWhatsapp            Boolean  @default(true)
   // Contatos de que esta pessoa é a responsável.
   leads                  Lead[]
-  createdAt              DateTime   @default(now())
+  createdAt              DateTime @default(now())
 }
 
 enum MailboxStatus {
@@ -467,30 +467,30 @@ enum MailboxStatus {
 // Caixa de e-mail usada na prospecção (várias, em rodízio). Cada uma tem limite por dia que
 // sobe aos poucos (aquecimento), pra proteger a reputação do domínio.
 model Mailbox {
-  id              String        @id @default(cuid())
-  createdAt       DateTime      @default(now())
-  address         String        @unique
+  id          String        @id @default(cuid())
+  createdAt   DateTime      @default(now())
+  address     String        @unique
   // Nome que aparece no "De:" (vazio = nome da assistente ou do corretor).
-  displayName     String?
-  status          MailboxStatus @default(ACTIVE)
-  smtpHost        String
-  smtpPort        Int
-  smtpSecure      Boolean
-  imapHost        String
-  imapPort        Int
-  imapSecure      Boolean
+  displayName String?
+  status      MailboxStatus @default(ACTIVE)
+  smtpHost    String
+  smtpPort    Int
+  smtpSecure  Boolean
+  imapHost    String
+  imapPort    Int
+  imapSecure  Boolean
   // Senha guardada cifrada (ver lib/secretBox.ts).
-  passwordEnc     String
+  passwordEnc String
   // Teto de e-mails por dia depois do aquecimento.
-  dailyLimit      Int           @default(25)
+  dailyLimit  Int           @default(25)
   // Dia em que a caixa começou a enviar: o limite do dia sobe a partir dele.
-  startedAt       DateTime      @default(now())
+  startedAt   DateTime      @default(now())
   // Leitura da caixa de entrada (IMAP): até onde já foi lida.
-  imapLastUid     Int?
-  imapUidValidity String?
-  bounces         Int           @default(0)
-  lastCheckedAt   DateTime?
-  lastError       String?
-  lastErrorAt     DateTime?
-  messages        Message[]
+  imapLastUid      Int?
+  imapUidValidity  String?
+  bounces     Int           @default(0)
+  lastCheckedAt DateTime?
+  lastError   String?
+  lastErrorAt DateTime?
+  messages    Message[]
 }
