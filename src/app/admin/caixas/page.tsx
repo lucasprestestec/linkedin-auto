@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import type { MailboxStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { MobileHeader } from "@/components/MobileHeader";
+import { adminEnabled, isAdmin } from "@/lib/admin";
 import { Help } from "@/components/Help";
 import { effectiveLimit } from "@/lib/mailboxPolicy";
 import { sentTodayByMailbox } from "@/lib/mailboxes";
@@ -9,6 +11,7 @@ import { MailboxForm } from "./MailboxForm";
 import { MailboxActions } from "./MailboxActions";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 const STATUS_LABEL: Record<MailboxStatus, string> = { ACTIVE: "Ativa", PAUSED: "Pausada", RETIRED: "Aposentada" };
 
@@ -16,6 +19,8 @@ const dateBR = (d: Date) => d.toLocaleString("pt-BR", { day: "2-digit", month: "
 
 // Caixas de envio da prospecção: o sistema gira entre elas e respeita o limite de cada uma por dia.
 export default async function MailboxesPage() {
+  if (!adminEnabled()) notFound();
+  if (!(await isAdmin())) redirect("/admin");
   const now = new Date();
   const [boxes, today, sentRows, replyRows] = await Promise.all([
     prisma.mailbox.findMany({ orderBy: [{ status: "asc" }, { createdAt: "asc" }] }),
@@ -26,13 +31,13 @@ export default async function MailboxesPage() {
   const sent = new Map(sentRows.map((r) => [r.mailboxId as string, r._count._all]));
   const replies = new Map(replyRows.map((r) => [r.mailboxId as string, r._count._all]));
   const active = boxes.filter((b) => b.status === "ACTIVE");
+  const last = [...boxes].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
   const room = active.reduce((n, b) => n + Math.max(0, effectiveLimit(b, now) - (today.get(b.id) ?? 0)), 0);
 
   return (
     <main className="page">
-      <MobileHeader />
-      <Link href="/channels" className="btn-text" style={{ alignSelf: "flex-start" }}>
-        ← Canais
+      <Link href="/admin" className="btn-text" style={{ alignSelf: "flex-start" }}>
+        ← Admin
       </Link>
       <header className="p-head">
         <div>
@@ -46,7 +51,7 @@ export default async function MailboxesPage() {
           </h1>
           <p className="t-sub">
             {active.length === 0
-              ? "Nenhuma caixa ativa: o e-mail sai pela caixa única conectada em Canais."
+              ? "Nenhuma caixa ativa: o e-mail sai pela caixa única conectada pelo usuário em Canais."
               : `${active.length} ${active.length === 1 ? "caixa ativa" : "caixas ativas"} · ainda cabem ${room} e-mails novos hoje.`}
           </p>
         </div>
@@ -85,7 +90,7 @@ export default async function MailboxesPage() {
       )}
 
       <section className="sec">
-        <MailboxForm />
+        <MailboxForm defaults={last ? { smtpHost: last.smtpHost, smtpPort: last.smtpPort, imapHost: last.imapHost, imapPort: last.imapPort, dailyLimit: last.dailyLimit } : undefined} />
       </section>
     </main>
   );

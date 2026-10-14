@@ -41,6 +41,7 @@ export default async function AdminPage() {
   const knowledge = await prisma.knowledgeSection.findMany({ where: { mode: { not: "OFF" } }, select: { mode: true, content: true } });
   const kbAlways = knowledge.filter((k) => k.mode === "ALWAYS").reduce((n, k) => n + k.content.length, 0);
   const kbCount = await prisma.knowledgeSection.count();
+  const mailboxActive = await prisma.mailbox.count({ where: { status: "ACTIVE" } });
   const email = await emailConnection();
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
@@ -73,6 +74,22 @@ export default async function AdminPage() {
           <small>Com um nome (ex.: Helena), ela se apresenta como ela mesma e nunca como você. Vazio: escreve como o corretor.</small>
         </div>
         <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
+      </section>
+
+      <section className="sec">
+        <div className="sec-head">
+          <div className="setting-text">
+            <h2 className="t-label">Caixas de envio (e-mail da prospecção)</h2>
+            <small>
+              {mailboxActive
+                ? `${mailboxActive} ${mailboxActive === 1 ? "caixa ativa" : "caixas ativas"} em rodízio, cada uma com limite por dia que sobe aos poucos.`
+                : "Nenhuma caixa cadastrada. Cadastre as caixas dos domínios de prospecção: o usuário final não mexe nisto."}
+            </small>
+          </div>
+          <Link href="/admin/caixas" className="btn-line btn-sm">
+            {mailboxActive ? "Abrir" : "Cadastrar"}
+          </Link>
+        </div>
       </section>
 
       <section className="sec">

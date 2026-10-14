@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { MobileHeader } from "@/components/MobileHeader";
 import { ChannelTitle } from "@/components/ChannelBadge";
@@ -28,7 +27,7 @@ async function emailWeek() {
 export default async function ChannelsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const emailResult = (await searchParams).email;
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [status, email, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, emailLeft] = await Promise.all([
+  const [status, email, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, boxProblems, emailLeft] = await Promise.all([
     linkedinStatus(settings),
     emailConnection(),
     messagesSentToday(),
@@ -36,6 +35,7 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
     whatsappSentToday(),
     emailWeek(),
     prisma.mailbox.count({ where: { status: "ACTIVE" } }),
+    prisma.mailbox.count({ where: { status: "ACTIVE", lastError: { not: null } } }),
     emailLeftToday(settings),
   ]);
 
@@ -69,12 +69,12 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
           fallbackAddress={email?.provider === "password" ? email.address : null}
           result={typeof emailResult === "string" ? emailResult : null}
         />
-        <p className="hint">
-          Caixas de envio da prospecção: {activeBoxes > 0 ? `${activeBoxes} ${activeBoxes === 1 ? "ativa" : "ativas"}` : "nenhuma ainda"}.{" "}
-          <Link href="/channels/caixas" className="btn-text">
-            Gerenciar caixas
-          </Link>
-        </p>
+        {activeBoxes > 0 && (
+          <p className="hint">
+            E-mail de prospecção: {activeBoxes} {activeBoxes === 1 ? "caixa ativa" : "caixas ativas"} em rodízio.
+            {boxProblems > 0 && " Alguma caixa está com problema: avise o suporte."}
+          </p>
+        )}
         {(email || activeBoxes > 0) && (
           <>
             <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
