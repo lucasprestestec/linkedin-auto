@@ -60,6 +60,25 @@ export async function sendViaMailbox(mb: Mailbox, input: EmailInput): Promise<Se
   return { messageId: info.messageId, threadId: null, date: new Date() };
 }
 
+// Marca onde a caixa de entrada está agora. Feito ao cadastrar a caixa: tudo que chegar depois disso é lido,
+// sem depender de quando a rotina automática passa pela primeira vez.
+export async function imapBaseline(cfg: PasswordConfig): Promise<{ imapLastUid: number; imapUidValidity: string } | null> {
+  const client = imapClient(cfg);
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      const box = client.mailbox;
+      if (!box) return null;
+      return { imapLastUid: Math.max(0, Number(box.uidNext) - 1), imapUidValidity: String(box.uidValidity) };
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
 export type MailboxEmail = IncomingEmail & { mailbox: { id: string; address: string } };
 
 // Lê só o que chegou desde a última leitura. Na primeira vez, apenas marca onde a caixa está.
