@@ -144,14 +144,24 @@ function escapeHtml(s: string) {
 
 // Mesmo texto em HTML simples (parece e-mail escrito à mão), com a imagem de
 // abertura no fim quando há rastreio.
-function htmlBody(text: string, pixel: string | null) {
+function htmlBody(text: string, pixel: string | null, optOut: string | null | undefined) {
   const paragraphs = text
     .trim()
     .split(/\n{2,}/)
     .map((p) => `<p style="margin:0 0 12px">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
     .join("");
+  const foot = optOut === undefined ? "" : `<p style="margin:16px 0 0;font-size:12px;color:#888">${optOut ? `Se preferir não receber mais mensagens, <a href="${optOut}" style="color:#888">clique aqui</a>.` : "Se preferir não receber mais mensagens, é só responder este e-mail avisando."}</p>`;
   const img = pixel ? `<img src="${pixel}" width="1" height="1" alt="" style="border:0;width:1px;height:1px">` : "";
-  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#222">${paragraphs}${img}</div>`;
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#222">${paragraphs}${foot}${img}</div>`;
+}
+
+// Texto puro do e-mail; para pessoa de fora (unsubscribeUrl definido), com o rodapé de descadastro.
+function plainBody(text: string, optOut: string | null | undefined) {
+  if (optOut === undefined) return text;
+  return `${text}
+
+---
+${optOut ? `Para não receber mais mensagens: ${optOut}` : "Para não receber mais mensagens, responda este e-mail avisando."}`;
 }
 
 export interface SentEmail {
@@ -168,6 +178,9 @@ export async function sendEmail(input: {
   references?: string[];
   threadId?: string | null;
   openToken?: string | null;
+  // E-mail para uma pessoa de fora (não aviso interno): leva o rodapé de descadastro. O link vai no rodapé e no
+  // cabeçalho que o Gmail usa no botão "cancelar inscrição"; null = sem link (sem APP_URL), o rodapé manda responder.
+  unsubscribeUrl?: string | null;
 }): Promise<SentEmail> {
   const conn = await emailConnection();
   if (!conn) throw new Error("Nenhum e-mail conectado.");
@@ -177,8 +190,9 @@ export async function sendEmail(input: {
     from: name ? { name, address: conn.address } : conn.address,
     to: input.to,
     subject: input.subject,
-    text: input.text,
-    html: htmlBody(input.text, pixel),
+    text: plainBody(input.text, input.unsubscribeUrl),
+    html: htmlBody(input.text, pixel, input.unsubscribeUrl),
+    headers: input.unsubscribeUrl ? { "List-Unsubscribe": `<${input.unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } : undefined,
     inReplyTo: input.inReplyTo ?? undefined,
     references: input.references?.length ? input.references : input.inReplyTo ? [input.inReplyTo] : undefined,
   };

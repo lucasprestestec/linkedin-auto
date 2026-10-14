@@ -11,6 +11,8 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api/webhooks/") ||
     // Imagem de abertura dos e-mails: carregada pelo app de e-mail do cliente.
     pathname.startsWith("/api/o/") ||
+    // "Não quero mais receber" do rodapé dos e-mails: vale só com o código assinado.
+    pathname.startsWith("/api/u/") ||
     // Áudio que vai por WhatsApp: o Deskcomm baixa daqui (código impossível de adivinhar, vence em 24 h).
     pathname.startsWith("/api/audio/") ||
     pathname === "/login" ||
