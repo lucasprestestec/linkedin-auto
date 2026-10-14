@@ -20,7 +20,7 @@ Regras que valem para todas:
 **D0, WhatsApp**
 > [Bom dia / Boa tarde], [NOME].
 >
-> Me chamo Helena, sou da área de novos negócios da DOR$, e estou entrando em contato por recomendação do(a) [INDICADOR].
+> Me chamo Helena, sou responsável de novos negócios da DOR$, e estou entrando em contato por recomendação do(a) [INDICADOR].
 >
 > Como hoje é difícil atendermos números desconhecidos, tomei a liberdade de te enviar essa mensagem e espero que não se importe.
 >
@@ -56,7 +56,7 @@ Regras que valem para todas:
 **Instruções:** Aborda pelo perfil, sem diagnosticar. Troca "dentistas" e "consultório" pela profissão e pelo local de trabalho. Nunca cita nome, cidade ou detalhe do cliente do caso. Caso aprovado: dentista que quebrou o braço e recebeu R$ 60 mil.
 
 **D0, WhatsApp** (hipótese A; a B fica para testar depois)
-> Oi, Dr(a). [NOME]! Tudo bem? Aqui é a Helena, da área de novos negócios da DOR$.
+> Oi, Dr(a). [NOME]! Tudo bem? Aqui é a Helena, responsável de novos negócios da DOR$.
 >
 > Pergunta rápida: se você quebrasse um braço amanhã e ficasse dois meses sem atender, sua receita seria a mesma nesses dois meses?
 
@@ -69,8 +69,8 @@ Regras que valem para todas:
 >
 > Mas provavelmente você vai me dizer que, com você, isso já tá resolvido, né?
 
-**D+4, WhatsApp** (prova social). ATENÇÃO: "no mês passado" precisa bater com a data real do caso; pergunte ao Daniel antes de ligar.
-> [NOME], no mês passado um cliente nosso, que também é dentista, quebrou o braço num acidente em casa e ficou meses sem atender. Ele tinha proteção e recebeu R$ 60 mil, o que manteve as contas em dia mesmo parado.
+**D+4, WhatsApp** (prova social). Diga sempre "recentemente", nunca "no mês passado" nem uma data (Base v1.3).
+> [NOME], recentemente um cliente nosso, que também é dentista, quebrou o braço num acidente em casa e ficou meses sem atender. Ele tinha proteção e recebeu R$ 60 mil, o que manteve as contas em dia mesmo parado.
 >
 > É exatamente pra isso que a proteção de renda existe. Se fosse com você, esses meses parado pesariam no caixa?
 
@@ -87,7 +87,7 @@ Regras que valem para todas:
 **Instruções:** Depois da primeira resposta, faz as 4 perguntas de benefícios, nesta ordem: que benefícios já oferece; "O que você mais valoriza hoje nesse benefício?"; "Se você pudesse melhorar algo nesse benefício hoje, o que seria?"; "Se eu conseguir melhorar esse benefício com essa condição, você teria alguma restrição em nos reunirmos por 30 minutos para falarmos?". Depois: número de funcionários, plano atual e mês de renovação, quem decide. Nunca promete economia nem cita preço ou operadora. Reunião com o Daniel.
 
 **D0, WhatsApp** (hipótese A, o reajuste)
-> Oi, [NOME]! Tudo bem? Aqui é a Helena, da área de novos negócios da DOR$. Somos especializados em planos de saúde empresariais.
+> Oi, [NOME]! Tudo bem? Aqui é a Helena, responsável de novos negócios da DOR$. Somos especializados em planos de saúde empresariais.
 >
 > Uma pergunta rápida: o reajuste do plano de saúde da sua empresa no último ano veio dentro do que você considerava justo, ou veio bem acima do esperado?
 
@@ -100,7 +100,7 @@ Regras que valem para todas:
 **Público e instruções:** os da campanha 3.
 
 **D0, WhatsApp** (hipótese C, as 3 perguntas)
-> Oi, [NOME]! Aqui é a Helena, da área de novos negócios da DOR$. Somos especializados em benefícios corporativos.
+> Oi, [NOME]! Aqui é a Helena, responsável de novos negócios da DOR$. Somos especializados em benefícios corporativos.
 >
 > Uma pergunta rápida: com os benefícios que sua empresa oferece hoje, você tem segurança de que está pagando um valor competitivo e extraindo o máximo de valor para os colaboradores?
 >
@@ -119,7 +119,7 @@ Regras que valem para todas:
 > Olá, [NOME], obrigada por aceitar a conexão. Vi seu post sobre [TEMA DO POST] e gostei da forma como você colocou. Vai ser bom acompanhar seu trabalho por aqui, e quem sabe trocar uma ideia de vez em quando.
 
 **D+3, LinkedIn**
-> [NOME], deixa eu me apresentar rápido: sou a Helena, da área de novos negócios da DOR$. Atuamos com planos de saúde e benefícios para empresas. Cruzamos com muita empresa do seu porte pagando bem mais do que precisaria, quase sempre por causa de reajuste que passou sem ninguém revisar. Como está esse tema aí na [EMPRESA]? Você já tem alguém que cuida disso pra você?
+> [NOME], deixa eu me apresentar rápido: sou a Helena, responsável de novos negócios da DOR$. Atuamos com planos de saúde e benefícios para empresas. Cruzamos com muita empresa do seu porte pagando bem mais do que precisaria, quase sempre por causa de reajuste que passou sem ninguém revisar. Como está esse tema aí na [EMPRESA]? Você já tem alguém que cuida disso pra você?
 
 **D+6, LinkedIn**
 > [NOME], vou ser direta pra não tomar seu tempo. Quando nosso especialista olha o contrato de plano de saúde de uma empresa do seu porte, quase sempre encontra reajuste que veio acima do que a sinistralidade real justificava, ou um desenho de plano que já não serve pro perfil da equipe de hoje. Essa análise não tem custo nem compromisso. Se o seu plano já estiver bem resolvido, ele te diz isso com todas as letras, sem empurrar mudança. Faz sentido a gente te mostrar o que costuma encontrar? E se não for você quem decide isso, você saberia me apontar quem é?

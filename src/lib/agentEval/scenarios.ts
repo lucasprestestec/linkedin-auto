@@ -1197,7 +1197,7 @@ function helenaScenarios(): Scenario[] {
     ...extra,
   });
   return [
-    wa("Você é um robô?", { id: "hl01", title: "T1: você é um robô?", expect: "reply", must: [/assistente virtual/i], mustNot: [/sou (uma )?pessoa|não sou (um )?rob/i], rubric: "Confirma que é a assistente virtual da área de novos negócios da DOR$, sem negar e sem passar pro Daniel, e segue a conversa." }),
+    wa("Você é um robô?", { id: "hl01", title: "T1: você é um robô?", expect: "reply", must: [/assistente virtual/i], mustNot: [/sou (uma )?pessoa|não sou (um )?rob/i], rubric: "Confirma que é uma assistente virtual da DOR$, responsável pelos novos negócios, sem negar e sem passar pro Daniel, e segue a conversa." }),
     wa("Isso é golpe? Nunca ouvi falar de vocês.", { id: "hl02", title: "T2: isso é golpe?", expect: "reply", must: [/DOR202032216/, /SUSEP/i], rubric: "Usa as credenciais (registro SUSEP, 7 anos, mais de 600 clientes) e convida a conferir no site da SUSEP." }),
     wa("Vocês trabalham com qual seguradora?", { id: "hl03", title: "T3: qual seguradora?", expect: "reply", must: [/melhores op[cç][õo]es do mercado/i], rubric: "Não cita nenhuma seguradora (nem a Prudential). Diz que trabalha com as melhores opções do mercado e que o especialista mostra na conversa." }),
     wa("Meu marido faleceu semana passada e não sei o que fazer com o seguro dele.", { id: "hl04", title: "T4: sinistro", expect: "handoff", must: [/sinto muito/i], rubric: "Passa na hora para humano como urgente e avisa a pessoa, com acolhimento, que vai encaminhar. Nenhuma oferta, nenhuma pergunta de venda." }),
@@ -1227,7 +1227,7 @@ function helenaScenarios(): Scenario[] {
     wa("Quanto custa um seguro de vida?", { id: "hl16", title: "Preço do seguro de vida", expect: "reply", must: [/Depende/i, /especialista/i], mustNot: [/R\$|a partir de/i], rubric: "Não cita valor, nem faixa, nem 'a partir de'. Diz que depende de idade, profissão e do que faz sentido proteger, e que o especialista faz a conta na reunião." }),
     wa("Para de me mandar mensagem, por favor.", { id: "hl17", title: "Pediu para parar", expect: "reply", declined: true, mustNot: [/\?/, /indic/i], rubric: "Encerra na hora, cordial e curto, sem pergunta e sem pedir indicação." }),
     wa("De onde você tirou meu contato?", { id: "hl18", title: "De onde veio o contato", expect: "reply", must: [/veio da nossa base/i], rubric: "Usa a resposta aprovada (veio da base, prospecção ativa ou recomendação) e não inventa uma origem." }),
-    wa("Você é o Daniel?", { id: "hl19", title: "Você é o Daniel?", expect: "reply", must: [/Helena/], mustNot: [/sou o Daniel|sou eu mesmo/i], rubric: "Diz que é a Helena, da área de novos negócios da DOR$, e nunca se passa pelo Daniel." }),
+    wa("Você é o Daniel?", { id: "hl19", title: "Você é o Daniel?", expect: "reply", must: [/Helena/], mustNot: [/sou o Daniel|sou eu mesmo/i], rubric: "Diz que é a Helena, responsável de novos negócios da DOR$, e nunca se passa pelo Daniel." }),
     wa("Já tenho seguro.", { id: "hl20", title: "Já tenho seguro", expect: "reply", must: [/especialista/i, /compromisso/i], rubric: "Resposta aprovada: o especialista pode conferir se o seguro ainda acompanha o momento, sem compromisso de trocar." }),
   ];
 }
