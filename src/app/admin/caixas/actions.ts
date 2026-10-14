@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/admin";
 import { parseEmail } from "@/lib/contactFields";
 import { seal } from "@/lib/secretBox";
 import { testServers } from "@/lib/email";
-import { mailboxConfig } from "@/lib/mailboxes";
+import { imapBaseline, mailboxConfig } from "@/lib/mailboxes";
 
 export interface MailboxInput {
   address: string;
@@ -49,15 +49,17 @@ export async function addMailbox(data: MailboxInput): Promise<{ error?: string }
     imapSecure: imapPort === 993,
     dailyLimit,
   };
-  const problem = await testServers({
+  const cfg = {
     address: fields.address,
     password: data.password,
     smtp: { host: smtpHost, port: smtpPort, secure: fields.smtpSecure },
     imap: { host: imapHost, port: imapPort, secure: fields.imapSecure },
-  });
+  };
+  const problem = await testServers(cfg);
   if (problem) return { error: `Não consegui entrar nessa caixa. ${problem}` };
+  const baseline = await imapBaseline(cfg).catch(() => null);
 
-  await prisma.mailbox.create({ data: { ...fields, passwordEnc: seal(data.password) } });
+  await prisma.mailbox.create({ data: { ...fields, ...(baseline ?? {}), passwordEnc: seal(data.password) } });
   revalidatePath("/admin/caixas");
   revalidatePath("/channels");
   return {};

@@ -38,6 +38,7 @@ export async function GET(request: Request) {
   try {
     const r = await syncEmailInbox();
     email = { read: r.read, saved: r.saved };
+    console.log(`[poll] E-mail: lidos ${r.read}, salvos ${r.saved}`);
     if (canReplyNow) for (const lead of r.leads) await handleIncomingMessage(lead, identityId);
   } catch (err) {
     console.error("Falha ao ler a caixa de e-mail", err);
