@@ -25,6 +25,50 @@ export async function testEmail() {
   return testEmailConnection();
 }
 
+const PROACTIVE_LABELS: Record<string, string> = {
+  acceptedInvites: "convites aceitos",
+  repliesSent: "respostas enviadas",
+  openingsSent: "aberturas enviadas",
+  introEmailsSent: "apresentações por e-mail",
+  firstContactsSent: "primeiros contatos",
+  cadenceStepsSent: "passos da sequência",
+  meetingRemindersSent: "lembretes de reunião",
+  followUpsSent: "retomadas",
+  markedLost: "contatos encerrados",
+  bookingNudgesSent: "convites para marcar reunião",
+};
+
+// Roda agora o mesmo robô que o cron-job.org chama de 15 em 15 minutos, sem esperar a próxima passada.
+export async function runRobotNow(): Promise<{ error?: string; lines?: string[] }> {
+  await requireAdmin();
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return { error: "CRON_SECRET não está definido no ambiente." };
+  try {
+    const { GET } = await import("@/app/api/cron/poll/route");
+    const res = await GET(new Request("http://interno/api/cron/poll", { headers: { authorization: `Bearer ${secret}` } }));
+    if (!res.ok) return { error: `O robô respondeu ${res.status}.` };
+    const j = (await res.json()) as {
+      email?: { read: number; saved: number; error?: string };
+      proactive?: Record<string, unknown> & { skipped?: string; error?: string };
+    };
+    const lines: string[] = [];
+    if (j.email) lines.push(j.email.error ? `E-mail: erro (${j.email.error})` : `E-mail: ${j.email.read} lidos, ${j.email.saved} novos.`);
+    const p = j.proactive;
+    if (p?.error) lines.push(`Envios: erro (${p.error})`);
+    else if (p?.skipped) lines.push(`Envios parados: ${p.skipped}.`);
+    else {
+      const done = Object.entries(PROACTIVE_LABELS)
+        .filter(([k]) => typeof p?.[k] === "number" && (p[k] as number) > 0)
+        .map(([k, label]) => `${p![k]} ${label}`);
+      lines.push(done.length ? `Envios: ${done.join(", ")}.` : "Envios: nada novo agora.");
+    }
+    revalidatePath("/", "layout");
+    return { lines };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao rodar o robô." };
+  }
+}
+
 export async function adminLogout() {
   (await cookies()).delete(ADMIN_COOKIE);
   revalidatePath("/admin");
