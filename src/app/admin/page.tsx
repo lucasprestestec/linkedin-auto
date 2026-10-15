@@ -14,11 +14,14 @@ import { AccountTypeNotice } from "./AccountTypeNotice";
 import { adminLogout } from "./actions";
 import { AgentEval } from "./eval/AgentEval";
 import { EmailStatus } from "./EmailStatus";
+import { RunRobotButton } from "./RunRobotButton";
 import { emailConnection } from "@/lib/email";
 import { googleConfigured, googleRedirectUri } from "@/lib/gmail";
 import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
+// O botão "Rodar agora" executa o robô inteiro aqui dentro (o robô de 15 em 15 minutos tem o mesmo teto).
+export const maxDuration = 120;
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 // Configurações técnicas, fora do alcance do usuário final. Sem ADMIN_PASSWORD
@@ -59,6 +62,14 @@ export default async function AdminPage() {
           </button>
         </form>
       </header>
+
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">Robô: rodar agora</h2>
+          <small>Ele já roda sozinho de 15 em 15 minutos. Use o botão nos testes, para não esperar a próxima passada.</small>
+        </div>
+        <RunRobotButton />
+      </section>
 
       <section className="sec">
         <div className="setting-text">
