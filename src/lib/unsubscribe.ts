@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { trackingBase } from "./trackingUrl";
 
 // Link de "não quero mais receber" dos e-mails: o código é o id da pessoa assinado
 // com o segredo da sessão, então não dá para adivinhar nem trocar por outra pessoa.
@@ -8,7 +9,7 @@ function sign(leadId: string): string | null {
 }
 
 export function unsubscribeUrl(leadId: string): string | null {
-  const base = process.env.APP_URL?.replace(/\/$/, "");
+  const base = trackingBase();
   const sig = sign(leadId);
   return base && sig ? `${base}/api/u/${leadId}.${sig}` : null;
 }
