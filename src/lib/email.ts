@@ -5,6 +5,7 @@ import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { prisma } from "@/lib/prisma";
 import { gmailCheck, gmailNewInboxMessages, gmailSend } from "@/lib/gmail";
+import { trackingBase } from "@/lib/trackingUrl";
 
 // E-mail pela caixa do PRÓPRIO corretor. Sem serviço pago: a mensagem sai no
 // nome dele, da caixa dele, e a resposta do cliente chega onde ele já lê.
@@ -145,9 +146,9 @@ export async function fromName(): Promise<string | undefined> {
   return s?.assistantName?.trim() || s?.ownerName || undefined;
 }
 
-// Endereço da imagem invisível que marca a abertura. Sem APP_URL, sem rastreio.
+// Endereço da imagem invisível que marca a abertura. Sem endereço (TRACKING_URL ou APP_URL), sem rastreio.
 export function openPixelUrl(token: string): string | null {
-  const base = process.env.APP_URL?.replace(/\/$/, "");
+  const base = trackingBase();
   return base ? `${base}/api/o/${token}.gif` : null;
 }
 
