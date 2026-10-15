@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isAutoOpen } from "@/lib/openTracking";
 
 // Imagem invisível dos e-mails enviados: cada vez que carrega, conta uma
 // abertura. Público (o app de e-mail do cliente não tem login), por isso só
@@ -9,8 +10,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   const token = (await params).token.replace(/\.gif$/, "");
   if (/^[\w-]{20,40}$/.test(token)) {
     const now = new Date();
-    const msg = await prisma.message.findUnique({ where: { openToken: token }, select: { id: true, firstOpenedAt: true } });
-    if (msg) {
+    const msg = await prisma.message.findUnique({ where: { openToken: token }, select: { id: true, firstOpenedAt: true, deliveredAt: true } });
+    // Carregamento automático logo depois do envio (Gmail, filtros) não é a pessoa abrindo: não conta.
+    if (msg && !isAutoOpen(msg.deliveredAt, now)) {
       await prisma.message.update({
         where: { id: msg.id },
         data: { openCount: { increment: 1 }, lastOpenedAt: now, firstOpenedAt: msg.firstOpenedAt ?? now },
