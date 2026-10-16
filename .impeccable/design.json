@@ -1,0 +1,714 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-16T00:31:01.623Z",
+  "title": "Design System: Central Dors",
+  "source": "docs/redesign/index.html (protótipo aprovado; o app em src/ ainda usa o visual antigo de src/app/ds.css)",
+  "extensions": {
+    "colorMeta": {
+      "sign-black": {
+        "role": "neutral",
+        "displayName": "Preto Placa",
+        "canonical": "#141414",
+        "oklch": "oklch(19.1% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#808080",
+          "#A4A4A4",
+          "#CACACA",
+          "#EEEEEE"
+        ],
+        "dark": "#000000"
+      },
+      "sign-raised": {
+        "role": "neutral",
+        "displayName": "Placa Elevada",
+        "canonical": "#232320",
+        "oklch": "oklch(25.5% 0.006 106.8)",
+        "tonalRamp": [
+          "#0B0B09",
+          "#242421",
+          "#40403D",
+          "#5E5E5A",
+          "#80807D",
+          "#A5A5A1",
+          "#CBCBC7",
+          "#EFEFEB"
+        ],
+        "dark": "#1A1A17"
+      },
+      "sign-ink": {
+        "role": "neutral",
+        "displayName": "Tinta de Placa",
+        "canonical": "#F4F2EC",
+        "oklch": "oklch(96.1% 0.008 91.5)",
+        "tonalRamp": [
+          "#0C0B07",
+          "#252420",
+          "#41403B",
+          "#5F5D58",
+          "#82807B",
+          "#A6A49F",
+          "#CCCAC5",
+          "#F0EEE8"
+        ]
+      },
+      "sign-dim": {
+        "role": "neutral",
+        "displayName": "Placa Apagada",
+        "canonical": "#A9A598",
+        "oklch": "oklch(72.2% 0.019 92.7)",
+        "tonalRamp": [
+          "#0E0B03",
+          "#27241A",
+          "#434035",
+          "#615E52",
+          "#848074",
+          "#A9A598",
+          "#CFCABD",
+          "#F3EEE1"
+        ]
+      },
+      "amber": {
+        "role": "primary",
+        "displayName": "Amarelo Sinalização",
+        "canonical": "#FFC928",
+        "oklch": "oklch(86.0% 0.168 87.8)",
+        "tonalRamp": [
+          "#180600",
+          "#3B1C00",
+          "#5E3600",
+          "#815500",
+          "#A47900",
+          "#C4A03F",
+          "#E1C88D",
+          "#F6EED9"
+        ]
+      },
+      "amber-soft": {
+        "role": "primary",
+        "displayName": "Amarelo Claro",
+        "canonical": "#FFF3CC",
+        "oklch": "oklch(96.4% 0.052 92.9)",
+        "tonalRamp": [
+          "#130900",
+          "#2D2301",
+          "#493F1D",
+          "#685D3B",
+          "#8B805C",
+          "#B0A480",
+          "#D6CAA4",
+          "#F5EEDA"
+        ],
+        "dark": "#3A2F0B"
+      },
+      "area-hoje": {
+        "role": "secondary",
+        "displayName": "Área Hoje",
+        "canonical": "#FFC928",
+        "oklch": "oklch(86.0% 0.168 87.8)",
+        "tonalRamp": [
+          "#180600",
+          "#3B1C00",
+          "#5E3600",
+          "#815500",
+          "#A47900",
+          "#C4A03F",
+          "#E1C88D",
+          "#F6EED9"
+        ]
+      },
+      "area-conversas": {
+        "role": "secondary",
+        "displayName": "Área Conversas",
+        "canonical": "#4A90F0",
+        "oklch": "oklch(65.4% 0.160 256.9)",
+        "tonalRamp": [
+          "#00072A",
+          "#001F5A",
+          "#003B87",
+          "#195BB0",
+          "#4380D4",
+          "#72A6EF",
+          "#A9CDFF",
+          "#E3F0FF"
+        ]
+      },
+      "area-contatos": {
+        "role": "secondary",
+        "displayName": "Área Contatos",
+        "canonical": "#34A866",
+        "oklch": "oklch(65.1% 0.142 154.1)",
+        "tonalRamp": [
+          "#001300",
+          "#003203",
+          "#005317",
+          "#007335",
+          "#1C9857",
+          "#61BB81",
+          "#A1DBB3",
+          "#E1F5E6"
+        ]
+      },
+      "area-agenda": {
+        "role": "secondary",
+        "displayName": "Área Agenda",
+        "canonical": "#F07B2C",
+        "oklch": "oklch(70.5% 0.168 49.9)",
+        "tonalRamp": [
+          "#210000",
+          "#4B0300",
+          "#751C00",
+          "#9C3B00",
+          "#C26220",
+          "#E18D5C",
+          "#F6BC9C",
+          "#FFEADE"
+        ]
+      },
+      "area-ajustes": {
+        "role": "secondary",
+        "displayName": "Área Ajustes",
+        "canonical": "#A9A598",
+        "oklch": "oklch(72.2% 0.019 92.7)",
+        "tonalRamp": [
+          "#0E0B03",
+          "#27241A",
+          "#434035",
+          "#615E52",
+          "#848074",
+          "#A9A598",
+          "#CFCABD",
+          "#F3EEE1"
+        ]
+      },
+      "ok": {
+        "role": "tertiary",
+        "displayName": "Verde Andando",
+        "canonical": "#24734A",
+        "oklch": "oklch(49.6% 0.101 156.6)",
+        "tonalRamp": [
+          "#001300",
+          "#00310D",
+          "#004F28",
+          "#1E6E45",
+          "#469267",
+          "#6CB88B",
+          "#9FDBB5",
+          "#E0F5E7"
+        ],
+        "dark": "#5CC48A"
+      },
+      "ok-soft": {
+        "role": "tertiary",
+        "displayName": "Verde Andando Suave",
+        "canonical": "#E1F1E7",
+        "oklch": "oklch(94.3% 0.022 158.6)",
+        "tonalRamp": [
+          "#040E08",
+          "#1B2720",
+          "#36433C",
+          "#546259",
+          "#76847B",
+          "#9AA9A0",
+          "#BFCFC5",
+          "#E3F3E9"
+        ],
+        "dark": "#163323"
+      },
+      "stop": {
+        "role": "tertiary",
+        "displayName": "Vermelho Parado",
+        "canonical": "#B83A24",
+        "oklch": "oklch(53.0% 0.166 32.3)",
+        "tonalRamp": [
+          "#230000",
+          "#4E0000",
+          "#791000",
+          "#A1321F",
+          "#C75A46",
+          "#E68774",
+          "#FBB8AA",
+          "#FFE8E3"
+        ],
+        "dark": "#F07A63"
+      },
+      "focus": {
+        "role": "tertiary",
+        "displayName": "Azul Foco",
+        "canonical": "#2F6FE0",
+        "oklch": "oklch(56.4% 0.185 260.8)",
+        "tonalRamp": [
+          "#00062A",
+          "#001D5A",
+          "#0C3988",
+          "#2759B0",
+          "#4C7ED5",
+          "#79A5F0",
+          "#ADCCFF",
+          "#E4EFFF"
+        ],
+        "dark": "#7AA8FF"
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Chão Areia",
+        "canonical": "#F4F2EC",
+        "oklch": "oklch(96.1% 0.008 91.5)",
+        "tonalRamp": [
+          "#0C0B07",
+          "#252420",
+          "#41403B",
+          "#5F5D58",
+          "#82807B",
+          "#A6A49F",
+          "#CCCAC5",
+          "#F0EEE8"
+        ],
+        "dark": "#131311"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "#FFFFFF",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#808080",
+          "#A4A4A4",
+          "#CACACA",
+          "#EEEEEE"
+        ],
+        "dark": "#1C1C19"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#141414",
+        "oklch": "oklch(19.1% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242424",
+          "#404040",
+          "#5D5D5D",
+          "#808080",
+          "#A4A4A4",
+          "#CACACA",
+          "#EEEEEE"
+        ],
+        "dark": "#EDEAE2"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Tinta 2",
+        "canonical": "#47463F",
+        "oklch": "oklch(39.3% 0.012 100.3)",
+        "tonalRamp": [
+          "#0C0B06",
+          "#25241E",
+          "#414039",
+          "#5F5E57",
+          "#828079",
+          "#A6A59D",
+          "#CCCBC2",
+          "#F0EFE6"
+        ],
+        "dark": "#C9C5BA"
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Tinta 3",
+        "canonical": "#66645B",
+        "oklch": "oklch(50.2% 0.014 96.6)",
+        "tonalRamp": [
+          "#0D0B05",
+          "#26241C",
+          "#424037",
+          "#605E55",
+          "#828077",
+          "#A7A59B",
+          "#CDCBC0",
+          "#F1EFE4"
+        ],
+        "dark": "#A29E92"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Filete",
+        "canonical": "#DEDAD0",
+        "oklch": "oklch(88.9% 0.014 88.7)",
+        "tonalRamp": [
+          "#0E0B05",
+          "#27241C",
+          "#433F37",
+          "#615D55",
+          "#848077",
+          "#A8A49B",
+          "#CECAC0",
+          "#F2EEE4"
+        ],
+        "dark": "#2E2D29"
+      },
+      "rule-2": {
+        "role": "neutral",
+        "displayName": "Filete Forte",
+        "canonical": "#CBC6B8",
+        "oklch": "oklch(82.7% 0.020 90.6)",
+        "tonalRamp": [
+          "#0E0B03",
+          "#282419",
+          "#443F34",
+          "#625D51",
+          "#858073",
+          "#A9A497",
+          "#CFCABC",
+          "#F3EEE0"
+        ],
+        "dark": "#3D3B35"
+      },
+      "board-cell": {
+        "role": "neutral",
+        "displayName": "Célula do Painel",
+        "canonical": "#1F1F1C",
+        "oklch": "oklch(23.8% 0.006 106.8)",
+        "tonalRamp": [
+          "#0B0B09",
+          "#242421",
+          "#40403D",
+          "#5E5E5A",
+          "#80807D",
+          "#A5A5A1",
+          "#CBCBC7",
+          "#EFEFEA"
+        ]
+      },
+      "board-divider": {
+        "role": "neutral",
+        "displayName": "Divisória do Painel",
+        "canonical": "#2E2D28",
+        "oklch": "oklch(29.6% 0.009 97.6)",
+        "tonalRamp": [
+          "#0C0B07",
+          "#25241F",
+          "#41403B",
+          "#5F5E58",
+          "#81807A",
+          "#A6A59E",
+          "#CCCBC4",
+          "#F0EFE8"
+        ]
+      },
+      "board-label": {
+        "role": "neutral",
+        "displayName": "Rótulo do Painel",
+        "canonical": "#BDB8A8",
+        "oklch": "oklch(78.2% 0.023 92.6)",
+        "tonalRamp": [
+          "#0F0B02",
+          "#282417",
+          "#444032",
+          "#625D4F",
+          "#858071",
+          "#A9A595",
+          "#D0CABA",
+          "#F4EEDE"
+        ]
+      },
+      "board-foot": {
+        "role": "neutral",
+        "displayName": "Rodapé do Painel",
+        "canonical": "#8F8B7E",
+        "oklch": "oklch(63.6% 0.020 92.8)",
+        "tonalRamp": [
+          "#0E0B03",
+          "#272419",
+          "#434034",
+          "#615E51",
+          "#848073",
+          "#A9A597",
+          "#CFCABD",
+          "#F3EEE0"
+        ]
+      },
+      "board-up": {
+        "role": "tertiary",
+        "displayName": "Verde de Placa",
+        "canonical": "#7FD6A0",
+        "oklch": "oklch(80.7% 0.115 155.6)",
+        "tonalRamp": [
+          "#001300",
+          "#003206",
+          "#005023",
+          "#087040",
+          "#3C9462",
+          "#63BA85",
+          "#A0DBB4",
+          "#E0F5E6"
+        ]
+      }
+    },
+    "darkTheme": {
+      "trigger": "prefers-color-scheme: dark, ou data-theme=\"dark\" no <html>",
+      "note": "Cada colorMeta com campo dark troca para esse valor; extras abaixo existem só no escuro.",
+      "extras": {
+        "go-border": "#FFC928",
+        "bubble": "#34332D",
+        "board-edge": "#3D3B35"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Título da tela, caixa alta, com o quadradinho da área (0.62em) à esquerda."
+      },
+      "board-digit": {
+        "displayName": "Dígito de Painel",
+        "purpose": "Só os dígitos split-flap do painel de embarque."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Título de seção em caixa alta (Aguardando você). Dias da Agenda: 800 a 30px."
+      },
+      "sign": {
+        "displayName": "Placa",
+        "purpose": "Rótulos da barra lateral; 13px na barra inferior do celular."
+      },
+      "button": {
+        "displayName": "Botão",
+        "purpose": "Botões em caixa alta; 15px no tamanho pequeno."
+      },
+      "label": {
+        "displayName": "Rótulo",
+        "purpose": "Cabeçalho de painel, de grupo de ajustes, de tabela (14px) e de coluna do painel (15px), em Tinta 3."
+      },
+      "tag": {
+        "displayName": "Etiqueta",
+        "purpose": "Etiquetas de estado e separador de dia na conversa."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Título de item da fila (18px) e de linha de ajuste (17px)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto corrido; rascunhos até 66ch, subtítulo de tela 17px até 62ch."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Canal, hora, cargo e empresa, em Tinta 3."
+      }
+    },
+    "shadows": [],
+    "borders": [
+      {
+        "name": "control",
+        "value": "1.5px solid",
+        "purpose": "Botões, campos, chips, calendário."
+      },
+      {
+        "name": "divider",
+        "value": "1px solid var(--rule)",
+        "purpose": "Linhas de lista, bordas de painel."
+      },
+      {
+        "name": "list-head",
+        "value": "2px solid var(--ink)",
+        "purpose": "Topo de lista e cabeçalho de tabela."
+      }
+    ],
+    "focus": {
+      "value": "outline: 3px solid var(--focus); outline-offset: 2px",
+      "purpose": "Anel de foco de teclado em todo elemento."
+    },
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Entrada de tela, dobra split-flap, aviso, interruptor."
+      },
+      {
+        "name": "screen-enter",
+        "value": "350ms; opacity .4 para 1, translateY 6px para 0",
+        "purpose": "Troca de tela."
+      },
+      {
+        "name": "flap-fold",
+        "value": "220ms rotateX(0 a -90deg) + brightness(.55); passo 130ms; colunas defasadas 60ms",
+        "purpose": "Virada split-flap, só no painel de embarque."
+      },
+      {
+        "name": "state",
+        "value": "150-200ms background/color",
+        "purpose": "Hover de botão e placa."
+      },
+      {
+        "name": "resolve",
+        "value": "300ms opacity para 0, translateX 16px",
+        "purpose": "Item da fila resolvido saindo."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation e transition desligadas",
+        "purpose": "prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-desktop",
+        "value": "1100px",
+        "purpose": "Divisão 2/3+1/3 vira uma coluna; detalhes da conversa somem."
+      },
+      {
+        "name": "mobile",
+        "value": "820px",
+        "purpose": "Barra inferior; painel 3+2; Conversas mostra lista ou conversa."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão principal (go)",
+      "kind": "button",
+      "refersTo": "button-go",
+      "description": "Ação que resolve a pendência: preto com texto amarelo, um por item.",
+      "html": "<button class=\"ds-btn ds-btn-go\">Aprovar e enviar</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:3px;border:1.5px solid #141414;font:700 17px/1 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s,transform .1s}.ds-btn-go{background:#141414;color:#FFC928}.ds-btn-go:hover{background:#000;color:#FFD95C}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:3px solid #2F6FE0;outline-offset:2px}"
+    },
+    {
+      "name": "Botão contorno",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Ação secundária; inverte ao passar o mouse.",
+      "html": "<button class=\"ds-btn-o\">Editar</button>",
+      "css": ".ds-btn-o{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:3px;border:1.5px solid #141414;background:transparent;color:#141414;font:700 17px/1 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}.ds-btn-o:hover{background:#141414;color:#F4F2EC}.ds-btn-o:active{transform:translateY(1px)}.ds-btn-o:focus-visible{outline:3px solid #2F6FE0;outline-offset:2px}"
+    },
+    {
+      "name": "Botão discreto",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Descartar, voltar, detalhes.",
+      "html": "<button class=\"ds-btn-q\">Descartar</button>",
+      "css": ".ds-btn-q{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:3px;border:1.5px solid transparent;background:transparent;color:#66645B;font:700 17px/1 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}.ds-btn-q:hover{background:#DEDAD0;color:#141414}.ds-btn-q:focus-visible{outline:3px solid #2F6FE0;outline-offset:2px}"
+    },
+    {
+      "name": "Placa de navegação",
+      "kind": "nav",
+      "refersTo": "sign",
+      "description": "Barra lateral preta com quadradinho de cor por área; a placa atual acende a cor.",
+      "html": "<nav class=\"ds-rail\"><button class=\"ds-sign\" aria-current=\"page\" style=\"--c:#FFC928\"><span class=\"ds-sq\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22\"/></svg></span><span class=\"ds-lbl\">Hoje</span><span class=\"ds-count\">3</span></button><button class=\"ds-sign\" style=\"--c:#4A90F0\"><span class=\"ds-sq\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"><path d=\"M4 5h16v11H9l-5 4z\"/></svg></span><span class=\"ds-lbl\">Conversas</span></button></nav>",
+      "css": ".ds-rail{background:#141414;padding:14px;display:flex;flex-direction:column;gap:4px;width:248px}.ds-sign{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 12px;border:0;background:transparent;color:#A9A598;cursor:pointer;text-align:left;border-radius:3px;font:700 20px/1 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;transition:background .2s,color .2s}.ds-sign:hover,.ds-sign[aria-current=page]{background:#232320;color:#F4F2EC}.ds-sq{width:26px;height:26px;display:grid;place-items:center;background:#232320;color:#A9A598;border-radius:2px}.ds-sign[aria-current=page] .ds-sq{background:var(--c);color:#141414}.ds-lbl{flex:1}.ds-count{min-width:26px;height:22px;padding:0 7px;border-radius:2px;background:#FFC928;color:#141414;font:700 15px/22px 'Barlow Condensed',sans-serif;text-align:center}.ds-sign:focus-visible{outline:3px solid #2F6FE0;outline-offset:2px}"
+    },
+    {
+      "name": "Painel de embarque",
+      "kind": "custom",
+      "refersTo": "board",
+      "description": "Faixa preta com dígitos amarelos tabulares em células split-flap; um por tela.",
+      "html": "<div class=\"ds-board\"><div class=\"ds-col\"><div class=\"ds-blbl\">Convidados</div><div class=\"ds-bval\"><span class=\"ds-flap\">6</span><span class=\"ds-flap\">4</span></div><div class=\"ds-bnote\"><b>+21</b> esta semana</div></div><div class=\"ds-col ds-hot\"><div class=\"ds-blbl\">Oportunidades</div><div class=\"ds-bval\"><span class=\"ds-flap\">0</span><span class=\"ds-flap\">4</span></div><div class=\"ds-bnote\">dados de exemplo</div></div></div>",
+      "css": ".ds-board{background:#141414;color:#FFC928;border-radius:4px;padding:18px 20px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ds-col{padding:0 18px;border-left:1px solid #2E2D28}.ds-col:first-child{border-left:0;padding-left:4px}.ds-blbl{font:600 15px/1.1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#BDB8A8}.ds-hot .ds-blbl{color:#FFC928}.ds-bval{display:flex;gap:3px;margin:10px 0 8px}.ds-flap{display:inline-grid;place-items:center;width:.68em;height:1.08em;background:#1F1F1C;border-radius:3px;font:700 48px/1 'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums;position:relative}.ds-flap::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#0A0A09}.ds-bnote{font:500 14px 'Barlow',sans-serif;color:#BDB8A8}.ds-bnote b{color:#7FD6A0;font-weight:600}"
+    },
+    {
+      "name": "Chip de filtro",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Filtro exclusivo; pressionado inverte para tinta.",
+      "html": "<div style=\"display:flex;gap:4px\"><button class=\"ds-chip\" aria-pressed=\"true\">Todas</button><button class=\"ds-chip\" aria-pressed=\"false\">Com você · 1</button></div>",
+      "css": ".ds-chip{min-height:34px;padding:0 9px;border-radius:2px;border:1.5px solid #CBC6B8;background:transparent;font:600 15px/1 'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#47463F;cursor:pointer}.ds-chip[aria-pressed=true]{background:#141414;border-color:#141414;color:#F4F2EC}.ds-chip:focus-visible{outline:3px solid #2F6FE0;outline-offset:2px}"
+    },
+    {
+      "name": "Etiquetas de estado",
+      "kind": "chip",
+      "refersTo": "tag-you",
+      "description": "Com você (amarelo), Andando (verde), hora (sem fundo).",
+      "html": "<span class=\"ds-tag ds-you\">Com você</span> <span class=\"ds-tag ds-ok\">Andando</span> <span class=\"ds-tag ds-q\">10:42</span>",
+      "css": ".ds-tag{display:inline-block;font:700 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:4px 6px;border-radius:2px}.ds-you{background:#FFC928;color:#141414}.ds-ok{background:#E1F1E7;color:#24734A}.ds-q{color:#66645B}"
+    },
+    {
+      "name": "Campo de busca",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Contorno 1.5px; a borda vira tinta no foco.",
+      "html": "<label class=\"ds-search\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M20 20l-4-4\"/></svg><input type=\"search\" placeholder=\"Buscar pessoa ou empresa\"></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:8px;padding:0 12px;min-height:44px;border:1.5px solid #CBC6B8;border-radius:3px;color:#66645B;background:#fff}.ds-search:focus-within{border-color:#141414}.ds-search input{border:0;outline:0;background:transparent;font:16px 'Barlow',sans-serif;color:#141414;flex:1;min-width:0}.ds-search input::placeholder{color:#66645B}"
+    },
+    {
+      "name": "Painel lateral com faixa de capacidade",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Papel com filete, cabeçalho em rótulo; faixa que enche e fica vermelha quando cheia.",
+      "html": "<div class=\"ds-panel\"><h3 class=\"ds-ph\">Quanto ainda cabe hoje</h3><div class=\"ds-cap\"><span>LinkedIn</span><span class=\"ds-tape ds-full\"><i style=\"width:100%\"></i></span><small>20/20</small></div><div class=\"ds-cap\"><span>E-mail</span><span class=\"ds-tape\"><i style=\"width:52%\"></i></span><small>31/60</small></div></div>",
+      "css": ".ds-panel{background:#fff;border:1px solid #DEDAD0;border-radius:3px;padding:18px 20px;font:15px 'Barlow',sans-serif;color:#141414}.ds-ph{font:700 16px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#66645B;margin:0 0 12px}.ds-cap{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px}.ds-cap small{color:#66645B;font-size:14px;font-variant-numeric:tabular-nums}.ds-tape{height:10px;background:#F4F2EC;border:1px solid #CBC6B8;border-radius:2px;overflow:hidden}.ds-tape i{display:block;height:100%;background:#141414}.ds-full i{background:#B83A24}"
+    },
+    {
+      "name": "Interruptor",
+      "kind": "input",
+      "refersTo": "switch",
+      "description": "Trilho quadrado; ligado = preto com polegar amarelo.",
+      "html": "<label class=\"ds-switch\"><input type=\"checkbox\" checked aria-label=\"Aprovar mensagens\"><span></span></label>",
+      "css": ".ds-switch{position:relative;display:inline-block;width:52px;height:30px}.ds-switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}.ds-switch span{position:absolute;inset:0;background:#CBC6B8;border-radius:2px;transition:background .2s}.ds-switch span::after{content:'';position:absolute;left:3px;top:3px;width:24px;height:24px;background:#fff;border-radius:1px;transition:transform .2s cubic-bezier(.16,1,.3,1)}.ds-switch input:checked+span{background:#141414}.ds-switch input:checked+span::after{transform:translateX(22px);background:#FFC928}.ds-switch input:focus-visible+span{outline:3px solid #2F6FE0;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Sinalização de Aeroporto",
+    "overview": "O painel funciona como a sinalização de um aeroporto bem resolvido: placas pretas com uma cor por área dizem onde cada coisa está, e um painel de embarque preto com dígitos amarelos diz o status de tudo num relance. Quem abre o painel não lê; reconhece. Cor marca lugar e estado, nunca enfeite.\n\nO chão é claro e quente (papel areia), a tinta é quase preta, e tudo que é \"placa\" é preto sólido: a barra lateral, o painel de embarque, o botão de ação principal, o aviso que aparece embaixo. A tipografia de placa é uma grotesca condensada em caixa alta; o texto corrido é a mesma família em largura normal, em caixa baixa. A densidade é de ferramenta de trabalho: listas com linhas finas, nada de cartões iguais enfileirados.\n\nO sistema recusa o arranjo padrão de SaaS (fileira de cartões de métrica iguais + tabela + menu cinza), sombra difusa decorativa e cantos arredondados de \"app amigável\".",
+    "keyCharacteristics": [
+      "Barra lateral preta com placas: quadradinho de cor por área + rótulo condensado em caixa alta + seta no item atual.",
+      "Um único painel de embarque por tela, preto, dígitos amarelos tabulares com virada split-flap.",
+      "Estado em três cores fixas: verde = andando, amarelo = aguardando você, vermelho = parado.",
+      "Cantos retos ou quase (2–4px), nenhuma sombra; profundidade por cor sólida e filete.",
+      "Tema escuro completo, com as placas ficando ainda mais pretas que o chão."
+    ],
+    "rules": [
+      {
+        "name": "The Amarelo é Você Rule",
+        "body": "Amarelo significa \"isto depende de você\" (ou é um dígito do painel). Não use amarelo para destacar algo que o assistente resolve sozinho.",
+        "section": "colors"
+      },
+      {
+        "name": "The Cor de Área é Marca Pequena Rule",
+        "body": "Cor de área nunca pinta fundo de bloco, texto corrido ou botão. Ela vive em quadradinhos, setas e faixas estreitas.",
+        "section": "colors"
+      },
+      {
+        "name": "The Três Estados Rule",
+        "body": "Verde andando, amarelo aguardando você, vermelho parado. Nenhuma quarta cor de status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Placa em Caixa Alta, Frase em Caixa Baixa Rule",
+        "body": "Toda letra condensada é caixa alta; todo texto em Barlow normal é caixa de frase. Nunca condensada em caixa baixa, nunca frase inteira em caixa alta.",
+        "section": "typography"
+      },
+      {
+        "name": "The Número Tabular Rule",
+        "body": "Todo número que muda ou se compara (contadores, horas, capacidade, dígitos) usa numerais tabulares.",
+        "section": "typography"
+      },
+      {
+        "name": "The Placa Não Flutua Rule",
+        "body": "Nenhum `box-shadow` em superfície alguma. Separe com cor sólida, filete ou mudança de chão para papel.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do marcar cada área com seu quadradinho de cor (Hoje amarelo, Conversas azul, Contatos verde, Agenda laranja, Ajustes cinza) na placa e ao lado do título.",
+      "Do usar o botão principal preto com texto amarelo para a ação que resolve a pendência, um por item.",
+      "Do usar setas para indicar direção (placa ativa, link \"Adicionar pessoas\", passagem \"Sua vez\"); a seta é sinalização, não enfeite.",
+      "Do rotular números ilustrativos como \"dados de exemplo\" no próprio painel.",
+      "Do manter avatares, luzes e marcadores quadrados (2–3px).",
+      "Do respeitar `prefers-reduced-motion`: sem virada split-flap, sem entrada de tela."
+    ],
+    "donts": [
+      "Don't montar fileira de cartões de métrica iguais + tabela + menu cinza; os números vivem no painel de embarque.",
+      "Don't usar sombra difusa ou qualquer `box-shadow` decorativo.",
+      "Don't usar a virada split-flap fora do painel de embarque.",
+      "Don't pintar fundos de bloco ou texto corrido com cor de área.",
+      "Don't colocar rótulo pequeno em caixa alta acima de títulos (kicker/eyebrow); o título display com o quadradinho já diz onde a pessoa está.",
+      "Don't usar círculos para avatares, luzes de status ou marcadores."
+    ]
+  }
+}

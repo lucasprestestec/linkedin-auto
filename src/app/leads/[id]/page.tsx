@@ -19,8 +19,10 @@ import { LeadActions } from "./LeadActions";
 import { HandoffCard } from "./HandoffCard";
 import { LeadFollowUp } from "./LeadFollowUp";
 import { describeRule, followUpRuleFor } from "@/lib/followupPolicy";
-import { DetailsToggle, LeadWorkspace } from "./LeadWorkspace";
-import { ConversationList } from "@/components/ConversationList";
+import { ConversationsFrame } from "@/components/ConversationsFrame";
+import { Avatar } from "@/components/Avatar";
+import { IconArrowLeft } from "@/components/Icons";
+import { SummaryButton } from "./SummaryButton";
 import { emailEnabled } from "@/lib/email";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { getConversationItems } from "@/lib/conversations";
@@ -114,6 +116,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   const conversation = (
     <>
+      {lead.messages.length > 0 && <SummaryButton leadId={lead.id} />}
       {lead.messages.length === 0 && (
         <p className="empty" style={{ textAlign: "center" }}>
           {lead.status === "INVITE_SENT"
@@ -139,7 +142,6 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     <div className="stack" style={{ gap: 28 }}>
       <section className="sec">
         <p className="status-text">{holdLabel ? `${statusLabel} · ${holdLabel}` : statusLabel}</p>
-        <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
       </section>
 
       <LeadProfile
@@ -220,32 +222,27 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   );
 
   return (
-    <div className="conv-layout">
-      <aside className="conv-col only-desktop" aria-label="Lista de conversas">
-        <ConversationList items={conversations} activeId={lead.id} />
-      </aside>
-
-      <LeadWorkspace>
-        <ChannelProvider available={available} reply={replyChannels} initial={lastChannel}>
+    <ConversationsFrame items={conversations} activeId={lead.id}>
+      <ChannelProvider available={available} reply={replyChannels} initial={lastChannel}>
         <div className="chat">
-          <header className="chat-head">
-            <Link href="/" className="btn-text only-mobile" aria-label="Voltar para Conversas">
-              ← Voltar
+          <header className="c-top">
+            <Link href="/conversations" className="icon-btn only-mobile" aria-label="Voltar para Conversas">
+              <IconArrowLeft size={20} />
             </Link>
-            <div className="grow">
+            <Avatar firstName={lead.firstName} lastName={lead.lastName} photoUrl={lead.avatarUrl} size={40} />
+            <div className="who-t">
               <h1 className="truncate">{fullName}</h1>
-              {lead.jobTitle && <p className="truncate">{company ? `${role} · ${company}` : lead.jobTitle}</p>}
-              <p className="chat-status">
-                <span className={`pill ${lead.status === "NEEDS_HUMAN" ? "pill-danger" : lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? "pill-ok" : ""}`}>{statusLabel}</span>
+              {lead.jobTitle && <small className="truncate">{company ? `${role} · ${company}` : lead.jobTitle}</small>}
+              <small className="chat-status">
+                <span className={`tg ${lead.status === "NEEDS_HUMAN" ? "tg-you" : lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? "tg-ok" : "tg-q"}`}>{statusLabel}</span>
                 {lead.nextStep && <span className="truncate">Próximo passo: {lead.nextStep}</span>}
-              </p>
+              </small>
             </div>
-            <DetailsToggle />
+            <LeadActions leadId={lead.id} status={lead.status} profileUrl={lead.linkedinProfileUrl} />
           </header>
 
-          <ChannelSwitcher counts={counts} drafts={draftCounts} />
-
           <LeadTabs
+            channels={<ChannelSwitcher counts={counts} drafts={draftCounts} />}
             chat={conversation}
             about={about}
             composer={
@@ -256,12 +253,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             }
           />
         </div>
-        </ChannelProvider>
-
-        <aside className="details only-desktop" aria-label="Detalhes">
-          {about}
-        </aside>
-      </LeadWorkspace>
-    </div>
+      </ChannelProvider>
+    </ConversationsFrame>
   );
 }

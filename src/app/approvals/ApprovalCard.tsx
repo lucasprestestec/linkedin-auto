@@ -12,6 +12,7 @@ import { approve, discard, markDraftFeedback, previewDraftAudio, setDraftAudio }
 export interface ApprovalItem {
   id: string;
   leadId: string;
+  avatarUrl?: string | null;
   firstName: string | null;
   lastName: string | null;
   jobTitle: string | null;
@@ -81,30 +82,20 @@ export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; co
   }
 
   return (
-    <article className={compact ? "ap-inline-card" : "card"}>
+    <article className={compact ? "ap-inline-card" : "q"}>
+      {!compact && <Avatar firstName={item.firstName} lastName={item.lastName} photoUrl={item.avatarUrl} channel={item.channelKey} size={44} />}
+      <div className={compact ? "stack" : "q-body"} style={compact ? { gap: 10 } : undefined}>
       {compact ? (
         <div className="row" style={{ gap: 8, justifyContent: "space-between" }}>
           <span className="pill pill-accent">Rascunho do assistente · {item.kind}</span>
           <span className="item-meta">{item.when}</span>
         </div>
       ) : (
-        <div className="row" style={{ gap: 12 }}>
-          <Avatar firstName={item.firstName} lastName={item.lastName} size={44} />
-          <div className="item-main">
-            <Link href={`/leads/${item.leadId}`} className="item-title" style={{ textDecoration: "none" }}>
-              {name}
-            </Link>
-            <span className="item-sub">{item.jobTitle ?? item.channel}</span>
-          </div>
-          <span className="stack" style={{ gap: 4, alignItems: "flex-end" }}>
-            <span className="item-meta">{item.when}</span>
-            <span className="pill pill-accent">
-              {item.kind} · {item.channel}
-            </span>
-          </span>
-        </div>
+        <p className="q-title">
+          <Link href={`/leads/${item.leadId}`}>Aprovar mensagem para {name}</Link>
+          {item.jobTitle && <span> · {item.jobTitle}</span>}
+        </p>
       )}
-
       {!compact && item.context.length > 0 && (
         <blockquote className="ap-quote">
           <span className="ap-quote-who">
@@ -161,7 +152,7 @@ export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; co
 
       <div className="row wrap" style={{ gap: 8 }}>
         <button type="button" className="btn-solid" onClick={send} disabled={pending || !text.trim()}>
-          {pending ? "Enviando…" : changed ? "Enviar com meu ajuste" : "Enviar"}
+          {pending ? "Enviando…" : changed ? "Enviar com meu ajuste" : "Aprovar e enviar"}
         </button>
         <button type="button" className="btn-line" onClick={drop} disabled={pending}>
           Descartar
@@ -181,6 +172,13 @@ export function ApprovalCard({ item, compact = false }: { item: ApprovalItem; co
           onDone={() => setFeedbackOpen(false)}
         />
       )}
+      {!compact && (
+        <p className="q-meta">
+          <span className="tg tg-you">Aprovar</span>
+          {item.channel} · {item.kind.toLowerCase()} · sai em {audio ? "áudio" : "texto"} · {item.when}
+        </p>
+      )}
+      </div>
       {dialog}
     </article>
   );

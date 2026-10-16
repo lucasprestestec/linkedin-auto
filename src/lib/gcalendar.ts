@@ -50,6 +50,7 @@ interface GEvent {
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   attendees?: { self?: boolean; responseStatus?: string }[];
+  extendedProperties?: { private?: Record<string, string> };
 }
 
 // Um compromisso da agenda, já no formato que o sistema usa.
@@ -64,6 +65,8 @@ export interface CalendarEvent {
   busy: boolean;
   meetLink: string | null;
   htmlLink: string | null;
+  // Bloqueio de horário criado pela tela Agenda (não é compromisso de verdade).
+  blocked: boolean;
 }
 
 // Compromissos entre `from` e `to`, em ordem. Ficam de fora os cancelados e os que o
@@ -98,6 +101,7 @@ export async function listEvents(from: Date, to: Date): Promise<CalendarEvent[]>
         busy: e.transparency !== "transparent",
         meetLink: e.hangoutLink ?? null,
         htmlLink: e.htmlLink ?? null,
+        blocked: e.extendedProperties?.private?.[BLOCK_KEY] === "1",
       });
     }
     pageToken = page.nextPageToken;
@@ -160,6 +164,38 @@ export async function createMeeting(input: MeetingInput): Promise<CreatedMeeting
 export async function deleteMeeting(eventId: string): Promise<void> {
   try {
     await calendarFetch(`/events/${encodeURIComponent(eventId)}?sendUpdates=all`, { method: "DELETE" });
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status !== 404 && status !== 410) throw err;
+  }
+}
+
+// Bloquear um horário: um evento "ocupado" na agenda do corretor, marcado como nosso. Como os horários livres
+// saem do que está ocupado no Google, o assistente para de oferecer esse horário. Liberar = apagar o evento.
+const BLOCK_KEY = "centralDorsBlock";
+
+export async function createBlock(start: Date, end: Date): Promise<string> {
+  const created = await calendarFetch<{ id: string }>(`/events?sendUpdates=none`, {
+    method: "POST",
+    body: JSON.stringify({
+      summary: "Bloqueado no Central Dors",
+      description: "Horário que você bloqueou na tela Agenda: o assistente não oferece este horário. Para liberar, use a tela Agenda (ou apague este evento).",
+      start: { dateTime: start.toISOString(), timeZone: TIME_ZONE },
+      end: { dateTime: end.toISOString(), timeZone: TIME_ZONE },
+      transparency: "opaque",
+      extendedProperties: { private: { [BLOCK_KEY]: "1" } },
+    }),
+  });
+  return created.id;
+}
+
+// Só apaga se o evento for um bloqueio nosso: nunca uma reunião ou compromisso do corretor.
+export async function deleteBlock(eventId: string): Promise<void> {
+  const path = `/events/${encodeURIComponent(eventId)}`;
+  const event = await calendarFetch<GEvent>(path);
+  if (event.extendedProperties?.private?.[BLOCK_KEY] !== "1") throw new CalendarError("Este horário não é um bloqueio feito pelo sistema.");
+  try {
+    await calendarFetch(`${path}?sendUpdates=none`, { method: "DELETE" });
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status !== 404 && status !== 410) throw err;

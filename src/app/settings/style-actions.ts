@@ -16,8 +16,9 @@ async function currentStyle(): Promise<WritingStyle> {
 async function saveStyle(style: WritingStyle) {
   await prisma.settings.update({ where: { id: "singleton" }, data: { writingStyle: style as unknown as Prisma.InputJsonValue } });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   revalidatePath("/calibrar");
-}
+  }
 
 // ---------------------------------------------------------------------------
 // Calibragem (página /calibrar) e ajustes rápidos

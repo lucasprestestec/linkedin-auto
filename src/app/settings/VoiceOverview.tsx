@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setAudioMode } from "@/app/voz/actions";
 import { AUDIO_MODES, hasVoice, type AudioMode, type VoiceSettings } from "@/lib/voice/settings";
 
-// "Mensagens de voz" em Conta: a voz do usuário e a escolha PESSOAL de quando o assistente responde em áudio.
+// "Quando mandar áudio" em Assistente: a voz do usuário e a escolha PESSOAL de quando o assistente responde em áudio.
 export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; configured: boolean }) {
   const [mode, setMode] = useState<AudioMode>(voice.mode);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +33,9 @@ export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; con
           <b>Escolha uma voz para o assistente responder em áudio</b>
           <span>Ouça as vozes prontas e escolha uma, ou grave a sua própria (uns 30 segundos). Dá para trocar quando quiser.</span>
           <div>
-            <Link href="/voz" className="btn-solid btn-sm">
+            <a href="#voz" className="btn-solid btn-sm">
               Escolher uma voz
-            </Link>
+            </a>
           </div>
         </div>
       ) : (
@@ -44,9 +43,9 @@ export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; con
           <span>
             <b>{voice.voiceName ?? "Minha voz"}</b> <span className="small muted">· {voice.provider === "elevenlabs" ? "voz pronta" : "sua voz gravada"}</span>
           </span>
-          <Link href="/voz" className="btn-line btn-sm">
+          <a href="#voz" className="btn-line btn-sm">
             Trocar a voz
-          </Link>
+          </a>
         </div>
       )}
 

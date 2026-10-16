@@ -27,7 +27,7 @@ function clip(text: string) {
 export async function loadApprovalItems(where: Prisma.DraftWhereInput): Promise<ApprovalItem[]> {
   const [settings, drafts] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { voiceSettings: true } }),
-    prisma.draft.findMany({ where, orderBy: { createdAt: "asc" }, include: { lead: { select: { firstName: true, lastName: true, jobTitle: true } } } }),
+    prisma.draft.findMany({ where, orderBy: { createdAt: "asc" }, include: { lead: { select: { firstName: true, lastName: true, jobTitle: true, avatarUrl: true } } } }),
   ]);
   if (drafts.length === 0) return [];
 
@@ -58,6 +58,7 @@ export async function loadApprovalItems(where: Prisma.DraftWhereInput): Promise<
     firstName: d.lead.firstName,
     lastName: d.lead.lastName,
     jobTitle: d.lead.jobTitle,
+    avatarUrl: d.lead.avatarUrl,
     channel: CHANNEL_LABEL[d.channel],
     channelKey: d.channel,
     kind: KIND_LABEL[d.kind],

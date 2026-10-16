@@ -15,7 +15,7 @@ export function LeadAssignee({ leadId, assigneeId, team }: { leadId: string; ass
     <section className="sec">
       <h2 className="t-label">
         Responsável
-        <Help>Quem da equipe atende esta pessoa. Os avisos de reunião marcada e de &ldquo;precisa de você&rdquo; vão para ela. Sem responsável, vão para quem cuida desse tipo de contato (Conta → Equipe).</Help>
+        <Help>Quem da equipe atende esta pessoa. Os avisos de reunião marcada e de &ldquo;precisa de você&rdquo; vão para ela. Sem responsável, vão para quem cuida desse tipo de contato (Ajustes → Equipe).</Help>
       </h2>
       <select
         className="field"

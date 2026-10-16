@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Big_Shoulders, Onest } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import "./ds.css";
@@ -9,17 +9,18 @@ import { getSession } from "@/lib/session";
 import { getShellData } from "@/lib/shell";
 import { PREFS_SCRIPT } from "@/lib/prefs";
 
-// Uma fonte só em todo o sistema.
-const display = Big_Shoulders({
+// Placas e títulos em Barlow Condensed (caixa-alta); texto corrido em Barlow.
+const display = Barlow_Condensed({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["700", "800"],
+  weight: ["600", "700", "800"],
   display: "swap",
 });
 
-const body = Onest({
+const body = Barlow({
   subsets: ["latin"],
-  variable: "--font-onest",
+  variable: "--font-body",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f5f6fa" }, { media: "(prefers-color-scheme: dark)", color: "#0e1016" }],
+  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f4f2ec" }, { media: "(prefers-color-scheme: dark)", color: "#131311" }],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

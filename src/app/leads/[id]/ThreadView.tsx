@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { Avatar } from "@/components/Avatar";
 import { CHANNELS, type ChannelKey } from "@/components/ChannelBadge";
 import { IconCheckCheck } from "@/components/Icons";
 import { useChannel } from "./ChannelContext";
@@ -20,15 +19,13 @@ export interface ThreadMessage {
   dayText: string;
 }
 
-const SENDER_LABEL = { AGENT: "Assistente", HUMAN: "Você" } as const;
-
-function DaySep({ text, variant }: { text: string; variant: "wa" | "li" | "em" }) {
-  return <div className={`day-sep day-${variant}`}>{text}</div>;
+function DaySep({ text }: { text: string }) {
+  return <div className="day-sep">{text}</div>;
 }
 
-// A conversa do canal escolhido, no visual daquele app: WhatsApp (balões verdes), LinkedIn (lista com foto e nome)
-// e e-mail (um cartão por mensagem). Só aparecem as mensagens do canal aberto.
-export function ThreadView({ messages, leadFirst, leadLast, leadPhoto, ownerName, children }: { messages: ThreadMessage[]; leadFirst: string | null; leadLast: string | null; leadPhoto?: string | null; ownerName: string; children?: React.ReactNode }) {
+// A conversa do canal escolhido: balões (preto = você e o assistente, papel = a pessoa) no LinkedIn e no WhatsApp,
+// e um cartão por mensagem no e-mail (que tem assunto). Só aparecem as mensagens do canal aberto.
+export function ThreadView({ messages, leadFirst, leadLast, ownerName, children }: { messages: ThreadMessage[]; leadFirst: string | null; leadLast: string | null; leadPhoto?: string | null; ownerName: string; children?: React.ReactNode }) {
   const { channel } = useChannel();
   const items = messages.filter((m) => m.channel === channel);
   const leadName = [leadFirst, leadLast].filter(Boolean).join(" ") || "Contato";
@@ -48,39 +45,18 @@ export function ThreadView({ messages, leadFirst, leadLast, leadPhoto, ownerName
         </p>
       )}
 
-      {channel === "WHATSAPP" &&
-        rows.map(({ m, showDay }) => (
-          <div key={m.id} style={{ display: "contents" }}>
-            {showDay && <DaySep text={m.dayText} variant="wa" />}
-            <div className={`wa-msg ${m.sender === "LEAD" ? "in" : "out"}`}>
-              <div className="wa-bubble">
-                {m.sender === "AGENT" && <span className="wa-who">Assistente</span>}
-                <span className="wa-text">{m.content}</span>
-                <span className="wa-meta">
-                  {m.time}
-                  {m.sender !== "LEAD" && <IconCheckCheck size={14} />}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-
-      {channel === "LINKEDIN" &&
+      {channel !== "EMAIL" &&
         rows.map(({ m, showDay }) => {
-          const name = m.sender === "LEAD" ? leadName : m.sender === "AGENT" ? `${SENDER_LABEL.AGENT} de ${ownerName}` : ownerName;
-          const [f, ...rest] = name.split(" ");
+          const who = m.sender === "LEAD" ? (leadFirst ?? "Contato") : m.sender === "AGENT" ? "Assistente" : "Você";
           return (
             <div key={m.id} style={{ display: "contents" }}>
-              {showDay && <DaySep text={m.dayText} variant="li" />}
-              <div className="li-msg">
-                <Avatar firstName={f} lastName={rest.at(-1) ?? null} photoUrl={m.sender === "LEAD" ? leadPhoto : null} size={36} variant={m.sender === "AGENT" ? "assistant" : undefined} />
-                <div className="li-body">
-                  <div className="li-head">
-                    <b>{name}</b>
-                    <time>{m.time}</time>
-                  </div>
-                  <p>{m.content}</p>
-                </div>
+              {showDay && <DaySep text={m.dayText} />}
+              <div className={`bub-row ${m.sender === "LEAD" ? "them" : "me"}`}>
+                <div className="bub">{m.content}</div>
+                <span className="bub-meta">
+                  {who} · {m.time}
+                  {m.sender !== "LEAD" && channel === "WHATSAPP" && <IconCheckCheck size={14} />}
+                </span>
               </div>
             </div>
           );
@@ -91,7 +67,7 @@ export function ThreadView({ messages, leadFirst, leadLast, leadPhoto, ownerName
           const fromLead = m.sender === "LEAD";
           return (
             <div key={m.id} style={{ display: "contents" }}>
-              {showDay && <DaySep text={m.dayText} variant="em" />}
+              {showDay && <DaySep text={m.dayText} />}
               <article className={`em-msg ${fromLead ? "in" : "out"}`}>
                 <header>
                   <b>{m.subject || "(sem assunto)"}</b>

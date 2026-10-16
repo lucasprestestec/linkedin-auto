@@ -10,13 +10,15 @@ export const dynamic = "force-dynamic";
 export default async function NewCampaignPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true } });
   return (
-    <main className="page">
+    <main className="page page-wide" style={{ "--c": "var(--a-camp)" } as React.CSSProperties}>
       <MobileHeader />
-      <Link href="/campaigns" className="btn-text" style={{ alignSelf: "flex-start" }}>
+      <Link href="/campaigns" className="backlink">
         ← Campanhas
       </Link>
-      <header className="p-head">
-        <h1 className="t-title">Nova campanha</h1>
+      <header className="area-head">
+        <h1 className="area-title">
+          <i className="area-sq" aria-hidden="true" />
+          Nova campanha</h1>
       </header>
       <CampaignWizard
         action={createCampaign}

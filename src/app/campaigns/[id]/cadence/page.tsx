@@ -14,15 +14,17 @@ export default async function CadencePage({ params }: { params: Promise<{ id: st
   const steps = campaign.steps.filter((s) => s.position > 0).map((s) => ({ day: s.day, channel: s.channel, text: s.text, notify: s.notify }));
 
   return (
-    <main className="page">
+    <main className="page page-wide" style={{ "--c": "var(--a-camp)" } as React.CSSProperties}>
       <MobileHeader />
-      <Link href={`/campaigns/${id}`} className="btn-text" style={{ alignSelf: "flex-start" }}>
+      <Link href={`/campaigns/${id}`} className="backlink">
         ← {campaign.name}
       </Link>
-      <header className="p-head">
+      <header className="area-head">
         <div>
-          <h1 className="t-title">Cadência</h1>
-          <p className="t-sub">
+          <h1 className="area-title">
+          <i className="area-sq" aria-hidden="true" />
+          Cadência</h1>
+          <p className="area-sub">
             Textos aprovados que o assistente manda, no dia certo, pra quem ainda não respondeu. Saem exatamente como estão; quando a pessoa responde, a
             cadência para e o assistente conduz a conversa.
           </p>

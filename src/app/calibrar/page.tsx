@@ -18,7 +18,7 @@ export default async function CalibratePage() {
           <h1 className="t-title">Calibrar o assistente</h1>
           <p className="t-sub">Ensine o assistente a escrever do seu jeito.</p>
         </div>
-        <Link href="/settings#jeito" className="btn-text">
+        <Link href="/assistente#jeito" className="btn-text">
           Sair
         </Link>
       </header>

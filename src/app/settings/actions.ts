@@ -43,6 +43,7 @@ export async function getOrCreateIdentityLoginLink(fresh = false): Promise<strin
   if (!link) throw new Error("A Edges não retornou o link de conexão.");
 
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   revalidatePath("/channels");
   return link;
 }
@@ -51,6 +52,7 @@ export async function updateTargetAudience(_prevState: unknown, formData: FormDa
   const targetAudience = String(formData.get("targetAudience") ?? "").trim();
   await prisma.settings.update({ where: { id: "singleton" }, data: { targetAudience: targetAudience || null } });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   revalidatePath("/channels");
   return { saved: true };
 }
@@ -63,6 +65,7 @@ export async function updateExclusionList(_prevState: unknown, formData: FormDat
     .join("\n");
   await prisma.settings.update({ where: { id: "singleton" }, data: { exclusionList: exclusionList || null } });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   revalidatePath("/channels");
   return { saved: true };
 }
@@ -103,6 +106,7 @@ export async function updateMeetingMinutes(minutes: number) {
   if (![15, 20, 30, 45, 60].includes(minutes)) return { error: "Duração fora do permitido." };
   await prisma.settings.update({ where: { id: "singleton" }, data: { meetingMinutes: minutes } });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   return { saved: true };
 }
 
@@ -161,12 +165,14 @@ export async function deleteLinkedinData() {
 export async function disconnectEmail() {
   await disconnectGoogle();
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   revalidatePath("/channels");
 }
 
 export async function updateDailySummary(enabled: boolean) {
   await prisma.settings.update({ where: { id: "singleton" }, data: { dailySummaryEnabled: enabled } });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
 }
 
 // Traz a foto de perfil de quem jÃ¡ estÃ¡ conectado no LinkedIn. Usa a lista de conexÃµes do Edges
@@ -179,7 +185,7 @@ export async function refreshLeadPhotos(): Promise<{ updated?: number; error?: s
   try {
     connections = await extractConnections(settings.linkedinIdentityId);
   } catch {
-    return { error: "NÃ£o consegui consultar o LinkedIn agora. Tente de novo em instantes." };
+    return { error: "Não consegui consultar o LinkedIn agora. Tente de novo em instantes." };
   }
 
   const photoBySlug = new Map<string, string>();

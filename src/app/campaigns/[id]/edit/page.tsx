@@ -14,13 +14,15 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
   ]);
   if (!c) notFound();
   return (
-    <main className="page">
+    <main className="page page-wide" style={{ "--c": "var(--a-camp)" } as React.CSSProperties}>
       <MobileHeader />
-      <Link href={`/campaigns/${id}`} className="btn-text" style={{ alignSelf: "flex-start" }}>
+      <Link href={`/campaigns/${id}`} className="backlink">
         ← Campanha
       </Link>
-      <header className="p-head">
-        <h1 className="t-title">Editar campanha</h1>
+      <header className="area-head">
+        <h1 className="area-title">
+          <i className="area-sq" aria-hidden="true" />
+          Editar campanha</h1>
       </header>
       <CampaignWizard
         action={updateCampaign.bind(null, id)}

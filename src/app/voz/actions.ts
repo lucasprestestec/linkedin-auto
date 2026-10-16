@@ -19,8 +19,9 @@ async function current() {
 async function save(voice: ReturnType<typeof parseVoiceSettings>) {
   await prisma.settings.update({ where: { id: "singleton" }, data: { voiceSettings: voice as unknown as Prisma.InputJsonValue } });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   revalidatePath("/voz");
-}
+  }
 
 // Quando o assistente responde em áudio (escolha pessoal do usuário).
 export async function setAudioMode(mode: AudioMode): Promise<{ error?: string }> {

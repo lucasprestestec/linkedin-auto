@@ -88,7 +88,7 @@ export function CalibrationWizard({ initial, startAt = 0 }: { initial: WritingSt
   function finish() {
     startTransition(async () => {
       await finishCalibration();
-      router.push("/settings#jeito");
+      router.push("/assistente#jeito");
     });
   }
 
@@ -268,7 +268,7 @@ export function CalibrationWizard({ initial, startAt = 0 }: { initial: WritingSt
             <p className="note">Você pulou tudo, então o assistente continua com um jeito neutro. Dá para voltar e responder quando quiser.</p>
           )}
           <p className="small muted">
-            Agora vale testar: olhe os próximos rascunhos em Aprovações. Se algo não estiver com a sua cara, peça o ajuste aqui embaixo (também dá para fazer isso depois, em Conta).
+            Agora vale testar: olhe os próximos rascunhos na tela Hoje. Se algo não estiver com a sua cara, peça o ajuste aqui embaixo (também dá para fazer isso depois, em Assistente).
           </p>
           <StyleAdjustments initialRules={style.rules} />
         </div>

@@ -23,6 +23,8 @@ export interface ConvItem {
   tags: string[];
   campaignId: string | null;
   campaignName: string | null;
+  assigneeName: string | null;
+  nextStep: string | null;
   // Pré-formatado no servidor: evita divergência de hidratação por relógio.
   when: string;
   whenTs: number;
@@ -33,6 +35,7 @@ export async function getConversationItems(): Promise<ConvItem[]> {
     include: {
       messages: { orderBy: { deliveredAt: "desc" }, take: 1 },
       campaign: { select: { name: true } },
+      assignee: { select: { name: true } },
       _count: { select: { messages: { where: { sender: "LEAD" } }, drafts: { where: { status: "PENDING" } } } },
     },
   });
@@ -58,6 +61,8 @@ export async function getConversationItems(): Promise<ConvItem[]> {
         tags: l.tags,
         campaignId: l.campaignId,
         campaignName: l.campaign?.name ?? null,
+        assigneeName: l.assignee?.name ?? null,
+        nextStep: l.nextStep,
         when: relativeTime(when),
         whenTs: when.getTime(),
       };

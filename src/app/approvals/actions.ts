@@ -12,6 +12,7 @@ import { hasVoice, parseVoiceSettings } from "@/lib/voice/settings";
 
 function refresh() {
   revalidatePath("/approvals");
+  revalidatePath("/assistente");
   revalidatePath("/conversations");
   revalidatePath("/");
   revalidatePath("/leads/[id]", "page");
@@ -36,6 +37,7 @@ export async function markDraftFeedback(draftId: string, reasons: string[], note
   await requireSession();
   const result = await recordFeedback({ draftId, reasons, note });
   revalidatePath("/settings");
+  revalidatePath("/assistente");
   return result;
 }
 
@@ -69,6 +71,7 @@ export async function setDraftAudio(id: string, on: boolean): Promise<{ error?: 
   }
   await prisma.draft.update({ where: { id }, data: { asAudio: on } });
   revalidatePath("/approvals");
+  revalidatePath("/assistente");
   return {};
 }
 

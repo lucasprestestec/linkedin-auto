@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { initials } from "@/lib/format";
+import { Avatar } from "./Avatar";
 import { useShell } from "./ShellContext";
 
-// Círculo com as iniciais do corretor; leva à tela Conta.
+// Rosto da sua conta (bonequinho pelo primeiro nome); leva à tela Conta.
 export function HeaderUser() {
   const { ownerName } = useShell();
-  const [first, ...rest] = (ownerName ?? "Você").split(/\s+/);
+  const [first, ...rest] = (ownerName ?? "").split(/\s+/);
   return (
-    <Link href="/settings" className="avatar" aria-label="Sua conta" style={{ width: 38, height: 38, fontSize: 14 }}>
-      {initials(first, rest.at(-1))}
+    <Link href="/settings" aria-label="Sua conta" style={{ display: "inline-flex" }}>
+      <Avatar firstName={first} lastName={rest.at(-1)} size={38} />
     </Link>
   );
 }
