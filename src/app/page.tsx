@@ -279,7 +279,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
             <h2 className="panel-h">Próxima reunião</h2>
             {nextMeeting && meetDay ? (
               <Link href={`/leads/${nextMeeting.id}`} className="meet">
-                <span className="cal" aria-hidden="true">
+                <span className="cal-day" aria-hidden="true">
                   <b>{meetDay.toLocaleDateString("pt-BR", { weekday: "short", timeZone: TZ }).replace(".", "")}</b>
                   <span>{meetDay.toLocaleDateString("pt-BR", { day: "numeric", timeZone: TZ })}</span>
                 </span>

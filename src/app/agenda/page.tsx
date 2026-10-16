@@ -13,12 +13,15 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   const data = await loadAgenda(googleConfigured(), parseView(params.v), params.d, typeof params.v === "string");
 
   return (
-    <main className="page">
+    <main className="page page-wide" style={{ "--c": "var(--a-agen)" } as React.CSSProperties}>
       <MobileHeader />
-      <header className="p-head">
-        <div>
-          <h1 className="t-title">Agenda</h1>
-          <p className="t-sub">
+      <header className="area-head">
+        <div className="grow">
+          <h1 className="area-title">
+            <i className="area-sq" aria-hidden="true" />
+            Agenda
+          </h1>
+          <p className="area-sub">
             {data.connected && data.googleEmail
               ? `Agenda da conta Google conectada (${data.googleEmail}). As reuniões que o assistente marcar entram aqui.`
               : "Sua agenda do Google: o que já está marcado e os horários que o assistente pode oferecer."}

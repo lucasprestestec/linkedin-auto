@@ -4092,7 +4092,7 @@ details.log[open] summary svg {
   font-size: 14px;
 }
 
-.cal {
+.cal-day {
   flex: none;
   width: 56px;
   overflow: hidden;
@@ -4101,7 +4101,7 @@ details.log[open] summary svg {
   border-radius: 3px;
 }
 
-.cal b {
+.cal-day b {
   display: block;
   background: var(--a-agen);
   color: #141414;
@@ -4113,7 +4113,7 @@ details.log[open] summary svg {
   text-transform: uppercase;
 }
 
-.cal span {
+.cal-day span {
   display: block;
   font-family: var(--font-head);
   font-size: 28px;
