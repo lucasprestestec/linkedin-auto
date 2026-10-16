@@ -49,9 +49,11 @@ export async function sendOnChannel(
     if (lead.emailBouncedAt) throw new Error("O e-mail dessa pessoa foi devolvido (o endereço não existe). Corrija o e-mail na ficha.");
     const thread = await replyThread(lead.id);
     const subject = opts.subject?.trim() || thread.subject;
+    // Primeiro e-mail da conversa sai simples (sem imagem de rastreio); sem imagem, não há abertura para medir.
+    const simple = !thread.inReplyTo;
     // Código único da imagem invisível: quando ela carrega, o e-mail foi aberto.
-    const openToken = randomBytes(18).toString("base64url");
-    const input = { to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken, unsubscribeUrl: unsubscribeUrl(lead.id) };
+    const openToken = simple ? null : randomBytes(18).toString("base64url");
+    const input = { to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken, unsubscribeUrl: unsubscribeUrl(lead.id), simple };
     // Com caixas de envio ativas, sai por uma delas (a mesma da conversa, se já houver); senão, pela caixa única.
     const { mailbox, configured } = await pickMailboxFor(lead.id);
     if (configured && !mailbox) throw new Error("Todas as caixas de envio chegaram ao limite de hoje. O e-mail sai amanhã.");
