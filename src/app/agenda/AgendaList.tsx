@@ -4,6 +4,8 @@ import type { AgendaPayload } from "@/lib/agendaView";
 import { addDays, longDayLabel } from "@/lib/dateKeys";
 import { Avatar } from "@/components/Avatar";
 import { IconArrowRight } from "@/components/Icons";
+import { hourSlotsFor } from "@/lib/hourBlocks";
+import { HourSlots } from "./HourSlots";
 
 // Quantos dias a lista mostra a partir de hoje (o assistente oferece horários nos próximos 10).
 const DAYS = 14;
@@ -29,9 +31,18 @@ export function AgendaList({ payload }: { payload: AgendaPayload }) {
   const days: AgendaDay[] = built
     .flatMap((b) => b.days)
     .filter((d) => d.key >= todayKey && d.key < addDays(todayKey, DAYS) && !seen.has(d.key) && seen.add(d.key));
+  const blockedIds = new Set(events.filter((e) => e.blocked).map((e) => e.id));
+  for (const d of days) d.events = d.events.filter((e) => !blockedIds.has(e.id));
   const shown = days.filter((d) => d.events.length > 0 || !d.offDay);
-  const offered = days.filter((d) => d.offerable && d.freeLabels.length > 0);
   const info = built[0];
+  // Horas do expediente nos dias em que o assistente oferece horário (ou em que há bloqueio para liberar).
+  const hourDays = days
+    .filter((d) => d.offerable && !d.offDay)
+    .map((d) => {
+      const hours = hourSlotsFor(d.key, payload.settings.workStartHour, payload.settings.workEndHour, events, now);
+      return { key: d.key, label: `${WEEKDAY_SHORT[d.weekday]} ${d.dayNumber}`, hours, offers: d.freeLabels.length > 0 };
+    })
+    .filter((d) => d.hours.length > 0 && (d.offers || d.hours.some((h) => h.state === "blocked")));
 
   return (
     <div className="split">
@@ -88,26 +99,9 @@ export function AgendaList({ payload }: { payload: AgendaPayload }) {
         <section className="panel">
           <h2 className="panel-h">Horários que o assistente oferece</h2>
           <p className="small muted" style={{ marginBottom: 12 }}>
-            Dentro do seu expediente ({info.workHours}), reuniões de {info.minutes} minutos, {info.notice}, só nos próximos 10 dias.
+            Dentro do seu expediente ({info.workHours}), reuniões de {info.minutes} minutos, {info.notice}, só nos próximos 10 dias. Toque numa hora para bloquear ou liberar.
           </p>
-          {offered.length === 0 ? (
-            <p className="small">Nenhum horário livre para oferecer agora.</p>
-          ) : (
-            offered.map((d) => (
-              <div key={d.key} className="slots-day">
-                <b>
-                  {WEEKDAY_SHORT[d.weekday]} {d.dayNumber}
-                </b>
-                <span className="slots">
-                  {d.freeLabels.map((w) => (
-                    <span key={w} className="sl">
-                      {w.replace("-", " – ")}
-                    </span>
-                  ))}
-                </span>
-              </div>
-            ))
-          )}
+          {hourDays.length === 0 ? <p className="small">Nenhum horário livre para oferecer agora.</p> : <HourSlots days={hourDays.map(({ key, label, hours }) => ({ key, label, hours }))} />}
           <Link href="/settings" className="link-arrow" style={{ marginTop: 6 }}>
             Mudar expediente e duração <IconArrowRight size={16} />
           </Link>

@@ -5228,3 +5228,45 @@ details.log[open] summary svg {
     justify-self: start;
   }
 }
+
+button.sl {
+  cursor: pointer;
+  min-width: 46px;
+  justify-content: center;
+}
+
+.sl-blocked {
+  border-color: var(--a-agen);
+  background: var(--a-agen);
+  color: #141414;
+}
+
+.sl-busy,
+button.sl:disabled.sl-busy {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+  color: var(--text-3);
+  cursor: default;
+  opacity: 1;
+}
+
+.sl-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 2px;
+  border: 1.5px solid var(--ok);
+  border-radius: 1px;
+  background: var(--ok-soft);
+  vertical-align: -1px;
+}
+
+.sl-key.sl-blocked {
+  border-color: var(--a-agen);
+  background: var(--a-agen);
+}
+
+.sl-key.sl-busy {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}

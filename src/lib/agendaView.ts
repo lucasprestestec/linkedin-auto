@@ -17,6 +17,7 @@ export interface RawAgendaEvent {
   busy: boolean;
   meetLink: string | null;
   htmlLink: string | null;
+  blocked: boolean;
 }
 
 export interface AgendaPayload {
@@ -93,6 +94,7 @@ export async function loadAgenda(googleConfigured: boolean, view: AgendaViewMode
         busy: e.busy,
         meetLink: e.meetLink,
         htmlLink: e.htmlLink,
+        blocked: e.blocked,
       })),
       leads: leads.map((l) => ({ id: l.id, name: [l.firstName, l.lastName].filter(Boolean).join(" ") || "Lead", googleEventId: l.googleEventId! })),
       upcomingMeetings,
