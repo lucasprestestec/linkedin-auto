@@ -185,7 +185,7 @@ export function VoiceStudio({ ownerName, voice, configured }: { ownerName: strin
           {sample && <audio controls src={sample} style={{ width: "100%" }} />}
         </div>
         <p className="small muted">
-          Em Conta → Mensagens de voz você escolhe quando o assistente responde em áudio. Nas primeiras semanas, com a aprovação ligada, você ouve cada áudio antes de ele sair.
+          Em "Quando mandar áudio", no alto desta tela, você escolhe quando o assistente responde em áudio. Nas primeiras semanas, com a aprovação ligada, você ouve cada áudio antes de ele sair.
         </p>
         {error && <p className="field-error">{error}</p>}
         {dialog}

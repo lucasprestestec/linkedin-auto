@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { setAudioMode } from "@/app/voz/actions";
 import { AUDIO_MODES, hasVoice, type AudioMode, type VoiceSettings } from "@/lib/voice/settings";
 
-// "Mensagens de voz" em Conta: a voz do usuário e a escolha PESSOAL de quando o assistente responde em áudio.
+// "Quando mandar áudio" em Assistente: a voz do usuário e a escolha PESSOAL de quando o assistente responde em áudio.
 export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; configured: boolean }) {
   const [mode, setMode] = useState<AudioMode>(voice.mode);
   const [error, setError] = useState<string | null>(null);
