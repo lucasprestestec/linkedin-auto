@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { IconRefresh } from "@/components/Icons";
 import { refreshLeadPhotos } from "./actions";
 
-// Busca as fotos de perfil de quem jÃ¡ estÃ¡ conectado no LinkedIn (consulta gratuita).
+// Busca as fotos de perfil de quem já está conectado no LinkedIn (consulta gratuita).
 export function RefreshPhotosButton() {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
@@ -23,7 +23,7 @@ export function RefreshPhotosButton() {
     <div style={{ paddingTop: 12 }}>
       <button type="button" onClick={run} disabled={pending} className="btn-line btn-sm">
         <IconRefresh size={13} />
-        {pending ? "Buscando fotosâ€¦" : "Atualizar fotos dos contatos"}
+        {pending ? "Buscando fotos…" : "Atualizar fotos dos contatos"}
       </button>
       {message && (
         <p className={message.error ? "field-error" : "ok-text"} role="status" style={{ marginTop: 8 }}>

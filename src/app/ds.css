@@ -5380,3 +5380,32 @@ details.set-d[open] > summary .btn-line {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.set-chev {
+  flex: none;
+  color: var(--text-3);
+  transition: transform 0.15s;
+}
+
+details.set-d[open] > summary .set-chev {
+  transform: rotate(90deg);
+}
+
+a.set-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.set-link:hover {
+  background: var(--bg);
+}
+
+nav.set.only-mobile {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  nav.set.only-mobile {
+    display: block;
+  }
+}

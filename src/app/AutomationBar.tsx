@@ -49,7 +49,7 @@ export function AutomationBar({ paused, connected, hasName, today }: { paused: b
           {on ? "Pausar" : "Ligar"}
         </button>
       ) : (
-        <Link href="/channels" className="btn-line btn-sm">
+        <Link href="/settings#canais" className="btn-line btn-sm">
           Conectar
         </Link>
       )}

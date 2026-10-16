@@ -185,7 +185,7 @@ export async function refreshLeadPhotos(): Promise<{ updated?: number; error?: s
   try {
     connections = await extractConnections(settings.linkedinIdentityId);
   } catch {
-    return { error: "NÃ£o consegui consultar o LinkedIn agora. Tente de novo em instantes." };
+    return { error: "Não consegui consultar o LinkedIn agora. Tente de novo em instantes." };
   }
 
   const photoBySlug = new Map<string, string>();

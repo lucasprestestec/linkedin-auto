@@ -104,7 +104,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
 
   const steps = [
     { done: Boolean(settings.ownerName?.trim()), label: "Cadastrar o seu nome (o assistente se apresenta com ele)", href: "/settings" },
-    { done: linkedinOk || whatsappOk, label: "Conectar um canal (LinkedIn ou WhatsApp)", href: "/channels" },
+    { done: linkedinOk || whatsappOk, label: "Conectar um canal (LinkedIn ou WhatsApp)", href: "/settings#canais" },
     { done: Boolean(settings.targetAudience?.trim()), label: "Dizer quem você quer alcançar", href: "/assistente#alcance" },
     { done: conversations.length > 0, label: "Adicionar as primeiras pessoas", href: "/contacts" },
   ];
@@ -112,8 +112,8 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
 
   const needYou = conversations.filter((c) => c.status === "NEEDS_HUMAN").sort((a, b) => b.whenTs - a.whenTs);
   const alerts = [
-    settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/channels", cta: "Reconectar", tag: "Parado" },
-    leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/channels", cta: "Ver", tag: "Aviso" },
+    settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/settings#linkedin", cta: "Reconectar", tag: "Parado" },
+    leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/settings#linkedin", cta: "Ver", tag: "Aviso" },
   ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string; tag: string } => Boolean(a));
   const waiting = alerts.length + needYou.length + drafts.length;
 
