@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { initials } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
 import { updateOwnerName } from "./actions";
 
 // Nome do corretor. Obrigatório: é o nome com que o assistente se apresenta aos leads (e também aparece
@@ -10,14 +10,12 @@ export function OwnerNameForm({ value }: { value: string }) {
   const [state, formAction, pending] = useActionState(updateOwnerName, undefined);
   const [name, setName] = useState(value);
   const dirty = name.trim() !== value.trim();
-  const [first, ...rest] = (name.trim() || "Você").split(/\s+/);
+  const [first, ...rest] = name.trim().split(/\s+/);
 
   return (
     <form action={formAction} className="card">
       <div className="row" style={{ gap: 14 }}>
-        <span className="avatar" style={{ width: 56, height: 56, fontSize: 20 }}>
-          {initials(first, rest.at(-1))}
-        </span>
+        <Avatar firstName={first} lastName={rest.at(-1)} size={56} />
         <div className="grow">
           <label htmlFor="owner-name" className="label">
             Seu nome (obrigatório)
