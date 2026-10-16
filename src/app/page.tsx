@@ -82,9 +82,9 @@ export default async function TodayPage() {
 
   const needYou = conversations.filter((c) => c.status === "NEEDS_HUMAN").sort((a, b) => b.whenTs - a.whenTs);
   const alerts = [
-    settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/channels", cta: "Reconectar" },
-    leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/channels", cta: "Ver" },
-  ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string } => Boolean(a));
+    settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/channels", cta: "Reconectar", tag: "Parado" },
+    leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/channels", cta: "Ver", tag: "Aviso" },
+  ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string; tag: string } => Boolean(a));
   const waiting = alerts.length + needYou.length + drafts.length;
 
   const hot = conversations
@@ -187,7 +187,7 @@ export default async function TodayPage() {
                       </Link>
                     </div>
                     <p className="q-meta">
-                      <span className="tg tg-stop">Parado</span>
+                      <span className={`tg ${a.tag === "Parado" ? "tg-stop" : "tg-you"}`}>{a.tag}</span>
                     </p>
                   </div>
                 </article>
@@ -197,8 +197,7 @@ export default async function TodayPage() {
                   <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} channel={c.channel} size={44} />
                   <div className="q-body">
                     <p className="q-title">
-                      {fullName(c)} {c.needsHumanReason && <>· {c.needsHumanReason.charAt(0).toLowerCase() + c.needsHumanReason.slice(1)}</>}{" "}
-                      <span>· o assistente passou a conversa para você</span>
+                      {fullName(c)} <span>· {c.needsHumanReason ?? "o assistente passou a conversa para você"}</span>
                     </p>
                     <div className="q-act">
                       <Link href={`/leads/${c.id}`} className="btn-solid">

@@ -4758,3 +4758,14 @@ details.log[open] summary svg {
     padding: 16px;
   }
 }
+
+.side-nav-foot {
+  flex: none;
+}
+
+.composer .btn-solid,
+.composer .btn-solid:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
