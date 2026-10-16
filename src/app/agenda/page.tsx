@@ -2,7 +2,9 @@ import { MobileHeader } from "@/components/MobileHeader";
 import { googleConfigured } from "@/lib/gmail";
 import { loadAgenda } from "@/lib/agendaView";
 import { parseView } from "@/lib/agendaBuild";
+import Link from "next/link";
 import { AgendaClient } from "./AgendaClient";
+import { AgendaList } from "./AgendaList";
 import "./agenda.css";
 
 // A agenda é lida do Google a cada abertura da tela: sempre o que está lá agora.
@@ -10,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 export default async function AgendaPage({ searchParams }: PageProps<"/agenda">) {
   const params = await searchParams;
-  const data = await loadAgenda(googleConfigured(), parseView(params.v), params.d, typeof params.v === "string");
+  // Sem escolha, abre a lista dos próximos dias; ?v=dia|semana|mes abre o calendário completo.
+  const list = params.v === undefined || params.v === "lista";
+  const data = await loadAgenda(googleConfigured(), parseView(params.v), list ? undefined : params.d, !list);
 
   return (
     <main className="page page-wide" style={{ "--c": "var(--a-agen)" } as React.CSSProperties}>
@@ -27,6 +31,16 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
               : "Sua agenda do Google: o que já está marcado e os horários que o assistente pode oferecer."}
           </p>
         </div>
+        {data.connected && !data.error && (
+          <div className="seg" role="group" aria-label="Como ver">
+            <Link href="/agenda" className="tab2" aria-current={list ? "page" : undefined}>
+              Lista
+            </Link>
+            <Link href="/agenda?v=semana" className="tab2" aria-current={list ? undefined : "page"}>
+              Calendário
+            </Link>
+          </div>
+        )}
       </header>
 
       {!data.connected ? (
@@ -59,7 +73,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
         </section>
       ) : (
         // `key` = a janela lida: ao buscar outra janela no servidor, o calendário recomeça dela.
-        <AgendaClient key={`${data.fromKey}|${data.view}|${data.focusKey}`} payload={data} />
+        list ? <AgendaList payload={data} /> : <AgendaClient key={`${data.fromKey}|${data.view}|${data.focusKey}`} payload={data} />
       )}
     </main>
   );

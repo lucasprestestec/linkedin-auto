@@ -5113,3 +5113,118 @@ details.log[open] summary svg {
     grid-column: 1 / -1;
   }
 }
+
+/* ---------- Agenda (lista) ---------- */
+
+.tt {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 2px solid var(--text);
+}
+
+.tt-day {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tt-day h2 {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tt-day h2 small {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  text-transform: none;
+  color: var(--text-3);
+}
+
+.slot {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.slot time {
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-name {
+  display: block;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.slot small {
+  display: block;
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+.empty-day {
+  padding: 6px 0;
+  color: var(--text-3);
+}
+
+.slots-day {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1.5px solid var(--ok);
+  border-radius: 2px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1023.98px) {
+  .tt-day {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .slot {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .slot > .tg {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
