@@ -5270,3 +5270,113 @@ button.sl:disabled.sl-busy {
   border-color: var(--border-strong);
   background: var(--surface-3);
 }
+
+/* ---------- Assistente e Ajustes: caixas de linhas que abrem ---------- */
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.seg > button.tab2[aria-selected="true"] {
+  background: #141414;
+  color: var(--amber);
+}
+
+.set {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.set-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.set > .set-row:last-child,
+.set > details:last-child > .set-row {
+  border-bottom: 0;
+}
+
+.set-row .k,
+.member .k {
+  flex: 1;
+  min-width: 220px;
+}
+
+.k b {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.k small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 15px;
+}
+
+details.set-d {
+  border-bottom: 1px solid var(--border);
+}
+
+details.set-d:last-child {
+  border-bottom: 0;
+}
+
+details.set-d > summary {
+  list-style: none;
+  cursor: pointer;
+  border-bottom: 0;
+}
+
+details.set-d > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.set-d[open] > summary {
+  background: var(--bg);
+}
+
+details.set-d[open] > summary .btn-line {
+  visibility: hidden;
+}
+
+.set-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 20px 18px;
+}
+
+.member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 1023.98px) {
+  .ai-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

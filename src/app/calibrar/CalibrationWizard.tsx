@@ -88,7 +88,7 @@ export function CalibrationWizard({ initial, startAt = 0 }: { initial: WritingSt
   function finish() {
     startTransition(async () => {
       await finishCalibration();
-      router.push("/settings#jeito");
+      router.push("/assistente#jeito");
     });
   }
 

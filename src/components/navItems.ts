@@ -9,7 +9,7 @@ export const NAV_ITEMS = [
   { href: "/contacts", label: "Contatos", Icon: IconUserSearch, color: "var(--a-cont)", mobile: true, match: ["/prospect"] },
   { href: "/campaigns", label: "Campanhas", Icon: IconMegaphone, color: "var(--a-camp)", mobile: false },
   { href: "/agenda", label: "Agenda", Icon: IconCalendar, color: "var(--a-agen)", mobile: true },
-  { href: "/settings#jeito", label: "Assistente", Icon: IconSparkles, color: "var(--a-ia)", mobile: false, foot: true, match: ["/voz", "/calibrar", "/approvals"] },
+  { href: "/assistente", label: "Assistente", Icon: IconSparkles, color: "var(--a-ia)", mobile: false, foot: true, match: ["/voz", "/calibrar"] },
   { href: "/settings", label: "Ajustes", Icon: IconSliders, color: "var(--a-ajus)", mobile: true, foot: true, match: ["/channels"] },
 ];
 

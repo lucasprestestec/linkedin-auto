@@ -141,7 +141,7 @@ export async function deliver(lead: Lead, channel: MessageChannel, content: stri
   await sendPush({
     title: `Aprove a mensagem para ${name}`,
     body: `${CHANNEL_LABEL[channel]}: ${content.slice(0, 90)}`,
-    url: "/approvals",
+    url: "/",
     tag: `draft-${lead.id}`,
   }).catch((err) => console.error("Falha ao avisar rascunho", err));
   return "queued";

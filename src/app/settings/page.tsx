@@ -6,29 +6,17 @@ import { emailConnection } from "@/lib/email";
 import { logout } from "../actions";
 import { NotificationsCard } from "./NotificationsCard";
 import { pushPublicKey } from "@/lib/push";
-import { IdealClientForm } from "./IdealClientForm";
 import { OwnerNameForm } from "./OwnerNameForm";
-import { FollowUpDefaultForm } from "./FollowUpDefaultForm";
 import { MobileHeader } from "@/components/MobileHeader";
-import { ExclusionListForm } from "./ExclusionListForm";
 import { DailySummaryToggle } from "./DailySummaryToggle";
 import { CalendarForm } from "./CalendarForm";
 import { MeetingRemindersForm } from "./MeetingRemindersForm";
 import { TeamForm } from "./TeamForm";
 import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
 import { googleConfigured } from "@/lib/gmail";
-import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
-import { describeRule } from "@/lib/followupPolicy";
-import { parseWritingStyle, summarizeStyle } from "@/lib/writingStyle";
-import { loadSuggestions } from "@/lib/styleSuggestions";
-import { StyleOverview } from "./StyleOverview";
-import { VoiceOverview } from "./VoiceOverview";
-import { parseVoiceSettings, summarizeVoice } from "@/lib/voice/settings";
-import { fishConfigured } from "@/lib/voice/fish";
-import { elevenConfigured } from "@/lib/voice/elevenlabs";
 import { noticeLabel } from "@/lib/slots";
 import type { Tone } from "@/components/IconChip";
-import { IconCalendar, IconChevronRight, IconLayers, IconSparkles, IconTarget } from "@/components/Icons";
+import { IconCalendar, IconChevronRight, IconLayers } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -90,29 +78,9 @@ function ShortcutItem({ href, download, title, sub }: { href: string; download?:
   );
 }
 
-function audienceSummary(raw: string | null) {
-  const icp = parseIdealClient(raw);
-  const parts = [...icp.titles.slice(0, 2), ...icp.industries.slice(0, 1), ...icp.regions.slice(0, 1)];
-  return parts.length ? parts.join(" · ") : "Ainda não definido";
-}
-
-function exclusionSummary(raw: string | null) {
-  const l = parseExclusionLines(raw);
-  const parts = [
-    l.companies.length && `${l.companies.length} empresa${l.companies.length > 1 ? "s" : ""}`,
-    l.people.length + l.profiles.length && `${l.people.length + l.profiles.length} pessoa${l.people.length + l.profiles.length > 1 ? "s" : ""}`,
-    l.other.length && `${l.other.length} outro${l.other.length > 1 ? "s" : ""}`,
-  ].filter(Boolean);
-  return parts.length ? parts.join(", ") : "Ninguém por enquanto";
-}
-
 export default async function SettingsPage() {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const email = await emailConnection();
-  const style = parseWritingStyle(settings.writingStyle);
-  const voice = parseVoiceSettings(settings.voiceSettings);
-  // As sugestões são um extra: se falharem, a tela abre do mesmo jeito.
-  const suggestions = await loadSuggestions(style).catch(() => []);
   const team = await prisma.teamMember.findMany({ orderBy: { createdAt: "asc" } });
 
   return (
@@ -126,24 +94,6 @@ export default async function SettingsPage() {
       </header>
 
       <OwnerNameForm value={settings.ownerName ?? ""} />
-
-      <Group id="alcance" Icon={IconTarget} tone="accent" title="Prospecção" hint="Quem o assistente aborda e como ele acompanha">
-        <SettingItem title="Quem você quer alcançar" summary={audienceSummary(settings.targetAudience)}>
-          <IdealClientForm value={settings.targetAudience ?? ""} />
-        </SettingItem>
-        <SettingItem
-          title="Acompanhamento"
-          summary={describeRule(Math.min(10, settings.followUpMaxCount), settings.followUpDelayHours)}
-        >
-          <FollowUpDefaultForm
-            count={Math.min(10, settings.followUpMaxCount)}
-            days={Math.min(30, Math.max(1, Math.round(settings.followUpDelayHours / 24)))}
-          />
-        </SettingItem>
-        <SettingItem title="Quem nunca contatar" summary={exclusionSummary(settings.exclusionList)}>
-          <ExclusionListForm value={settings.exclusionList ?? ""} />
-        </SettingItem>
-      </Group>
 
       <Group Icon={IconCalendar} tone="ok" title="Rotina e avisos" hint="Reuniões, resumo do dia e notificações">
         <SettingItem
@@ -203,19 +153,8 @@ export default async function SettingsPage() {
         )}
       </Group>
 
-      <Group id="jeito" Icon={IconSparkles} tone="violet" title="Jeito do assistente" hint="Como ele escreve e como ele soa nos áudios">
-        <SettingItem
-          title="Meu jeito de escrever"
-          summary={`${summarizeStyle(style)}${suggestions.length ? ` · ${suggestions.length === 1 ? "1 sugestão nova" : `${suggestions.length} sugestões novas`}` : ""}`}
-        >
-          <StyleOverview style={style} suggestions={suggestions} />
-        </SettingItem>
-        <SettingItem id="voz" title="Mensagens de voz" summary={summarizeVoice(voice)}>
-          <VoiceOverview voice={voice} configured={fishConfigured() || elevenConfigured()} />
-        </SettingItem>
-      </Group>
-
       <Group Icon={IconLayers} tone="neutral" title="Atalhos e dados" hint="Outras telas e a sua lista de contatos">
+        <ShortcutItem href="/assistente" title="Assistente" sub="Jeito de escrever, voz, quem ele aborda e o que passa por você" />
         <ShortcutItem href="/contacts" title="Contatos" sub="Colocar gente nova para o assistente abordar" />
         <ShortcutItem href="/campaigns" title="Campanhas" sub="Grupos de pessoas com uma oferta" />
         <ShortcutItem href="/channels" title="Canais" sub="LinkedIn, e-mail e WhatsApp" />

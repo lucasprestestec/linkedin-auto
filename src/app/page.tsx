@@ -105,7 +105,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const steps = [
     { done: Boolean(settings.ownerName?.trim()), label: "Cadastrar o seu nome (o assistente se apresenta com ele)", href: "/settings" },
     { done: linkedinOk || whatsappOk, label: "Conectar um canal (LinkedIn ou WhatsApp)", href: "/channels" },
-    { done: Boolean(settings.targetAudience?.trim()), label: "Dizer quem você quer alcançar", href: "/settings#alcance" },
+    { done: Boolean(settings.targetAudience?.trim()), label: "Dizer quem você quer alcançar", href: "/assistente#alcance" },
     { done: conversations.length > 0, label: "Adicionar as primeiras pessoas", href: "/contacts" },
   ];
   const pending = steps.filter((s) => !s.done);
@@ -337,7 +337,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
           )}
 
           <p className="cap-note">
-            <Link href="/approvals">{settings.approvalMode ? "Aprovação ligada: nada sai sem o seu OK." : "Aprovação desligada."} Ajustar</Link>
+            <Link href="/assistente#aprovacao">{settings.approvalMode ? "Aprovação ligada: nada sai sem o seu OK." : "Aprovação desligada."} Ajustar</Link>
           </p>
         </aside>
       </div>
