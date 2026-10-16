@@ -16,7 +16,8 @@ import { ProspectSearch, PasteFlow } from "../campaigns/ProspectSearch";
 import { WarmSuggestions } from "../campaigns/WarmSuggestions";
 import { ContactForm } from "./new/ContactForm";
 import { ImportForm } from "./import/ImportForm";
-import { CONTACT_TABS, ContactsTabs, type ContactTabKey } from "./ContactsTabs";
+import { ContactsTabs } from "./ContactsTabs";
+import { CONTACT_TABS, type ContactTabKey } from "./tabs";
 
 export const dynamic = "force-dynamic";
 

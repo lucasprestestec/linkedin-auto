@@ -1,17 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { CONTACT_TABS, type ContactTabKey } from "./tabs";
 
-// Os jeitos de colocar gente nova, um por aba. Todas ficam montadas para não perder o que foi digitado ao trocar.
-export const CONTACT_TABS = [
-  { key: "buscar", label: "Buscar no LinkedIn" },
-  { key: "quentes", label: "Sugestões quentes" },
-  { key: "colar", label: "Colar perfis" },
-  { key: "mao", label: "Adicionar à mão" },
-  { key: "planilha", label: "Importar planilha" },
-] as const;
-export type ContactTabKey = (typeof CONTACT_TABS)[number]["key"];
-
+// Uma aba por jeito de colocar gente nova. Todas ficam montadas para não perder o que foi digitado ao trocar.
 export function ContactsTabs({ initial, panes }: { initial: ContactTabKey; panes: Record<ContactTabKey, React.ReactNode> }) {
   const [tab, setTab] = useState<ContactTabKey>(initial);
 
