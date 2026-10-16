@@ -106,7 +106,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
     { done: Boolean(settings.ownerName?.trim()), label: "Cadastrar o seu nome (o assistente se apresenta com ele)", href: "/settings" },
     { done: linkedinOk || whatsappOk, label: "Conectar um canal (LinkedIn ou WhatsApp)", href: "/channels" },
     { done: Boolean(settings.targetAudience?.trim()), label: "Dizer quem você quer alcançar", href: "/settings#alcance" },
-    { done: conversations.length > 0, label: "Adicionar as primeiras pessoas", href: "/prospect" },
+    { done: conversations.length > 0, label: "Adicionar as primeiras pessoas", href: "/contacts" },
   ];
   const pending = steps.filter((s) => !s.done);
 
@@ -330,7 +330,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
                   </small>
                 </div>
               ))}
-              <Link href="/prospect" className="link-arrow">
+              <Link href="/contacts" className="link-arrow">
                 Adicionar pessoas <IconArrowRight size={16} />
               </Link>
             </section>

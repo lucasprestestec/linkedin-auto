@@ -144,7 +144,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
         <div className="sec-head">
           <h2 className="t-label">Pessoas nesta campanha</h2>
           {active && !full ? (
-            <Link href={`/prospect?campaign=${campaign.id}`} className="btn-solid btn-sm">
+            <Link href={`/contacts?campaign=${campaign.id}`} className="btn-solid btn-sm">
               Adicionar pessoas
             </Link>
           ) : (

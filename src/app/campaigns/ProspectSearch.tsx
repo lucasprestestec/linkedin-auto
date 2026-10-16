@@ -157,7 +157,7 @@ function recentLabel(f: PeopleSearchFilters) {
 
 // Com a busca pelo Google configurada: filtros, "Buscar pessoas" e lista aqui
 // mesmo, com caixinhas. Buscas recentes repetem a leva de ontem num toque.
-// Colar links fica como alternativa recolhida.
+// Colar links tem a sua própria aba em Contatos.
 function GoogleSearchFlow({ initialKeywords, searchesLeft }: { initialKeywords: string[]; searchesLeft: number }) {
   const [filters, setFilters] = useState<PeopleSearchFilters | null>(null);
   const [people, setPeople] = useState<FoundResult[] | null>(null);
@@ -235,11 +235,6 @@ function GoogleSearchFlow({ initialKeywords, searchesLeft }: { initialKeywords: 
       <div id="found-people" style={{ scrollMarginTop: 16 }}>
         {people && <FoundPeople key={JSON.stringify(filters)} people={people} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={more} left={left} />}
       </div>
-
-      <details className="sec h-fold">
-        <summary>Já tem os links dos perfis? Cole aqui</summary>
-        <PasteFlow />
-      </details>
     </div>
   );
 }
@@ -254,16 +249,11 @@ export function ProspectSearch({
   searchesLeft?: number;
 }) {
   if (searchEnabled) return <GoogleSearchFlow initialKeywords={initialKeywords} searchesLeft={searchesLeft} />;
-  return (
-    <div className="stack" style={{ gap: 16 }}>
-      <LinkedinSearchStep initialKeywords={initialKeywords} />
-      <PasteFlow numbered />
-    </div>
-  );
+  return <LinkedinSearchStep initialKeywords={initialKeywords} />;
 }
 
 // Colar links de perfis (um por linha), revisar e convidar.
-function PasteFlow({ numbered = false }: { numbered?: boolean }) {
+export function PasteFlow({ numbered = false }: { numbered?: boolean }) {
   const [state, formAction, parsing] = useActionState(parseProfiles, undefined);
   const [raw, setRaw] = useState("");
   const [clipboardError, setClipboardError] = useState(false);

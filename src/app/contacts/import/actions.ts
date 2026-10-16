@@ -130,6 +130,7 @@ export async function importContacts(input: { text: string; campaignId: string; 
     created += r.count;
   }
   revalidatePath("/conversations");
+  revalidatePath("/contacts");
   revalidatePath("/campaigns");
   revalidatePath("/");
   return { ...summary, created };

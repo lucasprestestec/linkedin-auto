@@ -6,7 +6,7 @@ import { IconCalendar, IconMegaphone, IconMessages, IconSliders, IconSparkles, I
 export const NAV_ITEMS = [
   { href: "/", label: "Hoje", Icon: IconSun, color: "var(--a-hoje)", badge: "drafts" as const, mobile: true },
   { href: "/conversations", label: "Conversas", Icon: IconMessages, color: "var(--a-conv)", badge: "attention" as const, mobile: true, match: ["/leads/"] },
-  { href: "/prospect", label: "Contatos", Icon: IconUserSearch, color: "var(--a-cont)", mobile: true, match: ["/contacts"] },
+  { href: "/contacts", label: "Contatos", Icon: IconUserSearch, color: "var(--a-cont)", mobile: true, match: ["/prospect"] },
   { href: "/campaigns", label: "Campanhas", Icon: IconMegaphone, color: "var(--a-camp)", mobile: false },
   { href: "/agenda", label: "Agenda", Icon: IconCalendar, color: "var(--a-agen)", mobile: true },
   { href: "/settings#jeito", label: "Assistente", Icon: IconSparkles, color: "var(--a-ia)", mobile: false, foot: true, match: ["/voz", "/calibrar", "/approvals"] },

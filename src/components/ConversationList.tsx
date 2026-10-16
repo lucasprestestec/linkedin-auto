@@ -75,7 +75,7 @@ export function ConversationList({ items, activeId, initialQuery = "", initialGr
         <p className="empty c-empty">
           {items.length === 0 ? (
             <>
-              Nenhuma conversa ainda. <Link href="/prospect" className="btn-text">Adicionar pessoas</Link>
+              Nenhuma conversa ainda. <Link href="/contacts" className="btn-text">Adicionar pessoas</Link>
             </>
           ) : (
             "Nada encontrado."

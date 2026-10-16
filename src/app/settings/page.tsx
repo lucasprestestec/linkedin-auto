@@ -216,7 +216,7 @@ export default async function SettingsPage() {
       </Group>
 
       <Group Icon={IconLayers} tone="neutral" title="Atalhos e dados" hint="Outras telas e a sua lista de contatos">
-        <ShortcutItem href="/prospect" title="Prospectar" sub="Adicionar pessoas para o assistente abordar" />
+        <ShortcutItem href="/contacts" title="Contatos" sub="Colocar gente nova para o assistente abordar" />
         <ShortcutItem href="/campaigns" title="Campanhas" sub="Grupos de pessoas com uma oferta" />
         <ShortcutItem href="/channels" title="Canais" sub="LinkedIn, e-mail e WhatsApp" />
         <ShortcutItem href="/api/export/leads" download title="Baixar meus contatos" sub="Planilha para Excel ou Google Planilhas" />
