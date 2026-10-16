@@ -8,6 +8,7 @@ import { Avatar } from "@/components/Avatar";
 import { ChannelBadge, type ChannelKey } from "@/components/ChannelBadge";
 import { IconAlert, IconArrowRight, IconChevronRight } from "@/components/Icons";
 import { dailyReport } from "@/lib/dailyReport";
+import { startOfLocalDay } from "@/lib/schedule";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { emailEnabled } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
@@ -45,20 +46,49 @@ function fullName(c: { firstName: string | null; lastName: string | null }) {
   return [c.firstName, c.lastName].filter(Boolean).join(" ") || "Contato";
 }
 
+// Períodos do painel de números. Sem escolha, mostra a última semana.
+const PERIODS = [
+  { key: "hoje", label: "Hoje", note: "Hoje desde 0h" },
+  { key: "7d", label: "7 dias", note: "Últimos 7 dias" },
+  { key: "30d", label: "30 dias", note: "Últimos 30 dias" },
+  { key: "tudo", label: "Tudo", note: "Desde o início" },
+] as const;
+type PeriodKey = (typeof PERIODS)[number]["key"];
+
+function sinceOf(period: PeriodKey, now: Date): Date | null {
+  if (period === "hoje") return startOfLocalDay(now);
+  if (period === "tudo") return null;
+  return new Date(now.getTime() - (period === "7d" ? 7 : 30) * 86_400_000);
+}
+
+// Números do painel no período. "Oportunidades" usa a última mudança da ficha (o sistema não guarda a data
+// exata em que a pessoa virou oportunidade), como o resumo do dia; "Reuniões" conta as marcadas do início do período em diante.
+async function boardNumbers(since: Date | null) {
+  const at = since ? { gte: since } : undefined;
+  const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] }, createdAt: at } };
+  const [contacted, replied, qualified, meetings, sent, invites] = await Promise.all([
+    prisma.lead.count({ where: { messages: outbound } }),
+    prisma.lead.count({ where: { AND: [{ messages: outbound }, { messages: { some: { sender: "LEAD", createdAt: at } } }] } }),
+    prisma.lead.count({ where: { status: "QUALIFIED", updatedAt: at } }),
+    prisma.lead.count({ where: { meetingAt: at ?? { not: null } } }),
+    prisma.message.count({ where: { sender: { in: ["AGENT", "HUMAN"] }, createdAt: at } }),
+    prisma.lead.count({ where: { invitedAt: at ?? { not: null } } }),
+  ]);
+  return { contacted, replied, qualified, meetings, sent, invites };
+}
+
 // Tela Hoje: o que precisa de você (aprovar, responder, consertar), o painel de números e como o dia está indo.
-export default async function TodayPage() {
+export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const now = new Date();
-  const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] } } };
-  const [settings, conversations, drafts, report, meetingCount, nextMeeting, contacted, replied, qualified, emailOn, invitesLeft, liSent, emSent, waSent] = await Promise.all([
+  const raw = (await searchParams).periodo;
+  const period = PERIODS.find((p) => p.key === raw) ?? PERIODS[1];
+  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     getConversationItems(),
     loadApprovalItems({ status: "PENDING" }),
     dailyReport(),
-    prisma.lead.count({ where: { meetingAt: { gte: now } } }),
+    boardNumbers(sinceOf(period.key, now)),
     prisma.lead.findFirst({ where: { meetingAt: { gte: now } }, orderBy: { meetingAt: "asc" }, select: { id: true, firstName: true, lastName: true, jobTitle: true, meetingAt: true, meetingLink: true } }),
-    prisma.lead.count({ where: { messages: outbound } }),
-    prisma.lead.count({ where: { AND: [{ messages: outbound }, { messages: { some: { sender: "LEAD" } } }] } }),
-    prisma.lead.count({ where: { status: "QUALIFIED" } }),
     emailEnabled(),
     remainingDailyInviteQuota(),
     messagesSentToday(),
@@ -99,13 +129,13 @@ export default async function TodayPage() {
     whatsappOk && { key: "WHATSAPP" as ChannelKey, label: "WhatsApp", used: waSent, limit: settings.dailyWhatsappLimit },
   ].filter((c): c is { key: ChannelKey; label: string; used: number; limit: number } => Boolean(c));
 
-  const rate = contacted ? Math.round((replied / contacted) * 100) : 0;
+  const rate = nums.contacted ? Math.min(100, Math.round((nums.replied / nums.contacted) * 100)) : 0;
   const board = [
-    { label: "Contatados", value: contacted, note: <><b>+{report.invites}</b> convites hoje</> },
-    { label: "Responderam", value: replied, note: <><b>{rate}%</b> de resposta</> },
-    { label: "Oportunidades", value: qualified, note: "mostraram interesse", hot: true },
-    { label: "Reuniões", value: meetingCount, note: "marcadas na agenda" },
-    { label: "Hoje", value: sentToday, note: "mensagens enviadas" },
+    { label: "Contatados", value: nums.contacted, note: <><b>+{nums.invites}</b> convites</> },
+    { label: "Responderam", value: nums.replied, note: <><b>{rate}%</b> de resposta</> },
+    { label: "Oportunidades", value: nums.qualified, note: "mostraram interesse", hot: true },
+    { label: "Reuniões", value: nums.meetings, note: "marcadas na agenda" },
+    { label: "Mensagens", value: nums.sent, note: "enviadas" },
   ];
 
   const meetDay = nextMeeting?.meetingAt;
@@ -158,8 +188,16 @@ export default async function TodayPage() {
           </div>
         ))}
         <div className="board-foot">
-          <span>Desde o início · hoje desde 0h</span>
-          <span>Atualizado às {clockTime(now)}</span>
+          <nav className="board-periods" aria-label="Período dos números">
+            {PERIODS.map((p) => (
+              <Link key={p.key} href={p.key === "7d" ? "/" : `/?periodo=${p.key}`} aria-current={p.key === period.key ? "true" : undefined} scroll={false}>
+                {p.label}
+              </Link>
+            ))}
+          </nav>
+          <span>
+            {period.note} · atualizado às {clockTime(now)}
+          </span>
         </div>
       </section>
 

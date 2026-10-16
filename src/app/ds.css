@@ -4769,3 +4769,39 @@ details.log[open] summary svg {
   border-color: var(--accent);
   color: var(--on-accent);
 }
+
+.board-periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.board-periods a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #3d3b35;
+  border-radius: 2px;
+  color: #bdb8a8;
+  text-decoration: none;
+}
+
+.board-periods a:hover {
+  color: var(--amber);
+}
+
+.board-periods a[aria-current="true"] {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #141414;
+}
+
+.board-foot {
+  align-items: center;
+}
+
+/* O texto do título não pode encolher até sumir quando o quadro de situação divide a linha. */
+.area-head > .grow {
+  min-width: min(100%, 280px);
+}
