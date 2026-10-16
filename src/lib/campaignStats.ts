@@ -7,6 +7,7 @@ export interface CampaignNumbers {
   contacted: number;
   replied: number;
   qualified: number;
+  meetings: number;
   // Responderam ÷ receberam mensagem nossa (null se ninguém foi contatado).
   rate: number | null;
 }
@@ -20,6 +21,7 @@ export function campaignNumbers(leads: { status: LeadStatus; messages: { sender:
     contacted: contacted.length,
     replied: leads.filter((l) => l.messages.some((m) => m.sender === "LEAD")).length,
     qualified: leads.filter((l) => l.status === "QUALIFIED").length,
+    meetings: leads.filter((l) => l.status === "MEETING_SCHEDULED").length,
     rate: contacted.length ? Math.round((repliedAfter / contacted.length) * 100) : null,
   };
 }
