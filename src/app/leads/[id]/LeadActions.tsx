@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { LeadStatus } from "@prisma/client";
+import { IconChevronDown } from "@/components/Icons";
 import { leadAction, markMeeting, markNoShow, type LeadActionKind } from "./actions";
 
-// Botão principal (marcar como oportunidade) e "Mais". Marcar tira a pessoa da
+// Menu "Ações" no topo da conversa: oportunidade, reunião, assumir/devolver, encerrar. Marcar tira a pessoa da
 // automação de abordagem; assumir faz o assistente parar de responder até você devolver.
 export function LeadActions({ leadId, status, profileUrl }: { leadId: string; status: LeadStatus; profileUrl: string | null }) {
   const [open, setOpen] = useState(false);
@@ -42,16 +43,19 @@ export function LeadActions({ leadId, status, profileUrl }: { leadId: string; st
   }
 
   return (
-    <div className="row wrap" ref={ref} style={{ gap: 8 }}>
-      <button type="button" className="btn-solid btn-sm" disabled={pending || qualified} onClick={() => run("qualify")}>
-        {meeting ? "Reunião marcada" : qualified ? "Oportunidade" : "Marcar como oportunidade"}
-      </button>
+    <div ref={ref}>
       <div className="menu-anchor">
-        <button type="button" className="btn-line btn-sm" aria-expanded={open} onClick={() => setOpen((o) => !o)} disabled={pending}>
-          Mais
+        <button type="button" className="btn-line btn-sm" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)} disabled={pending}>
+          {pending ? "Salvando…" : "Ações"}
+          <IconChevronDown size={14} />
         </button>
         {open && (
-          <div className="menu" role="menu" style={{ right: "auto", left: 0 }}>
+          <div className="menu" role="menu">
+            {!qualified && (
+              <button type="button" role="menuitem" onClick={() => run("qualify")}>
+                Marcar como oportunidade
+              </button>
+            )}
             {status === "NEEDS_HUMAN" ? (
               <button type="button" role="menuitem" onClick={() => run("handback")}>
                 Devolver para o assistente

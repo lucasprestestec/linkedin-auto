@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useOptimistic, useState, useTransition } from "react";
 import { toggleAutomation } from "./actions";
 
-// Liga e desliga o assistente. Cápsula pequena para o topo da tela (não ocupa a linha toda).
+// Liga e desliga o assistente: o quadro de situação no topo da tela Hoje.
 export function AutomationBar({ paused, connected, hasName, today }: { paused: boolean; connected: boolean; hasName: boolean; today: string }) {
   const [optimisticPaused, setOptimisticPaused] = useOptimistic(paused);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const on = connected && !optimisticPaused;
 
-  const title = !connected ? "Assistente parado" : on ? "Assistente ligado" : "Assistente pausado";
+  const title = !connected ? "Assistente parado" : on ? "Assistente trabalhando" : "Assistente pausado";
   const detail = !connected
     ? "Conecte um canal para começar."
     : error
@@ -23,8 +23,8 @@ export function AutomationBar({ paused, connected, hasName, today }: { paused: b
           : "Nada é enviado enquanto estiver pausado.";
 
   return (
-    <div className={`auto-pill${on ? " is-on" : ""}`} title={detail}>
-      <i className={`dot-b ${on ? "b-ok" : "b-neutral"}`} />
+    <div className={`status-box${on ? " is-on" : ""}`}>
+      <i className="status-dot" aria-hidden="true" />
       <span className="auto-text">
         <b>{title}</b>
         <small>{detail}</small>
@@ -36,10 +36,7 @@ export function AutomationBar({ paused, connected, hasName, today }: { paused: b
       ) : connected ? (
         <button
           type="button"
-          role="switch"
-          aria-checked={on}
-          aria-label={on ? "Pausar" : "Ligar"}
-          className="switch"
+          className={on ? "btn-line btn-sm" : "btn-solid btn-sm"}
           onClick={() =>
             startTransition(async () => {
               setError(null);
@@ -48,7 +45,9 @@ export function AutomationBar({ paused, connected, hasName, today }: { paused: b
               if (r.error) setError(r.error);
             })
           }
-        />
+        >
+          {on ? "Pausar" : "Ligar"}
+        </button>
       ) : (
         <Link href="/channels" className="btn-line btn-sm">
           Conectar

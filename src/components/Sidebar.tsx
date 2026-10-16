@@ -11,7 +11,10 @@ import { IconArrowRight, IconLogOut, IconPanelLeft } from "./Icons";
 import { SIDE_KEY } from "@/lib/prefs";
 import { logout } from "@/app/actions";
 
-// Menu lateral do computador (≥1024px): trilho preto de placas, cada área com o seu quadrado de cor. Pode ficar só com os ícones (a escolha fica guardada neste navegador).
+type Item = (typeof NAV_ITEMS)[number];
+
+// Menu lateral do computador (≥1024px): trilho preto de placas, cada área com o seu quadrado de cor.
+// Assistente e Ajustes ficam no pé. Pode ficar só com os ícones (a escolha fica guardada neste navegador).
 export function Sidebar() {
   const pathname = usePathname();
   const { ownerName, needYouCount, draftCount } = useShell();
@@ -26,6 +29,21 @@ export function Sidebar() {
     } catch {}
   }
 
+  function sign(item: Item) {
+    const { href, label, Icon, color } = item;
+    const badge = "badge" in item ? item.badge : undefined;
+    const count = badge === "attention" ? needYouCount : badge === "drafts" ? draftCount : 0;
+    return (
+      <Link key={href} href={href} className="side-link" style={{ "--c": color } as React.CSSProperties} title={label} aria-label={collapsed ? label : undefined} aria-current={isActive(pathname, item) ? "page" : undefined}>
+        <span className="side-sq">
+          <Icon size={16} strokeWidth={2.2} />
+        </span>
+        <span className="side-label">{label}</span>
+        {count > 0 ? <span className="side-count">{count > 99 ? "99+" : count}</span> : <IconArrowRight size={18} className="side-arrow" />}
+      </Link>
+    );
+  }
+
   return (
     <aside className="side" aria-label="Navegação principal">
       <div className="side-top">
@@ -35,19 +53,9 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="side-nav">
-        {NAV_ITEMS.map(({ href, label, Icon, badge, color }) => {
-          const count = badge === "attention" ? needYouCount : badge === "drafts" ? draftCount : 0;
-          return (
-            <Link key={href} href={href} className="side-link" style={{ "--c": color } as React.CSSProperties} title={label} aria-label={collapsed ? label : undefined} aria-current={isActive(pathname, href) ? "page" : undefined}>
-              <span className="side-sq">
-                <Icon size={16} strokeWidth={2.2} />
-              </span>
-              <span className="side-label">{label}</span>
-              {count > 0 ? <span className="side-count">{count > 99 ? "99+" : count}</span> : <IconArrowRight size={18} className="side-arrow" />}
-            </Link>
-          );
-        })}
+      <nav className="side-nav">{NAV_ITEMS.filter((i) => !("foot" in i && i.foot)).map(sign)}</nav>
+      <nav className="side-nav side-nav-foot" aria-label="Assistente e ajustes">
+        {NAV_ITEMS.filter((i) => "foot" in i && i.foot).map(sign)}
       </nav>
 
       <div className="side-foot">
