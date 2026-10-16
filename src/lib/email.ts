@@ -195,17 +195,21 @@ export interface EmailInput {
   // E-mail para uma pessoa de fora (não aviso interno): leva o rodapé de descadastro. O link vai no rodapé e no
   // cabeçalho que o Gmail usa no botão "cancelar inscrição"; null = sem link (sem APP_URL), o rodapé manda responder.
   unsubscribeUrl?: string | null;
+  // Primeiro e-mail para quem nunca recebeu da gente: só texto, sem imagem de rastreio e sem link no corpo (o
+  // descadastro fica no cabeçalho). O Gmail costuma mandar para o spam o e-mail de remetente novo com imagem e link.
+  simple?: boolean;
 }
 
 // Monta o e-mail pronto para sair de uma caixa (a conectada ou uma caixa de envio).
 export function composeMail(input: EmailInput, address: string, name: string | undefined): Mail.Options {
-  const pixel = input.openToken ? openPixelUrl(input.openToken) : null;
+  const pixel = !input.simple && input.openToken ? openPixelUrl(input.openToken) : null;
+  const footerLink = input.simple && input.unsubscribeUrl ? null : input.unsubscribeUrl;
   return {
     from: name ? { name, address } : address,
     to: input.to,
     subject: input.subject,
-    text: plainBody(input.text, input.unsubscribeUrl),
-    html: htmlBody(input.text, pixel, input.unsubscribeUrl),
+    text: plainBody(input.text, footerLink),
+    html: input.simple ? undefined : htmlBody(input.text, pixel, input.unsubscribeUrl),
     headers: input.unsubscribeUrl ? { "List-Unsubscribe": `<${input.unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } : undefined,
     inReplyTo: input.inReplyTo ?? undefined,
     references: input.references?.length ? input.references : input.inReplyTo ? [input.inReplyTo] : undefined,
