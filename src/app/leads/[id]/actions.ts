@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { activeIdentityIdOrNull } from "@/lib/identity";
 import { sendOnChannel } from "@/lib/channels";
 import { supersedeDrafts } from "@/lib/outbox";
+import { TAKEOVER_REASON } from "@/lib/handoff";
 import type { MessageChannel } from "@prisma/client";
 import { summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
@@ -14,9 +15,6 @@ import { parseEmail, parsePhone } from "@/lib/contactFields";
 import { recordFeedback } from "@/lib/agentFeedback";
 import { requireSession } from "@/lib/session";
 import { sendNoShow } from "@/lib/meetingReminders";
-
-// Motivo gravado quando o corretor assume: enquanto ele não devolver, nem uma resposta manual religa a IA.
-const TAKEOVER_REASON = "Você assumiu a conversa";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   await requireSession();

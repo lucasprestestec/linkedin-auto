@@ -308,18 +308,25 @@ export async function flushApprovedDrafts(limit = 10): Promise<number> {
     await markNeedsHuman(d.leadId, error).catch((err) => console.error("Falha ao avisar rascunho preso", err));
   }
 
-  const due = await prisma.draft.findMany({
-    where: { status: "APPROVED", decidedAt: { lt: new Date(Date.now() - APPROVED_GRACE_MS) } },
-    orderBy: { decidedAt: "asc" },
-    take: 100,
-  });
   let sent = 0;
   let tried = 0;
-  for (const draft of due) {
-    if (tried >= limit) break;
-    const r = await sendApproved(draft);
-    if (r.ok) sent++;
-    if (r.ok || !r.deferred) tried++;
+  // Os sem vaga ficam na fila (deferred): a próxima página pula só eles, para não esconder os que têm vaga.
+  let deferred = 0;
+  for (let rounds = 0; rounds < 50 && tried < limit; rounds++) {
+    const page = await prisma.draft.findMany({
+      where: { status: "APPROVED", decidedAt: { lt: new Date(Date.now() - APPROVED_GRACE_MS) } },
+      orderBy: { decidedAt: "asc" },
+      skip: deferred,
+      take: 50,
+    });
+    if (page.length === 0) break;
+    for (const draft of page) {
+      if (tried >= limit) break;
+      const r = await sendApproved(draft);
+      if (r.ok) sent++;
+      if (!r.ok && r.deferred) deferred++;
+      else tried++;
+    }
   }
   return sent;
 }

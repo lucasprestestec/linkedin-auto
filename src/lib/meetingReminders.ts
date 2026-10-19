@@ -1,5 +1,6 @@
 import type { Lead, MessageChannel, Settings } from "@prisma/client";
-import { effectiveLimits, messagesSentToday } from "@/lib/limits";
+import { effectiveLimits, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { emailLeftToday } from "@/lib/mailboxes";
 import { prisma } from "@/lib/prisma";
 import { sendOnChannel } from "@/lib/channels";
 import { fillTemplate } from "@/lib/cadence";
@@ -91,6 +92,14 @@ function conversationChannel(messages: { sender: string; channel: MessageChannel
   return [...messages].reverse().find((m) => m.sender === "LEAD")?.channel ?? messages.at(-1)?.channel ?? null;
 }
 
+// O limite diário do canal já foi usado? (LinkedIn protege a conta; e-mail e WhatsApp seguem o limite do cliente.)
+async function channelFullToday(channel: MessageChannel, settings: Settings): Promise<boolean> {
+  const limits = effectiveLimits(settings);
+  if (channel === "LINKEDIN") return (await messagesSentToday()) >= limits.linkedinMessages;
+  if (channel === "WHATSAPP") return (await whatsappSentToday()) >= limits.whatsapp;
+  return (await emailLeftToday(settings)) <= 0;
+}
+
 // Rodada do cron (dentro do horário de trabalho).
 export async function sendMeetingReminders(identityId: string | null, settings: Settings): Promise<number> {
   if (!settings.meetingRemindersEnabled) return 0;
@@ -108,8 +117,8 @@ export async function sendMeetingReminders(identityId: string | null, settings: 
     if (send) {
       const channel = conversationChannel(lead.messages);
       if (!channel) continue;
-      // O limite diário protege a conta do LinkedIn: sem vaga, tenta de novo na próxima rodada.
-      if (channel === "LINKEDIN" && (await messagesSentToday()) >= effectiveLimits(settings).linkedinMessages) continue;
+      // Canal sem vaga hoje: tenta de novo na próxima rodada.
+      if (await channelFullToday(channel, settings)) continue;
       try {
         await sendOnChannel(lead, channel, renderReminder(texts[send], lead, settings.ownerName), { identityId });
         resolved.push(send);
@@ -130,6 +139,6 @@ export async function sendNoShow(lead: Lead & { messages: { sender: string; chan
   const channel = conversationChannel(lead.messages);
   if (!channel) throw new Error("Não há conversa com essa pessoa para mandar a mensagem.");
   if (lead.doNotContact) throw new Error("A pessoa pediu para não receber mais mensagens.");
-  if (channel === "LINKEDIN" && (await messagesSentToday()) >= effectiveLimits(settings).linkedinMessages) throw new Error("O limite diário de mensagens do LinkedIn já foi atingido hoje.");
+  if (await channelFullToday(channel, settings)) throw new Error("O limite diário de mensagens desse canal já foi atingido hoje. Tente amanhã.");
   await sendOnChannel(lead, channel, renderReminder(reminderTexts(settings).noShow, lead, settings.ownerName), { identityId });
 }
