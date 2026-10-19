@@ -12,7 +12,7 @@ export function KnowledgeImport({ hasSections }: { hasSections: boolean }) {
       style={{ gap: 12 }}
       onSubmit={(e) => {
         e.preventDefault();
-        if (hasSections && !window.confirm("Substituir a base atual? As seções e os modos escolhidos serão trocados pelos do arquivo novo.")) return;
+        if (hasSections && !window.confirm("Substituir TODOS os temas de hoje pelos do arquivo? Os temas que você corrigiu ou criou serão apagados. Baixe uma cópia antes se ainda não baixou.")) return;
         const data = new FormData(e.currentTarget);
         startTransition(() => action(data));
       }}
@@ -26,14 +26,14 @@ export function KnowledgeImport({ hasSections }: { hasSections: boolean }) {
         <textarea name="markdown" className="field" rows={5} placeholder={"# 1. Quem é a assistente\n...\n# 2. Produtos\n..."} />
       </label>
       <p className="hint" style={{ margin: 0 }}>
-        Títulos com &quot;# &quot; viram seções; índice, fontes e pendências já vêm desligados.
+        Cada título que começa com &quot;# &quot; vira um tema. Índice, fontes e pendências já entram desligados.
       </p>
       <div className="form-actions">
         <button type="submit" className="btn-solid btn-sm" disabled={pending}>
           {pending ? "Importando…" : hasSections ? "Substituir" : "Importar"}
         </button>
         {state?.error && <span className="field-error">{state.error}</span>}
-        {state?.imported && <span className="ok-text">{state.imported} seções importadas. Confira os modos.</span>}
+        {state?.imported && <span className="ok-text">{state.imported} temas importados.</span>}
       </div>
     </form>
   );

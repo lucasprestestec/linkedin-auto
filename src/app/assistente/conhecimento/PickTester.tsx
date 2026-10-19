@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { testPick } from "./actions";
 
-// Mostra quais seções "sob demanda" entrariam para uma mensagem de exemplo —
-// pra conferir se a escolha faz sentido antes de ir ao ar.
+// Mostra quais temas "só quando o assunto aparecer" entrariam para uma pergunta de exemplo.
 export function PickTester() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<{ titles?: string[]; error?: string } | null>(null);
@@ -17,7 +16,7 @@ export function PickTester() {
         rows={3}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        aria-label="Mensagem de exemplo do lead"
+        aria-label="Pergunta de exemplo de um cliente"
         placeholder='Ex.: "O seguro cobre câncer? Tenho 2 filhos e sou dentista."'
       />
       <div className="form-actions">
@@ -27,7 +26,7 @@ export function PickTester() {
           disabled={pending || !text.trim()}
           onClick={() => startTransition(async () => setResult(await testPick(text)))}
         >
-          {pending ? "Consultando…" : "Ver seções escolhidas"}
+          {pending ? "Consultando…" : "Ver temas escolhidos"}
         </button>
         {result?.error && <span className="field-error">{result.error}</span>}
       </div>
@@ -40,7 +39,7 @@ export function PickTester() {
           </ul>
         ) : (
           <p className="hint" style={{ margin: 0 }}>
-            Nenhuma seção extra: só o núcleo (&quot;Sempre&quot;) entraria.
+            Nenhum tema extra: só os que ela sempre considera.
           </p>
         ))}
     </div>

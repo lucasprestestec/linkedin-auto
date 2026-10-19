@@ -14,11 +14,15 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function KnowledgePage() {
   if (!(await getSession())) redirect("/login");
 
-  const sections = await prisma.knowledgeSection.findMany({ orderBy: { position: "asc" } });
-  const size = (mode: string) => sections.filter((s) => s.mode === mode).reduce((n, s) => n + s.content.length, 0);
-  const always = size("ALWAYS");
-  const onDemand = size("ON_DEMAND");
-  const off = sections.filter((s) => s.mode === "OFF").length;
+  const [sections, settings] = await Promise.all([
+    prisma.knowledgeSection.findMany({ orderBy: { position: "asc" } }),
+    prisma.settings.findUnique({ where: { id: "singleton" }, select: { assistantName: true } }),
+  ]);
+  const assistant = settings?.assistantName?.trim() || "";
+  // "a Helena" / "a assistente": o nome entra sempre com artigo.
+  const who = assistant ? `a ${assistant}` : "a assistente";
+  const Who = assistant ? `A ${assistant}` : "A assistente";
+  const alwaysChars = sections.filter((s) => s.mode === "ALWAYS").reduce((n, s) => n + s.content.length, 0);
 
   return (
     <main className="page">
@@ -27,67 +31,66 @@ export default async function KnowledgePage() {
       </Link>
       <header className="p-head">
         <div>
-          <h1 className="t-title">Base de conhecimento</h1>
+          <h1 className="t-title">O que {who} sabe</h1>
           <p className="t-sub">
-            O manual da assistente, dividido em seções. &quot;Sempre&quot; entra em toda mensagem; &quot;Sob demanda&quot; entra só quando o assunto aparece na
-            conversa (um modelo rápido escolhe até 4); &quot;Desligada&quot; fica guardada.
+            Tudo o que {who} diz sobre produtos, regras e textos aprovados vem destes temas. Se algo não estiver aqui, ela não afirma. Corrigiu um
+            texto? Vale já na próxima mensagem.
           </p>
         </div>
       </header>
 
-      {sections.length > 0 && (
-        <section className="sec know-summary">
-          <div>
-            <b>{sections.length}</b>
-            <small>seções</small>
-          </div>
-          <div>
-            <b>~{approxTokens(always).toLocaleString("pt-BR")}</b>
-            <small>tokens em toda mensagem ({(always / 1000).toFixed(1)} mil caracteres)</small>
-          </div>
-          <div>
-            <b>{(onDemand / 1000).toFixed(1)} mil</b>
-            <small>caracteres sob demanda</small>
-          </div>
-          <div>
-            <b>{off}</b>
-            <small>desligadas</small>
-          </div>
-          {approxTokens(always) > 15000 && (
-            <p className="note note-warn" style={{ gridColumn: "1 / -1", margin: 0 }}>
-              O núcleo está grande: cada mensagem fica mais cara e o modelo se perde mais. Passe seções longas para &quot;Sob demanda&quot;.
-            </p>
-          )}
+      {sections.length > 0 ? (
+        <section className="sec">
+          <KnowledgeList sections={sections.map((s) => ({ id: s.id, title: s.title, content: s.content, mode: s.mode }))} assistantName={assistant} />
+        </section>
+      ) : (
+        <section className="sec">
+          <h2 className="t-label">Nenhum tema ainda</h2>
+          <p className="hint" style={{ margin: 0 }}>
+            Importe o arquivo com o manual d{who} (em &quot;Opções avançadas&quot;, abaixo).
+          </p>
         </section>
       )}
 
-      <div className="know-layout">
-        <section className="sec">
-          <h2 className="t-label">{sections.length ? "Seções" : "Nenhuma seção ainda"}</h2>
-          {sections.length > 0 ? (
-            <KnowledgeList sections={sections.map((s) => ({ id: s.id, title: s.title, content: s.content, mode: s.mode }))} />
-          ) : (
+      <details className="sec know-adv-sec">
+        <summary className="t-label">Opções avançadas</summary>
+        <div className="stack" style={{ gap: 18, marginTop: 14 }}>
+          <div className="stack" style={{ gap: 8 }}>
+            <h2 className="t-label">Baixar uma cópia</h2>
             <p className="hint" style={{ margin: 0 }}>
-              Importe o arquivo da base (.md). Cada título &quot;# &quot; vira uma seção; seções longas são divididas pelos &quot;## &quot;.
+              Guarda todos os temas num arquivo de texto. Faça isso antes de substituir tudo.
             </p>
-          )}
-        </section>
-        <div className="stack" style={{ gap: 16 }}>
-          <section className="sec">
-            <h2 className="t-label">{sections.length ? "Substituir a base" : "Importar a base"}</h2>
+            <a className="btn-line btn-sm" href="/api/export/knowledge" style={{ alignSelf: "flex-start" }}>
+              Baixar cópia (.md)
+            </a>
+          </div>
+
+          <div className="stack" style={{ gap: 8 }}>
+            <h2 className="t-label">{sections.length ? "Substituir tudo por um arquivo" : "Importar o manual"}</h2>
+            {sections.length > 0 && (
+              <p className="note note-warn" style={{ margin: 0 }}>
+                Isto apaga todos os temas de hoje, inclusive os que você corrigiu ou criou, e coloca os do arquivo. Baixe uma cópia antes.
+              </p>
+            )}
             <KnowledgeImport hasSections={sections.length > 0} />
-          </section>
+          </div>
+
           {sections.length > 0 && (
-            <section className="sec">
-              <div className="setting-text">
-                <h2 className="t-label">Testar a escolha</h2>
-                <small>Quais seções &quot;sob demanda&quot; entrariam para uma mensagem de exemplo.</small>
-              </div>
+            <div className="stack" style={{ gap: 8 }}>
+              <h2 className="t-label">Testar uma pergunta</h2>
+              <p className="hint" style={{ margin: 0 }}>
+                Escreva uma pergunta de cliente e veja quais temas {who} usaria para responder, além dos que ela sempre considera.
+              </p>
               <PickTester />
-            </section>
+            </div>
           )}
+
+          <p className="hint" style={{ margin: 0 }}>
+            Os temas que {who} sempre considera somam {(alwaysChars / 1000).toFixed(1)} mil caracteres
+            {approxTokens(alwaysChars) > 15000 ? `. Está grande: ${Who} fica mais lenta e se perde mais. Deixe os textos longos em "Só quando o assunto aparecer".` : "."}
+          </p>
         </div>
-      </div>
+      </details>
     </main>
   );
 }
