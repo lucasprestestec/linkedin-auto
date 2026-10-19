@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { adminVisible, isAdmin } from "@/lib/admin";
 import { AdminLogin } from "./AdminLogin";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
-import { LimitsForm } from "./LimitsForm";
 import { EngagementForm } from "./EngagementForm";
 import { AccountTypeNotice } from "./AccountTypeNotice";
 import { adminLogout } from "./actions";
@@ -105,11 +104,6 @@ export default async function AdminPage() {
           <small>Valem para todas as conversas. O texto de cada campanha é somado a estas instruções.</small>
         </div>
         <AgentInstructionsForm value={settings.agentInstructions ?? ""} />
-      </section>
-
-      <section className="sec">
-        <h2 className="t-label">Limites diários</h2>
-        <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
       </section>
 
       <section className="sec">

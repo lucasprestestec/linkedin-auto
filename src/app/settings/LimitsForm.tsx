@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { updateLimits } from "./actions";
 import { Stepper } from "@/components/Stepper";
 
-export function LimitsForm({ dailyInviteLimit, dailyMessageLimit }: { dailyInviteLimit: number; dailyMessageLimit: number }) {
+// Convites e mensagens por dia no LinkedIn. O cliente escolhe até o teto que o dono definiu.
+export function LimitsForm({ dailyInviteLimit, dailyMessageLimit, inviteMax, messageMax }: { dailyInviteLimit: number; dailyMessageLimit: number; inviteMax: number; messageMax: number }) {
   const [state, formAction, pending] = useActionState(updateLimits, undefined);
   const [invites, setInvites] = useState(dailyInviteLimit);
   const [messages, setMessages] = useState(dailyMessageLimit);
@@ -15,16 +16,16 @@ export function LimitsForm({ dailyInviteLimit, dailyMessageLimit }: { dailyInvit
       <div className="setting" style={{ padding: "8px 0" }}>
         <label htmlFor="dailyInviteLimit" className="setting-text">
           <b>Convites</b>
-          <small>por dia, no máximo 50</small>
+          <small>por dia, no máximo {inviteMax}</small>
         </label>
-        <Stepper id="dailyInviteLimit" name="dailyInviteLimit" value={invites} min={1} max={50} onChange={setInvites} />
+        <Stepper id="dailyInviteLimit" name="dailyInviteLimit" value={invites} min={1} max={inviteMax} onChange={setInvites} />
       </div>
       <div className="setting" style={{ padding: "8px 0" }}>
         <label htmlFor="dailyMessageLimit" className="setting-text">
           <b>Mensagens</b>
-          <small>por dia, no máximo 80</small>
+          <small>por dia, no máximo {messageMax}</small>
         </label>
-        <Stepper id="dailyMessageLimit" name="dailyMessageLimit" value={messages} min={1} max={80} onChange={setMessages} />
+        <Stepper id="dailyMessageLimit" name="dailyMessageLimit" value={messages} min={1} max={messageMax} onChange={setMessages} />
       </div>
       <p className="hint">
         Convite ou mensagem demais é o principal motivo de restrição de conta. Sem Sales Navigator, o LinkedIn aceita no máximo cerca de 25 a 30 convites por
