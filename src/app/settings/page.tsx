@@ -15,7 +15,7 @@ import { logout } from "../actions";
 import { WhatsappCard } from "../channels/WhatsappCard";
 import { EmailChannelOptions } from "../channels/EmailChannelOptions";
 import { LinkedinCard, linkedinStatus } from "../channels/LinkedinCard";
-import { EmailCard } from "./EmailCard";
+import { GoogleCard } from "./GoogleCard";
 import { RefreshPhotosButton } from "./RefreshPhotosButton";
 import { NotificationsCard } from "./NotificationsCard";
 import { OwnerNameForm } from "./OwnerNameForm";
@@ -95,7 +95,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     whatsapp ? whatsappLiveStatus(whatsapp) : null,
   ]);
 
-  const emailOn = Boolean(email) || activeBoxes > 0;
   // O número está pareado de verdade (o Deskcomm diz WORKING), não só configurado.
   const whatsappOn = whatsappLive === "connected";
   const ok = { label: "Conectado", cls: "tg-ok" };
@@ -143,34 +142,29 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <Row
             id="email"
             channel="EMAIL"
-            title="E-mail"
+            title="E-mail de prospecção"
             summary={
-              emailOn
-                ? `${settings.googleEmail ?? email?.address ?? `${activeBoxes} caixas em rodízio`} · hoje ${emailToday} enviados · 7 dias: ${openedWeek} de ${sentWeek} abertos`
-                : "Apresentar-se e acompanhar por e-mail"
+              activeBoxes > 0
+                ? `${activeBoxes} ${activeBoxes === 1 ? "caixa de envio ativa" : "caixas de envio ativas"} · hoje ${emailToday} enviados · 7 dias: ${openedWeek} de ${sentWeek} abertos`
+                : "Nenhuma caixa de envio ativa"
             }
-            tag={emailOn ? ok : off}
-            open={typeof emailResult === "string"}
+            tag={activeBoxes > 0 ? (boxProblems > 0 ? { label: "Atenção", cls: "tg-stop" } : ok) : off}
           >
-            <EmailCard
-              googleAddress={settings.googleEmail}
-              expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
-              fallbackAddress={email?.provider === "password" ? email.address : null}
-              result={typeof emailResult === "string" ? emailResult : null}
-            />
-            {activeBoxes > 0 && (
-              <p className="hint">
-                E-mail de prospecção: {activeBoxes} {activeBoxes === 1 ? "caixa ativa" : "caixas ativas"} em rodízio.
-                {boxProblems > 0 && " Alguma caixa está com problema: avise o suporte."}
-              </p>
-            )}
-            {emailOn && (
+            {activeBoxes > 0 ? (
               <>
+                <p className="hint">
+                  O e-mail da prospecção sai por {activeBoxes === 1 ? "uma caixa de envio" : "caixas de envio"} própria{activeBoxes === 1 ? "" : "s"}, em rodízio, com limite diário que sobe aos poucos.
+                  {boxProblems > 0 && " Alguma caixa está com problema: avise o suporte."}
+                </p>
                 <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
                 <p className="hint">
                   Hoje: {emailToday} enviados, ainda cabem {emailLeft} · últimos 7 dias: {openedWeek} de {sentWeek} abertos
                 </p>
               </>
+            ) : (
+              <p className="hint">
+                O e-mail da prospecção sai por caixas de envio próprias, preparadas pelo suporte (separadas da sua conta pessoal, para proteger a entrega). Quando houver uma caixa ativa, ela aparece aqui.
+              </p>
             )}
           </Row>
           <Row
@@ -220,12 +214,27 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} replyAnytime={settings.replyAnytime} />
           </Row>
           <Row
+            id="google"
+            title="Conta Google"
+            summary={settings.googleEmail && settings.googleRefreshToken ? `${settings.googleEmail} · agenda e avisos por e-mail` : "Para a agenda de reuniões e os avisos por e-mail"}
+            tag={settings.googleEmail && settings.googleRefreshToken ? ok : off}
+            open={typeof emailResult === "string"}
+          >
+            <GoogleCard
+              googleAddress={settings.googleEmail}
+              expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
+              calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
+              configured={googleConfigured()}
+              result={typeof emailResult === "string" ? emailResult : null}
+            />
+          </Row>
+          <Row
             id="agenda"
             title="Agenda de reuniões"
             summary={
               settings.googleCalendarEnabled
-                ? `Google Agenda conectada · ${settings.meetingMinutes} min · ${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`
-                : "Não conectada: o assistente passa a conversa para você"
+                ? `Reuniões de ${settings.meetingMinutes} min na sua agenda do Google · ${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`
+                : "Precisa da Conta Google: sem ela o assistente passa a conversa para você"
             }
             tag={settings.googleCalendarEnabled ? { label: "Conectada", cls: "tg-ok" } : undefined}
           >
@@ -233,7 +242,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               minutes={settings.meetingMinutes}
               googleEmail={settings.googleEmail}
               calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
-              configured={googleConfigured()}
               workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
               notice={noticeLabel({ fromNextBusinessDay: Boolean(settings.assistantName?.trim()) })}
             />

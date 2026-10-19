@@ -69,7 +69,7 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
   }
   if (firstContact === "EMAIL") {
     if (!e.email) return { error: "Para o assistente se apresentar por e-mail, informe o e-mail." };
-    if (!(await emailEnabled())) return { error: "Conecte o e-mail em Canais para o assistente mandar a primeira mensagem." };
+    if (!(await emailEnabled())) return { error: "É preciso ter uma caixa de envio ativa para o assistente mandar a primeira mensagem por e-mail. Fale com o suporte." };
   }
   if (firstContact === "WHATSAPP") {
     if (!p.phone) return { error: "Para o assistente falar pelo WhatsApp, informe o número." };

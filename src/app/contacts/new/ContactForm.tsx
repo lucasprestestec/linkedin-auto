@@ -35,7 +35,7 @@ export function ContactForm({
       label: "O assistente se apresenta por e-mail",
       hint: "E-mail de apresentação no próximo horário de trabalho, com rastreio de abertura.",
       enabled: ready.EMAIL && Boolean(values.email.trim()),
-      why: !ready.EMAIL ? "Conecte o e-mail em Canais" : "Informe o e-mail",
+      why: !ready.EMAIL ? "Sem caixa de envio ativa" : "Informe o e-mail",
     },
     {
       id: "LINKEDIN",
