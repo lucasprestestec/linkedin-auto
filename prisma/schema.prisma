@@ -533,6 +533,9 @@ model AiUsage {
   inputTokens  Int      @default(0)
   outputTokens Int      @default(0)
   costUsd      Float?
+  // Com quem a IA estava falando (para medir o tamanho de cada conversa); vazio quando a chamada não é de uma pessoa.
+  leadId       String?
 
   @@index([createdAt])
+  @@index([leadId, createdAt])
 }

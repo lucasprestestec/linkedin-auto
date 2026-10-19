@@ -1,4 +1,5 @@
 import type { Lead, Prisma } from "@prisma/client";
+import { runInLeadScope } from "@/lib/aiUsage";
 import { prisma } from "@/lib/prisma";
 import { fetchWhatsappUpdates, type WhatsappHistoryMessage } from "@/lib/deskcomm";
 import { markNeedsHuman } from "@/lib/handoff";
@@ -79,7 +80,7 @@ export async function syncWhatsapp(only?: string): Promise<{ checked: number; sa
           await captureContactsSafely(lead.id, plan.text);
         }
       } else if (plan.action === "media") {
-        const r = await understandMedia({ url: plan.url, kind: plan.kind, mime: plan.mime });
+        const r = await runInLeadScope(lead.id, () => understandMedia({ url: plan.url, kind: plan.kind, mime: plan.mime }));
         if (r.ok) {
           // Nada de capturar telefone/e-mail daqui: número ouvido ou lido numa imagem pode vir errado.
           const created = await createOnce({

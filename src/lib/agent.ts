@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { recordAiUsage } from "@/lib/aiUsage";
+import { recordAiUsage, withLeadScope } from "@/lib/aiUsage";
 import type { LeadKind, LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LEAD_KIND_PROMPT } from "@/lib/leadKind";
@@ -457,7 +457,7 @@ async function styleBlockFor(explicit: string | null | undefined): Promise<strin
   return renderStyleBlock(await loadWritingStyle().catch(() => null));
 }
 
-export async function decideResponse(
+async function decideResponseImpl(
   input: ConversationInput,
   // skipAutoFilter: só o banco de testes usa, pra medir o prompt sozinho (sem a regra de mensagem automática).
   opts: { model?: string; complete?: Completer; skipAutoFilter?: boolean } = {},
@@ -688,7 +688,7 @@ async function writeMessage(
 // Primeira mensagem no LinkedIn depois que o convite é aceito. Se já houve
 // contato por outro canal (ex.: e-mail enquanto o convite estava pendente), o
 // histórico entra pra não repetir a apresentação.
-export async function generateOpeningMessage(
+async function generateOpeningMessageImpl(
   instructions: string | null,
   lead: LeadContext,
   opts: { model?: string; history?: HistoryItem[] } = {},
@@ -714,7 +714,7 @@ export async function generateOpeningMessage(
 
 // Convite do LinkedIn parado há dias e a pessoa tem e-mail na ficha: a
 // secretária se apresenta por e-mail (camada extra da prospecção).
-export async function generateIntroEmail(instructions: string | null, lead: LeadContext, daysPending: number, opts: { model?: string } = {}): Promise<string> {
+async function generateIntroEmailImpl(instructions: string | null, lead: LeadContext, daysPending: number, opts: { model?: string } = {}): Promise<string> {
   const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
@@ -733,7 +733,7 @@ export async function generateIntroEmail(instructions: string | null, lead: Lead
 
 // Contato adicionado à mão pelo corretor (indicação, evento, conhecido): a
 // secretária faz o primeiro contato no canal escolhido por ele.
-export async function generateFirstContact(instructions: string | null, lead: LeadContext, channel: MessageChannel, opts: { model?: string } = {}): Promise<string> {
+async function generateFirstContactImpl(instructions: string | null, lead: LeadContext, channel: MessageChannel, opts: { model?: string } = {}): Promise<string> {
   const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
@@ -752,7 +752,7 @@ export async function generateFirstContact(instructions: string | null, lead: Le
 
 // Passo de cadência com texto aprovado que não deu pra preencher sozinho (dado
 // faltando, "o(a)", "Dr(a)."): a IA ajusta o mínimo, sem acrescentar nada.
-export async function adaptTemplate(
+async function adaptTemplateImpl(
   instructions: string | null,
   lead: LeadContext,
   template: string,
@@ -810,7 +810,7 @@ function nextStepTool(options: MessageChannel[]): OpenAI.Chat.Completions.ChatCo
   };
 }
 
-export async function decideNextStep(
+async function decideNextStepImpl(
   input: { instructions: string | null; lead: LeadContext; history: HistoryItem[]; options: MessageChannel[]; signals: string[]; extraTouch: boolean },
   opts: { model?: string } = {},
 ): Promise<NextStepDecision> {
@@ -860,7 +860,7 @@ Use a ferramenta next_step. Nunca responda em texto livre.`;
 }
 
 // Follow-up número `attempt` (1..maxCount) numa conversa sem resposta.
-export async function generateFollowUp(
+async function generateFollowUpImpl(
   instructions: string | null,
   lead: LeadContext,
   history: HistoryItem[],
@@ -892,7 +892,7 @@ export async function generateFollowUp(
 
 // Lembrete único depois de sugerir horários e o lead não responder. Não cita horário
 // nenhum (a agenda pode ter mudado): só pergunta se algum serviu ou se ele prefere sugerir.
-export async function generateBookingNudge(
+async function generateBookingNudgeImpl(
   instructions: string | null,
   lead: LeadContext,
   history: HistoryItem[],
@@ -1002,7 +1002,7 @@ export async function scoreProfiles(idealCustomer: string, profiles: ProfileToSc
 // Ajudas sob demanda na tela da conversa (só quando o corretor clica).
 // ---------------------------------------------------------------------------
 
-export async function summarizeConversation(lead: LeadContext, history: HistoryItem[]): Promise<string> {
+async function summarizeConversationImpl(lead: LeadContext, history: HistoryItem[]): Promise<string> {
   return writeMessage(
     `Você ajuda um corretor de seguros a retomar conversas do LinkedIn. Resuma a conversa abaixo em português do Brasil,
 em até 5 tópicos curtos começando com "• ": quem é o lead, o que ele quer ou perguntou, objeções ou dúvidas,
@@ -1013,7 +1013,7 @@ Use a ferramenta write_message (o campo message recebe o resumo).`,
   );
 }
 
-export async function suggestReply(
+async function suggestReplyImpl(
   instructions: string | null,
   lead: LeadContext,
   history: HistoryItem[],
@@ -1032,3 +1032,15 @@ export async function suggestReply(
     `Conversa até agora (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
   );
 }
+
+// Cada chamada de IA feita por estas funções é gravada com a pessoa da conversa (ver aiUsage.ts).
+export const generateOpeningMessage = withLeadScope(generateOpeningMessageImpl, ([, lead]) => (lead as { id?: string }).id);
+export const generateIntroEmail = withLeadScope(generateIntroEmailImpl, ([, lead]) => (lead as { id?: string }).id);
+export const generateFirstContact = withLeadScope(generateFirstContactImpl, ([, lead]) => (lead as { id?: string }).id);
+export const adaptTemplate = withLeadScope(adaptTemplateImpl, ([, lead]) => (lead as { id?: string }).id);
+export const generateFollowUp = withLeadScope(generateFollowUpImpl, ([, lead]) => (lead as { id?: string }).id);
+export const generateBookingNudge = withLeadScope(generateBookingNudgeImpl, ([, lead]) => (lead as { id?: string }).id);
+export const suggestReply = withLeadScope(suggestReplyImpl, ([, lead]) => (lead as { id?: string }).id);
+export const summarizeConversation = withLeadScope(summarizeConversationImpl, ([lead]) => (lead as { id?: string }).id);
+export const decideNextStep = withLeadScope(decideNextStepImpl, ([input]) => (input.lead as { id?: string }).id);
+export const decideResponse = withLeadScope(decideResponseImpl, ([input]) => (input.lead as { id?: string }).id);
