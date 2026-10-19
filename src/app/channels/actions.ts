@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommUrl, saveDeskcommConnection } from "@/lib/deskcomm";
+import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommUrl, saveDeskcommConnection, whatsappPairing, type WhatsappPairing } from "@/lib/deskcomm";
 
 // Regras do canal de e-mail (tela Canais). null em fallbackDays = o assistente
 // nunca se apresenta por e-mail quando o convite fica parado.
@@ -53,6 +53,18 @@ export async function connectDeskcomm(input: { url: string; token: string; chann
 async function currentConfig() {
   const s = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { deskcommUrl: true, deskcommToken: true, deskcommChannelId: true } });
   return deskcommConfigOf(s);
+}
+
+// Estado do número de WhatsApp. withQr=false só olha (não pede QR); true pede o QR
+// (e, se a sessão caiu, reinicia só ela). A tela chama de novo a cada poucos segundos.
+export async function whatsappPairingState(withQr: boolean): Promise<WhatsappPairing | { state: "error"; message: string }> {
+  const cfg = await currentConfig();
+  if (!cfg) return { state: "error", message: "O WhatsApp ainda não foi preparado. Fale com o suporte." };
+  try {
+    return await whatsappPairing(cfg, withQr);
+  } catch (err) {
+    return { state: "error", message: err instanceof Error ? err.message : "Não foi possível falar com o WhatsApp." };
+  }
 }
 
 export async function disconnectDeskcomm() {

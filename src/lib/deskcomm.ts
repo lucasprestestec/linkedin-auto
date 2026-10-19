@@ -26,11 +26,18 @@ export function fixedDeskcommUrl(): string | null {
   return raw ? normalizeDeskcommUrl(raw) : null;
 }
 
+// Chave de acesso única da instalação (DESKCOMM_TOKEN), posta pelo suporte junto com o
+// endereço. Com as duas definidas, o cliente não digita nada: só lê o QR Code.
+export function fixedDeskcommToken(): string | null {
+  return process.env.DESKCOMM_TOKEN?.trim() || null;
+}
+
 export function deskcommConfigOf(s: Pick<Settings, "deskcommUrl" | "deskcommToken" | "deskcommChannelId">): DeskcommConfig | null {
   const url = fixedDeskcommUrl() ?? s.deskcommUrl;
-  if (!url || !s.deskcommToken) return null;
+  const fixedToken = fixedDeskcommToken();
+  if (!url || (!fixedToken && !s.deskcommToken)) return null;
   try {
-    return { url, token: open(s.deskcommToken), channelId: s.deskcommChannelId };
+    return { url, token: fixedToken ?? open(s.deskcommToken!), channelId: s.deskcommChannelId };
   } catch {
     return null;
   }
@@ -153,6 +160,37 @@ export async function inspectDeskcomm(cfg: Pick<DeskcommConfig, "url" | "token">
     const missingTools = needed.filter((n) => !names.has(n));
     const channelId = missingTools.length ? null : await detectChannelId(client);
     return { channelId, missingTools };
+  });
+}
+
+// Pareamento do número pelo QR Code (ferramentas crm_list_whatsapp_channels e
+// crm_get_whatsapp_channel_qr). O número em si nasce no Deskcomm, na implantação
+// (criar canal exige administrador logado lá); aqui o cliente só escaneia.
+export type WhatsappPairing =
+  | { state: "none" } // nenhum número criado no Deskcomm ainda
+  | { state: "connected"; phone: string | null }
+  | { state: "pair" } // precisa escanear, mas ninguém pediu o QR ainda
+  | { state: "qr"; qr: string } // imagem PNG em base64
+  | { state: "waiting" }; // sessão subindo / QR sendo gerado: tente de novo em segundos
+
+export async function whatsappPairing(cfg: DeskcommConfig, withQr: boolean): Promise<WhatsappPairing> {
+  return withClient(cfg, async (client) => {
+    const names = new Set(await client.listTools());
+    if (!names.has("crm_list_whatsapp_channels") || !names.has("crm_get_whatsapp_channel_qr")) {
+      throw new DeskcommError("Esta instalação do WhatsApp ainda não conecta por QR Code. Fale com o suporte.");
+    }
+    const { channels } = await client.call<{ channels: { channel_session_id: string; phone_number: string | null; status: string; has_session: boolean }[] }>("crm_list_whatsapp_channels", {});
+    const ch = channels.find((c) => c.channel_session_id === cfg.channelId) ?? channels.find((c) => c.has_session) ?? channels[0];
+    if (!ch) return { state: "none" };
+    // Guarda o número que a secretária vai usar nas conversas novas.
+    if (ch.channel_session_id !== cfg.channelId) {
+      await prisma.settings.update({ where: { id: "singleton" }, data: { deskcommChannelId: ch.channel_session_id } });
+    }
+    if (ch.status === "WORKING") return { state: "connected", phone: ch.phone_number };
+    if (!withQr) return { state: "pair" };
+    const r = await client.call<{ status: string; qr_png_base64: string | null }>("crm_get_whatsapp_channel_qr", { channel_session_id: ch.channel_session_id });
+    if (r.status === "WORKING") return { state: "connected", phone: ch.phone_number };
+    return r.qr_png_base64 ? { state: "qr", qr: r.qr_png_base64 } : { state: "waiting" };
   });
 }
 
