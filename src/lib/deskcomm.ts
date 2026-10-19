@@ -19,15 +19,16 @@ export interface DeskcommConfig {
   channelId: string | null;
 }
 
-// Endereco unico do servidor de WhatsApp (DESKCOMM_URL). Quando definido, o cliente
-// nao informa endereco nenhum: so a chave. Mudar de servidor vira trocar uma variavel.
-export function fixedDeskcommUrl(): string | null {
+// Endereço do CRM de WhatsApp: um só para todos os clientes (cada um é uma organização lá),
+// então vem de uma constante; DESKCOMM_URL só existe para trocar de servidor sem mexer no código.
+export const DEFAULT_DESKCOMM_URL = "https://crm.lucasprestes.com";
+export function fixedDeskcommUrl(): string {
   const raw = process.env.DESKCOMM_URL?.trim();
-  return raw ? normalizeDeskcommUrl(raw) : null;
+  return (raw ? normalizeDeskcommUrl(raw) : null) ?? DEFAULT_DESKCOMM_URL;
 }
 
-// Chave de acesso única da instalação (DESKCOMM_TOKEN), posta pelo suporte junto com o
-// endereço. Com as duas definidas, o cliente não digita nada: só lê o QR Code.
+// A chave de acesso de cada cliente fica cifrada no banco dele e é posta em /admin, sem passar
+// pela Vercel. DESKCOMM_TOKEN continua valendo, só como atalho que vence a do banco.
 export function fixedDeskcommToken(): string | null {
   return process.env.DESKCOMM_TOKEN?.trim() || null;
 }
@@ -156,7 +157,7 @@ async function detectChannelId(client: Rpc): Promise<string | null> {
 export async function inspectDeskcomm(cfg: Pick<DeskcommConfig, "url" | "token">): Promise<{ channelId: string | null; missingTools: string[] }> {
   return withClient(cfg, async (client) => {
     const names = new Set(await client.listTools());
-    const needed = ["crm_start_conversation_and_send", "crm_send_whatsapp_message", "crm_list_conversations", "crm_get_conversation_history", "crm_get_conversation"];
+    const needed = ["crm_start_conversation_and_send", "crm_send_whatsapp_message", "crm_list_conversations", "crm_get_conversation_history", "crm_get_conversation", "crm_list_whatsapp_channels", "crm_get_whatsapp_channel_qr"];
     const missingTools = needed.filter((n) => !names.has(n));
     const channelId = missingTools.length ? null : await detectChannelId(client);
     return { channelId, missingTools };

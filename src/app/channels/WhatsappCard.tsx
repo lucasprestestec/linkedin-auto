@@ -4,33 +4,22 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
-import { connectDeskcomm, disconnectDeskcomm, resetWhatsappNumber, updateWhatsappChannel, whatsappPairingState } from "./actions";
+import { resetWhatsappNumber, updateWhatsappChannel, whatsappPairingState } from "./actions";
 
-// WhatsApp pelo Deskcomm. O cliente só escaneia o QR Code; endereço e chave são
-// postos uma vez pelo suporte (variáveis do servidor, ou o formulário dobrado
-// abaixo). Conectado, mostra as regras (liga/desliga e limite diário). A
-// secretária só usa o WhatsApp com quem já deu sinal de interesse.
+// WhatsApp pelo Deskcomm. O cliente só escaneia o QR Code, desconecta ou troca de número; a chave de
+// acesso do CRM é posta uma vez pelo suporte, em /admin. Conectado, mostra as regras (liga/desliga e
+// limite diário). A secretária só usa o WhatsApp com quem já deu sinal de interesse.
 export function WhatsappCard({
   configured,
-  tokenFixed,
-  host,
-  channelId,
   enabled,
   dailyLimit,
   sentToday,
-  fixedAddress,
 }: {
-  // Endereço e chave existem (do servidor ou salvos): dá para falar com o Deskcomm.
+  // A chave do CRM existe (de /admin ou do servidor): dá para falar com o Deskcomm.
   configured: boolean;
-  // A chave vem do servidor (DESKCOMM_TOKEN): o cliente não vê nem troca.
-  tokenFixed: boolean;
-  host: string | null;
-  channelId: string | null;
   enabled: boolean;
   dailyLimit: number;
   sentToday: number;
-  // O servidor tem endereço único: o suporte não precisa informá-lo.
-  fixedAddress: boolean;
 }) {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [rules, setRules] = useState({ enabled, dailyLimit });
@@ -96,7 +85,6 @@ export function WhatsappCard({
         </div>
       )}
 
-      {!tokenFixed && <SupportForm configured={configured} host={host} channelId={channelId} fixedAddress={fixedAddress} />}
     </div>
   );
 }
@@ -306,109 +294,5 @@ function Pairing() {
         </div>
       )}
     </div>
-  );
-}
-
-// Configuração do suporte: endereço e chave digitados à mão. Só aparece quando a
-// chave não vem do servidor.
-function SupportForm({ configured, host, channelId, fixedAddress }: { configured: boolean; host: string | null; channelId: string | null; fixedAddress: boolean }) {
-  const router = useRouter();
-  const [form, setForm] = useState({ url: "", token: "", channelId: "" });
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [pending, start] = useTransition();
-
-  function connect(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
-    start(async () => {
-      const r = await connectDeskcomm(form);
-      if (r.error) return setMessage({ ok: false, text: r.error });
-      setMessage({ ok: true, text: "Chave salva." });
-      setForm({ url: "", token: "", channelId: "" });
-      router.refresh();
-    });
-  }
-
-  return (
-    <details className="fold">
-      <summary>Configuração do suporte</summary>
-      <div className="fold-body">
-        <form className="form" onSubmit={connect}>
-          {!fixedAddress && (
-            <div>
-              <label className="label">
-                Endereço da conexão <Help>Fornecido pelo suporte na hora de configurar o WhatsApp.</Help>
-              </label>
-              <input
-                className="field"
-                inputMode="url"
-                placeholder={host ? "Deixe em branco para manter o atual" : "https://…"}
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-                required={!configured}
-              />
-            </div>
-          )}
-          <div>
-            <label className="label">
-              Chave de acesso <Help>Fornecida pelo suporte na hora de configurar o WhatsApp.</Help>
-            </label>
-            <input
-              className="field"
-              type="password"
-              autoComplete="off"
-              placeholder={configured ? "Deixe em branco para manter a atual" : "Cole a chave"}
-              value={form.token}
-              onChange={(e) => setForm({ ...form, token: e.target.value })}
-              required={!configured}
-            />
-          </div>
-          <div>
-            <label className="label">
-              Identificador do número <Help>Só para o suporte. Normalmente o número é reconhecido sozinho.</Help>
-            </label>
-            <input className="field" placeholder={channelId ?? "Reconhecido sozinho"} value={form.channelId} onChange={(e) => setForm({ ...form, channelId: e.target.value })} />
-          </div>
-          {message && <p className={message.ok ? "ok-text" : "field-error"}>{message.text}</p>}
-          <div className="form-actions">
-            <button type="submit" className="btn-solid" disabled={pending}>
-              {pending ? "Salvando…" : configured ? "Salvar e testar" : "Salvar"}
-            </button>
-            {configured && !confirming && (
-              <button type="button" className="btn-line btn-sm" onClick={() => setConfirming(true)}>
-                Desconectar
-              </button>
-            )}
-          </div>
-          {confirming && (
-            <div className="note stack" style={{ gap: 10 }}>
-              <p>
-                <b>Desconectar o WhatsApp?</b> O assistente para de enviar e ler mensagens por lá.
-              </p>
-              <div className="row" style={{ gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn-line btn-sm btn-danger-line"
-                  disabled={pending}
-                  onClick={() =>
-                    start(async () => {
-                      await disconnectDeskcomm();
-                      setConfirming(false);
-                      router.refresh();
-                    })
-                  }
-                >
-                  {pending ? "Desconectando…" : "Desconectar"}
-                </button>
-                <button type="button" className="btn-text" onClick={() => setConfirming(false)} disabled={pending}>
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
-        </form>
-      </div>
-    </details>
   );
 }

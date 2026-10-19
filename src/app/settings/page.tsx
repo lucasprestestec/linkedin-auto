@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
-import { deskcommConfigOf, fixedDeskcommToken, fixedDeskcommUrl, whatsappLiveStatus } from "@/lib/deskcomm";
+import { deskcommConfigOf, whatsappLiveStatus } from "@/lib/deskcomm";
 import { emailLeftToday } from "@/lib/mailboxes";
 import { pushPublicKey } from "@/lib/push";
 import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
@@ -187,10 +187,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           >
             <WhatsappCard
               configured={whatsapp !== null}
-              tokenFixed={fixedDeskcommToken() !== null}
-              host={whatsapp ? new URL(whatsapp.url).host : null}
-              channelId={settings.deskcommChannelId}
-              fixedAddress={fixedDeskcommUrl() !== null}
               enabled={settings.whatsappChannelEnabled}
               dailyLimit={settings.dailyWhatsappLimit}
               sentToday={whatsappToday}
