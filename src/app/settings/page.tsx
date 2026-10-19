@@ -25,6 +25,7 @@ import { MeetingRemindersForm } from "./MeetingRemindersForm";
 import { TeamForm } from "./TeamForm";
 import { AssistantIdentityForm } from "./AssistantIdentityForm";
 import { WorkHoursForm } from "./WorkHoursForm";
+import { LimitsForm } from "./LimitsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -236,6 +237,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
               notice={noticeLabel({ fromNextBusinessDay: Boolean(settings.assistantName?.trim()) })}
             />
+          </Row>
+          <Row id="limites" title="Limites diários do LinkedIn" summary={`${settings.dailyInviteLimit} convites e ${settings.dailyMessageLimit} mensagens por dia`}>
+            <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} inviteMax={settings.dailyInviteMax} messageMax={settings.dailyMessageMax} />
           </Row>
           <LinkRow href="/assistente/conhecimento" title="Base de conhecimento" sub="Manual, produtos e textos aprovados que o assistente consulta" />
           <Row title="Lembretes da reunião" summary={settings.meetingRemindersEnabled ? "Na véspera, 5h e 1h antes, e aviso se a pessoa faltar" : "Desligados"}>
