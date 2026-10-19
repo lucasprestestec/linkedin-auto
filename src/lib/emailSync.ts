@@ -1,20 +1,19 @@
 import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fetchNewEmails, type IncomingEmail } from "@/lib/email";
+import type { IncomingEmail } from "@/lib/email";
 import { fetchAllMailboxEmails, handleBounceEmail, type MailboxEmail } from "@/lib/mailboxes";
 import { markNeedsHuman } from "@/lib/handoff";
 import { captureContactsSafely } from "@/lib/contactCapture";
 
-// Lê a caixa do corretor e grava, na conversa certa, os e-mails de pessoas que
-// já estão no sistema (casando pelo e-mail da ficha). E-mail de quem não é
-// lead é ignorado: a caixa é pessoal, não uma fila de atendimento.
+// Lê as caixas de envio (nunca a conta Google do corretor) e grava, na conversa certa, os e-mails
+// de pessoas que já estão no sistema (casando pelo e-mail da ficha). E-mail de quem não é lead é ignorado.
 // Devolve os leads que escreveram, pra secretária responder.
 export async function syncEmailInbox(): Promise<{ read: number; saved: number; leads: Lead[] }> {
   const mailboxEmails = await fetchAllMailboxEmails().catch((err) => {
     console.error("Falha ao ler as caixas de envio", err);
     return [] as MailboxEmail[];
   });
-  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...(await fetchNewEmails()), ...mailboxEmails];
+  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...mailboxEmails];
   // E-mail devolvido: trata e tira da fila (não é conversa).
   const emails: typeof all = [];
   for (const e of all) {

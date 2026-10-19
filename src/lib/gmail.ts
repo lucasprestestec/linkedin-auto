@@ -101,7 +101,7 @@ export async function googleAccessToken(): Promise<string> {
     // invalid_grant: o corretor revogou o acesso ou trocou a senha — precisa reconectar.
     if ((err as { code?: string }).code === "invalid_grant") {
       await prisma.settings.update({ where: { id: "singleton" }, data: { googleRefreshToken: null } });
-      throw new Error("A conexão com o Google expirou. Conecte o e-mail de novo em Conta.");
+      throw new Error("A conexão com o Google expirou. Reconecte a Conta Google em Ajustes.");
     }
     throw err;
   }

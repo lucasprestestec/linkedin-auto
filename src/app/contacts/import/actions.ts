@@ -94,7 +94,7 @@ export async function importContacts(input: { text: string; campaignId: string; 
   if (!input.commit) return summary;
 
   if (fresh.length === 0) return { ...summary, error: "Nenhum contato novo para importar." };
-  if (input.firstContact === "EMAIL" && !(await emailEnabled())) return { ...summary, error: "Para o assistente se apresentar por e-mail, conecte o e-mail em Canais ou cadastre caixas de envio." };
+  if (input.firstContact === "EMAIL" && !(await emailEnabled())) return { ...summary, error: "Para o assistente se apresentar por e-mail, é preciso ter uma caixa de envio ativa. Fale com o suporte." };
   if (input.firstContact === "WHATSAPP" && !(await deskcommConfig())) return { ...summary, error: "Para o assistente falar pelo WhatsApp, conecte o WhatsApp em Canais." };
   if (input.campaignId && maxLeads != null) {
     const inCampaign = await prisma.lead.count({ where: { campaignId: input.campaignId } });

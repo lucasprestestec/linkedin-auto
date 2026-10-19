@@ -68,9 +68,10 @@ export async function emailConnection(): Promise<EmailConnection | null> {
   return cfg ? { provider: "password", address: cfg.address, cfg } : null;
 }
 
-// E-mail de prospecção disponível: alguma caixa de envio ativa ou a caixa única conectada.
+// E-mail de prospecção disponível: só com caixa de envio ativa. A conta Google do corretor (agenda e avisos)
+// nunca prospecta: a entrega de um Gmail pessoal sofreria e o risco seria dele.
 export async function emailEnabled(): Promise<boolean> {
-  return (await internalEmailEnabled()) || (await prisma.mailbox.count({ where: { status: "ACTIVE" } })) > 0;
+  return (await prisma.mailbox.count({ where: { status: "ACTIVE" } })) > 0;
 }
 
 // Só a caixa única conectada (Google ou senha de app): os avisos internos (equipe, resumo do dia) saem por ela,

@@ -8,7 +8,7 @@ import { updateDailySummary } from "./actions";
 export function DailySummaryToggle({ enabled, endHour, hasEmail, hasPush }: { enabled: boolean; endHour: number; hasEmail: boolean; hasPush: boolean }) {
   const [value, setValue] = useOptimistic(enabled);
   const [, start] = useTransition();
-  const where = [hasPush && "notificação no celular", hasEmail && "e-mail na sua caixa"].filter(Boolean).join(" e ") || "o painel (ative os avisos no celular ou conecte o e-mail para receber)";
+  const where = [hasPush && "notificação no celular", hasEmail && "e-mail na sua caixa"].filter(Boolean).join(" e ") || "o painel (ative os avisos no celular ou conecte a Conta Google para receber por e-mail)";
 
   return (
     <div className="setting" style={{ padding: 0 }}>
