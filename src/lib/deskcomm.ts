@@ -180,7 +180,10 @@ export async function whatsappPairing(cfg: DeskcommConfig, withQr: boolean): Pro
       throw new DeskcommError("Esta instalação do WhatsApp ainda não conecta por QR Code. Fale com o suporte.");
     }
     const { channels } = await client.call<{ channels: { channel_session_id: string; phone_number: string | null; status: string; has_session: boolean }[] }>("crm_list_whatsapp_channels", {});
-    const ch = channels.find((c) => c.channel_session_id === cfg.channelId) ?? channels.find((c) => c.has_session) ?? channels[0];
+    // Um número que está funcionando ganha de um caído (o cliente pode ter conectado um número novo
+    // e deixado o antigo para trás); entre iguais, vale o que já estava guardado.
+    const saved = channels.find((c) => c.channel_session_id === cfg.channelId);
+    const ch = (saved?.status === "WORKING" ? saved : channels.find((c) => c.status === "WORKING")) ?? saved ?? channels.find((c) => c.has_session) ?? channels[0];
     if (!ch) return { state: "none" };
     // Guarda o número que a secretária vai usar nas conversas novas.
     if (ch.channel_session_id !== cfg.channelId) {
