@@ -7,7 +7,7 @@ import { Stepper } from "@/components/Stepper";
 import { resetWhatsappNumber, updateWhatsappChannel, whatsappPairingState } from "./actions";
 
 // WhatsApp pelo Deskcomm. O cliente só escaneia o QR Code, desconecta ou troca de número; a chave de
-// acesso do CRM é posta uma vez pelo suporte, em /admin. Conectado, mostra as regras (liga/desliga e
+// acesso do CRM é posta uma vez pelo suporte, na central. Conectado, mostra as regras (liga/desliga e
 // limite diário). A secretária só usa o WhatsApp com quem já deu sinal de interesse.
 export function WhatsappCard({
   configured,
@@ -15,7 +15,7 @@ export function WhatsappCard({
   dailyLimit,
   sentToday,
 }: {
-  // A chave do CRM existe (de /admin ou do servidor): dá para falar com o Deskcomm.
+  // A chave do CRM existe (posta pela central ou pelo servidor): dá para falar com o Deskcomm.
   configured: boolean;
   enabled: boolean;
   dailyLimit: number;

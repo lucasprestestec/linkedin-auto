@@ -27,7 +27,7 @@ export function fixedDeskcommUrl(): string {
   return (raw ? normalizeDeskcommUrl(raw) : null) ?? DEFAULT_DESKCOMM_URL;
 }
 
-// A chave de acesso de cada cliente fica cifrada no banco dele e é posta em /admin, sem passar
+// A chave de acesso de cada cliente fica cifrada no banco dele e é posta pela central, sem passar
 // pela Vercel. DESKCOMM_TOKEN continua valendo, só como atalho que vence a do banco.
 export function fixedDeskcommToken(): string | null {
   return process.env.DESKCOMM_TOKEN?.trim() || null;
