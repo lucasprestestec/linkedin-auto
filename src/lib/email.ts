@@ -4,7 +4,7 @@ import type Mail from "nodemailer/lib/mailer";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { prisma } from "@/lib/prisma";
-import { gmailCheck, gmailNewInboxMessages, gmailSend } from "@/lib/gmail";
+import { gmailSend } from "@/lib/gmail";
 import { trackingBase } from "@/lib/trackingUrl";
 
 // E-mail pela caixa do PRÓPRIO corretor. Sem serviço pago: a mensagem sai no
@@ -105,21 +105,6 @@ export function imapClient(cfg: PasswordConfig) {
 }
 
 export const errMessage = (err: unknown) => (err instanceof Error ? err.message : "erro desconhecido");
-
-// Confere a conexão sem enviar nem ler nada. null = funcionando.
-export async function testEmailConnection(): Promise<{ address: string | null; error: string | null }> {
-  const conn = await emailConnection();
-  if (!conn) return { address: null, error: "Nenhum e-mail conectado." };
-  if (conn.provider === "google") {
-    try {
-      await gmailCheck();
-      return { address: conn.address, error: null };
-    } catch (err) {
-      return { address: conn.address, error: errMessage(err) };
-    }
-  }
-  return { address: conn.address, error: await testServers(conn.cfg) };
-}
 
 // Confere envio (SMTP) e leitura (IMAP) de uma caixa com senha, sem enviar nem ler nada. null = funcionando.
 export async function testServers(cfg: PasswordConfig): Promise<string | null> {
@@ -276,48 +261,3 @@ export async function parseRaw(raw: Buffer, threadId: string | null): Promise<In
   };
 }
 
-// Lê só o que chegou desde a última leitura. Na primeira vez, apenas marca
-// onde a caixa está — não processa e-mails antigos.
-export async function fetchNewEmails(): Promise<IncomingEmail[]> {
-  const conn = await emailConnection();
-  if (!conn) return [];
-  if (conn.provider === "google") {
-    const raws = await gmailNewInboxMessages();
-    const out: IncomingEmail[] = [];
-    for (const m of raws) {
-      const e = await parseRaw(m.raw, m.threadId);
-      if (e) out.push(e);
-    }
-    return out;
-  }
-  return fetchImap(conn.cfg);
-}
-
-async function fetchImap(cfg: PasswordConfig): Promise<IncomingEmail[]> {
-  const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { emailLastUid: true, emailUidValidity: true } });
-  const client = imapClient(cfg);
-  await client.connect();
-  const lock = await client.getMailboxLock("INBOX");
-  const emails: IncomingEmail[] = [];
-  let maxUid = 0;
-  try {
-    const box = client.mailbox;
-    if (!box) return [];
-    const validity = String(box.uidValidity);
-    const next = Number(box.uidNext);
-    const firstRun = settings.emailLastUid == null || settings.emailUidValidity !== validity;
-    if (!firstRun && next - 1 > settings.emailLastUid!) {
-      for await (const msg of client.fetch(`${settings.emailLastUid! + 1}:*`, { uid: true, source: true }, { uid: true })) {
-        if (!msg.source || msg.uid <= settings.emailLastUid!) continue;
-        maxUid = Math.max(maxUid, msg.uid);
-        const e = await parseRaw(msg.source, null);
-        if (e) emails.push(e);
-      }
-    }
-    await prisma.settings.update({ where: { id: "singleton" }, data: { emailLastUid: Math.max(0, next - 1, maxUid), emailUidValidity: validity } });
-  } finally {
-    lock.release();
-    await client.logout().catch(() => {});
-  }
-  return emails;
-}

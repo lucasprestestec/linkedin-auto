@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { open, seal } from "@/lib/secretBox";
 
-// "Entrar com Google": o corretor autoriza o sistema a enviar e ler e-mails da
-// conta dele, sem passar senha. Tudo pela API REST do Gmail (grátis).
+// "Entrar com Google": o corretor autoriza o sistema a ver a agenda dele e a enviar os
+// avisos por e-mail (resumo do dia, equipe), sem passar senha. O sistema NÃO lê a caixa de
+// entrada dele: a prospecção sai e volta pelas caixas de envio, nunca pelo Gmail pessoal.
 //
 // Configuração (uma vez, pelo dono do sistema — não pelo cliente):
 //   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET — credenciais OAuth de um projeto no
@@ -10,8 +11,10 @@ import { open, seal } from "@/lib/secretBox";
 //   <APP_URL>/api/email/google/callback autorizado.
 
 const SCOPES = [
+  // Identifica a conta conectada (endereço de e-mail), sem acesso a mais nada.
+  "openid",
+  "email",
   "https://www.googleapis.com/auth/gmail.send",
-  "https://www.googleapis.com/auth/gmail.readonly",
   // Google Agenda: ver os horários livres e criar a reuniao (com link do Meet).
   "https://www.googleapis.com/auth/calendar.events",
 ];
@@ -64,17 +67,25 @@ async function tokenRequest(body: Record<string, string>) {
 export async function connectGoogle(code: string, redirectUri: string): Promise<string> {
   const tokens = await tokenRequest({ code, redirect_uri: redirectUri, grant_type: "authorization_code" });
   if (!tokens.refresh_token) throw new Error("O Google não devolveu a autorização permanente. Tente conectar de novo.");
-  const profile = await gmailFetch<{ emailAddress: string; historyId: string }>("/profile", tokens.access_token!);
+  const profile = await googleUserEmail(tokens.access_token!);
   await prisma.settings.update({
     where: { id: "singleton" },
-    data: { googleEmail: profile.emailAddress.toLowerCase(), googleRefreshToken: seal(tokens.refresh_token),
-      googleHistoryId: profile.historyId,
+    data: { googleEmail: profile.email.toLowerCase(), googleRefreshToken: seal(tokens.refresh_token),
+      googleHistoryId: null,
       // O corretor pode desmarcar a agenda na tela do Google: so vale se o escopo veio.
       googleCalendarEnabled: (tokens.scope ?? "").split(" ").includes(CALENDAR_SCOPE),
     },
   });
   cached = null;
-  return profile.emailAddress;
+  return profile.email;
+}
+
+// Endereço da conta que acabou de entrar (escopos openid e email).
+async function googleUserEmail(accessToken: string): Promise<{ email: string }> {
+  const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { authorization: `Bearer ${accessToken}` } });
+  const json = (await res.json().catch(() => ({}))) as { email?: string };
+  if (!res.ok || !json.email) throw new Error("O Google não informou o e-mail da conta. Tente conectar de novo.");
+  return { email: json.email };
 }
 
 export async function disconnectGoogle() {
@@ -126,63 +137,6 @@ export async function gmailSend(raw: Buffer, threadId?: string | null): Promise<
     method: "POST",
     body: JSON.stringify({ raw: raw.toString("base64url"), ...(threadId ? { threadId } : {}) }),
   });
-  // O Message-ID final (é ele que volta no "In-Reply-To" da resposta do cliente).
-  const meta = await gmailFetch<{ payload?: { headers?: { name: string; value: string }[] } }>(
-    `/messages/${sent.id}?format=metadata&metadataHeaders=Message-ID`,
-  ).catch(() => null);
-  const messageId = meta?.payload?.headers?.find((h) => h.name.toLowerCase() === "message-id")?.value ?? null;
-  return { ...sent, messageId };
-}
-
-// Mensagens que entraram na caixa de entrada desde a última leitura. Na
-// primeira vez (ou se o ponteiro for antigo demais), só marca a posição.
-export async function gmailNewInboxMessages(): Promise<{ id: string; threadId: string; raw: Buffer }[]> {
-  const s = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { googleHistoryId: true } });
-  const markNow = async () => {
-    const p = await gmailFetch<{ historyId: string }>("/profile");
-    await prisma.settings.update({ where: { id: "singleton" }, data: { googleHistoryId: p.historyId } });
-  };
-  if (!s.googleHistoryId) {
-    await markNow();
-    return [];
-  }
-
-  const ids = new Map<string, string>();
-  let pageToken: string | undefined;
-  let latest = s.googleHistoryId;
-  try {
-    do {
-      const q = new URLSearchParams({ startHistoryId: s.googleHistoryId, historyTypes: "messageAdded", labelId: "INBOX", ...(pageToken ? { pageToken } : {}) });
-      const page = await gmailFetch<{ history?: { messagesAdded?: { message: { id: string; threadId: string; labelIds?: string[] } }[] }[]; historyId: string; nextPageToken?: string }>(
-        `/history?${q}`,
-      );
-      for (const h of page.history ?? [])
-        for (const a of h.messagesAdded ?? []) {
-          // Rascunhos e enviados por nós não interessam.
-          if (a.message.labelIds?.includes("SENT") || a.message.labelIds?.includes("DRAFT")) continue;
-          ids.set(a.message.id, a.message.threadId);
-        }
-      latest = page.historyId;
-      pageToken = page.nextPageToken;
-    } while (pageToken);
-  } catch (err) {
-    // 404: histórico expirou (caixa sem leitura por muito tempo) — recomeça daqui.
-    if ((err as { status?: number }).status === 404) {
-      await markNow();
-      return [];
-    }
-    throw err;
-  }
-
-  const out: { id: string; threadId: string; raw: Buffer }[] = [];
-  for (const [id, threadId] of ids) {
-    const m = await gmailFetch<{ raw: string }>(`/messages/${id}?format=raw`);
-    out.push({ id, threadId, raw: Buffer.from(m.raw, "base64url") });
-  }
-  await prisma.settings.update({ where: { id: "singleton" }, data: { googleHistoryId: latest } });
-  return out;
-}
-
-export async function gmailCheck(): Promise<void> {
-  await gmailFetch("/profile");
+  // Sem a permissão de leitura não dá para consultar o Message-ID final: os avisos não precisam dele.
+  return { ...sent, messageId: null };
 }
