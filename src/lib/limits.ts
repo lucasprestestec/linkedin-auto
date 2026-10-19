@@ -1,4 +1,4 @@
-import type { Settings } from "@prisma/client";
+import type { Prisma, PrismaClient, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { startOfDaySP } from "@/lib/mailboxPolicy";
 
@@ -28,8 +28,12 @@ export function effectiveLimits(settings: LimitSettings): DailyLimits {
 // O dia dos limites é o de Brasília (o mesmo do expediente), não o do servidor.
 // Mensagens que saíram da conta hoje (agente + corretor) — base do limite
 // diário de mensagens, que protege a conta do LinkedIn.
-export async function messagesSentToday(): Promise<number> {
-  return prisma.message.count({
+// Dentro de uma transação, passe o cliente dela (db): consultar pelo cliente global pede OUTRA conexão e,
+// com várias transações juntas, esgota o pool do banco.
+export type Db = PrismaClient | Prisma.TransactionClient;
+
+export async function messagesSentToday(db: Db = prisma): Promise<number> {
+  return db.message.count({
     // Só LinkedIn: o limite existe pra proteger a conta de lá. E-mail sai da
     // caixa do próprio corretor e não conta.
     where: { sender: { not: "LEAD" }, channel: "LINKEDIN", createdAt: { gte: startOfDaySP(new Date()) } },
@@ -37,11 +41,11 @@ export async function messagesSentToday(): Promise<number> {
 }
 
 // E-mails que a conta mandou hoje — base do limite diário do canal de e-mail.
-export async function emailsSentToday(): Promise<number> {
-  return prisma.message.count({ where: { sender: { not: "LEAD" }, channel: "EMAIL", createdAt: { gte: startOfDaySP(new Date()) } } });
+export async function emailsSentToday(db: Db = prisma): Promise<number> {
+  return db.message.count({ where: { sender: { not: "LEAD" }, channel: "EMAIL", createdAt: { gte: startOfDaySP(new Date()) } } });
 }
 
 // WhatsApp enviado hoje pela secretária/corretor — base do limite diário do canal.
-export async function whatsappSentToday(): Promise<number> {
-  return prisma.message.count({ where: { sender: { not: "LEAD" }, channel: "WHATSAPP", createdAt: { gte: startOfDaySP(new Date()) } } });
+export async function whatsappSentToday(db: Db = prisma): Promise<number> {
+  return db.message.count({ where: { sender: { not: "LEAD" }, channel: "WHATSAPP", createdAt: { gte: startOfDaySP(new Date()) } } });
 }

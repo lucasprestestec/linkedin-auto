@@ -11,7 +11,7 @@ import { formatSlot } from "@/lib/slots";
 import { sendAudioMessage } from "@/lib/voice/send";
 import { campaignReviewNote } from "@/lib/campaignReview";
 import { notifyTeam } from "@/lib/team";
-import { effectiveLimits, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { effectiveLimits, messagesSentToday, whatsappSentToday, type Db } from "@/lib/limits";
 import { emailLeftToday } from "@/lib/mailboxes";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
@@ -178,14 +178,14 @@ type SendResult = { ok: true } | { ok: false; error: string; deferred?: true };
 // e a aprovação imediata não podem passar do que o canal aguenta. Resposta a quem escreveu não conta
 // em e-mail/WhatsApp (mesma regra de respond.ts); no LinkedIn o limite protege a conta e vale sempre.
 // Conta também o que está sendo enviado agora (SENDING) por outro robô.
-async function overDailyLimit(draft: Draft): Promise<boolean> {
-  const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+async function overDailyLimit(draft: Draft, db: Db): Promise<boolean> {
+  const settings = await db.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   const limits = effectiveLimits(settings);
-  const inFlight = await prisma.draft.count({ where: { status: "SENDING", channel: draft.channel, id: { not: draft.id } } });
-  if (draft.channel === "LINKEDIN") return (await messagesSentToday()) + inFlight >= limits.linkedinMessages;
+  const inFlight = await db.draft.count({ where: { status: "SENDING", channel: draft.channel, id: { not: draft.id } } });
+  if (draft.channel === "LINKEDIN") return (await messagesSentToday(db)) + inFlight >= limits.linkedinMessages;
   if (draft.kind === "REPLY") return false;
-  if (draft.channel === "WHATSAPP") return (await whatsappSentToday()) + inFlight >= limits.whatsapp;
-  return (await emailLeftToday(settings)) - inFlight <= 0;
+  if (draft.channel === "WHATSAPP") return (await whatsappSentToday(db)) + inFlight >= limits.whatsapp;
+  return (await emailLeftToday(settings, new Date(), db)) - inFlight <= 0;
 }
 
 // Confere a vaga do dia e reserva o rascunho (APPROVED -> SENDING) de uma vez, com trava no banco:
@@ -193,7 +193,7 @@ async function overDailyLimit(draft: Draft): Promise<boolean> {
 async function claimForSending(draft: Draft): Promise<"ok" | "taken" | "limit"> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(73001)`;
-    if (await overDailyLimit(draft)) return "limit" as const;
+    if (await overDailyLimit(draft, tx)) return "limit" as const;
     const claimed = await tx.draft.updateMany({ where: { id: draft.id, status: "APPROVED" }, data: { status: "SENDING", decidedAt: new Date() } });
     return claimed.count === 0 ? ("taken" as const) : ("ok" as const);
   });

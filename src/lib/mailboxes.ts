@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { open } from "@/lib/secretBox";
 import { composeMail, errMessage, fromName, imapClient, parseRaw, smtpTransport, type EmailInput, type IncomingEmail, type PasswordConfig, type SentEmail } from "@/lib/email";
 import { chooseMailbox, parseBounce, startOfDaySP, totalRemainingToday } from "@/lib/mailboxPolicy";
-import { effectiveLimits, emailsSentToday, type LimitSettings } from "@/lib/limits";
+import { effectiveLimits, emailsSentToday, type Db, type LimitSettings } from "@/lib/limits";
 
 // Caixas de envio da prospecção: várias, em rodízio, cada uma com limite próprio por dia.
 // Quando não há nenhuma ativa, o e-mail segue pela caixa única de antes (Google ou senha de app).
@@ -22,8 +22,8 @@ export async function hasActiveMailboxes(): Promise<boolean> {
 }
 
 // E-mails que cada caixa mandou hoje (dia de Brasília).
-export async function sentTodayByMailbox(now = new Date()): Promise<Map<string, number>> {
-  const rows = await prisma.message.groupBy({
+export async function sentTodayByMailbox(now = new Date(), db: Db = prisma): Promise<Map<string, number>> {
+  const rows = await db.message.groupBy({
     by: ["mailboxId"],
     where: { channel: "EMAIL", sender: { not: "LEAD" }, mailboxId: { not: null }, createdAt: { gte: startOfDaySP(now) } },
     _count: { _all: true },
@@ -32,12 +32,12 @@ export async function sentTodayByMailbox(now = new Date()): Promise<Map<string, 
 }
 
 // Quantos e-mails novos ainda cabem hoje. Sem caixas de envio, vale o limite da caixa única (Conta).
-export async function emailLeftToday(settings: LimitSettings, now = new Date()): Promise<number> {
-  const active = await prisma.mailbox.findMany({ where: { status: "ACTIVE" } });
-  if (active.length === 0) return Math.max(0, effectiveLimits(settings).email - (await emailsSentToday()));
-  const used = await sentTodayByMailbox(now);
+export async function emailLeftToday(settings: LimitSettings, now = new Date(), db: Db = prisma): Promise<number> {
+  const active = await db.mailbox.findMany({ where: { status: "ACTIVE" } });
+  if (active.length === 0) return Math.max(0, effectiveLimits(settings).email - (await emailsSentToday(db)));
+  const used = await sentTodayByMailbox(now, db);
   // Vale o menor entre o que as caixas aguentam e o limite diário do cliente (que o plano vai definir).
-  const total = effectiveLimits(settings).email - (await emailsSentToday());
+  const total = effectiveLimits(settings).email - (await emailsSentToday(db));
   return Math.max(0, Math.min(totalRemainingToday(active, (id) => used.get(id) ?? 0, now), total));
 }
 
