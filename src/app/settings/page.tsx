@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
-import { fixedDeskcommUrl } from "@/lib/deskcomm";
+import { deskcommConfigOf, fixedDeskcommToken, fixedDeskcommUrl } from "@/lib/deskcomm";
 import { emailLeftToday } from "@/lib/mailboxes";
 import { pushPublicKey } from "@/lib/push";
 import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
@@ -91,7 +91,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   ]);
 
   const emailOn = Boolean(email) || activeBoxes > 0;
-  const whatsappOn = Boolean(settings.deskcommUrl && settings.deskcommChannelId);
+  const whatsapp = deskcommConfigOf(settings);
+  const whatsappOn = Boolean(whatsapp && settings.deskcommChannelId);
   const ok = { label: "Conectado", cls: "tg-ok" };
   const off = { label: "Não conectado", cls: "tg-q" };
 
@@ -175,7 +176,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             tag={whatsappOn ? ok : off}
           >
             <WhatsappCard
-              host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
+              configured={whatsapp !== null}
+              tokenFixed={fixedDeskcommToken() !== null}
+              host={whatsapp ? new URL(whatsapp.url).host : null}
               channelId={settings.deskcommChannelId}
               fixedAddress={fixedDeskcommUrl() !== null}
               enabled={settings.whatsappChannelEnabled}
