@@ -171,7 +171,7 @@ export type WhatsappPairing =
   | { state: "connected"; phone: string | null }
   | { state: "pair" } // precisa escanear, mas ninguém pediu o QR ainda
   | { state: "qr"; qr: string } // imagem PNG em base64
-  | { state: "waiting" }; // sessão subindo / QR sendo gerado: tente de novo em segundos
+  | { state: "waiting"; hint: string | null }; // sessão subindo / QR sendo gerado: tente de novo em segundos
 
 export async function whatsappPairing(cfg: DeskcommConfig, withQr: boolean): Promise<WhatsappPairing> {
   return withClient(cfg, async (client) => {
@@ -188,10 +188,26 @@ export async function whatsappPairing(cfg: DeskcommConfig, withQr: boolean): Pro
     }
     if (ch.status === "WORKING") return { state: "connected", phone: ch.phone_number };
     if (!withQr) return { state: "pair" };
-    const r = await client.call<{ status: string; qr_png_base64: string | null }>("crm_get_whatsapp_channel_qr", { channel_session_id: ch.channel_session_id });
+    const r = await client.call<{ status: string; qr_png_base64: string | null; message?: string }>("crm_get_whatsapp_channel_qr", { channel_session_id: ch.channel_session_id });
     if (r.status === "WORKING") return { state: "connected", phone: ch.phone_number };
-    return r.qr_png_base64 ? { state: "qr", qr: r.qr_png_base64 } : { state: "waiting" };
+    return r.qr_png_base64 ? { state: "qr", qr: r.qr_png_base64 } : { state: "waiting", hint: r.message ?? null };
   });
+}
+
+// Estado real do número para a lista de Ajustes. Tempo curto: a tela não espera o Deskcomm.
+export async function whatsappLiveStatus(cfg: DeskcommConfig): Promise<"connected" | "down" | "unknown"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const r = await Promise.race([
+      whatsappPairing(cfg, false),
+      new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("timeout")), 4000))),
+    ]);
+    return r.state === "connected" ? "connected" : "down";
+  } catch {
+    return "unknown";
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function saveDeskcommConnection(url: string, token: string, channelId: string | null) {
