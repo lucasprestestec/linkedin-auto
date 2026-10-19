@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { adminVisible, isAdmin } from "@/lib/admin";
+import { getSession } from "@/lib/session";
+import { OWNER_LOGINS } from "@/lib/panelUsers";
 import { UserForm } from "./UserForm";
 import { UserActions } from "./UserActions";
 
@@ -11,15 +12,15 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 // Quem entra no painel, cada um com o próprio e-mail e a própria senha.
 export default async function AccessPage() {
-  if (!(await adminVisible())) notFound();
-  if (!(await isAdmin())) redirect("/admin");
-  const users = await prisma.panelUser.findMany({ orderBy: { createdAt: "asc" } });
+  if (!(await getSession())) redirect("/login");
+  // O acesso do suporte não aparece para a equipe do cliente.
+  const users = (await prisma.panelUser.findMany({ orderBy: { createdAt: "asc" } })).filter((u) => !OWNER_LOGINS.includes(u.login));
   const withPassword = users.filter((u) => u.passwordHash).length;
 
   return (
     <main className="page">
-      <Link href="/admin" className="btn-text" style={{ alignSelf: "flex-start" }}>
-        ← Admin
+      <Link href="/settings" className="btn-text" style={{ alignSelf: "flex-start" }}>
+        ← Ajustes
       </Link>
       <header className="p-head">
         <div>

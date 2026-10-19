@@ -5,10 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { adminVisible, isAdmin } from "@/lib/admin";
 import { AdminLogin } from "./AdminLogin";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
-import { AssistantIdentityForm } from "./AssistantIdentityForm";
-import { approxTokens } from "@/lib/knowledge";
 import { LimitsForm } from "./LimitsForm";
-import { WorkHoursForm } from "./WorkHoursForm";
 import { EngagementForm } from "./EngagementForm";
 import { AccountTypeNotice } from "./AccountTypeNotice";
 import { adminLogout } from "./actions";
@@ -43,9 +40,6 @@ export default async function AdminPage() {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const knowledge = await prisma.knowledgeSection.findMany({ where: { mode: { not: "OFF" } }, select: { mode: true, content: true } });
-  const kbAlways = knowledge.filter((k) => k.mode === "ALWAYS").reduce((n, k) => n + k.content.length, 0);
-  const kbCount = await prisma.knowledgeSection.count();
   const mailboxActive = await prisma.mailbox.count({ where: { status: "ACTIVE" } });
   const email = await emailConnection();
   const h = await headers();
@@ -90,14 +84,6 @@ export default async function AdminPage() {
       </section>
 
       <section className="sec">
-        <div className="setting-text">
-          <h2 className="t-label">Identidade da assistente</h2>
-          <small>Com um nome (ex.: Helena), ela se apresenta como ela mesma e nunca como você. Vazio: escreve como o corretor.</small>
-        </div>
-        <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
-      </section>
-
-      <section className="sec">
         <div className="sec-head">
           <div className="setting-text">
             <h2 className="t-label">Caixas de envio (e-mail da prospecção)</h2>
@@ -114,34 +100,6 @@ export default async function AdminPage() {
       </section>
 
       <section className="sec">
-        <div className="sec-head">
-          <div className="setting-text">
-            <h2 className="t-label">Acessos ao painel</h2>
-            <small>Cada pessoa da equipe entra com o próprio login e a própria senha, escolhida por um link de convite.</small>
-          </div>
-          <Link href="/admin/acessos" className="btn-line btn-sm">
-            Abrir
-          </Link>
-        </div>
-      </section>
-
-      <section className="sec">
-        <div className="sec-head">
-          <div className="setting-text">
-            <h2 className="t-label">Base de conhecimento</h2>
-            <small>
-              {kbCount
-                ? `${kbCount} seções · ~${approxTokens(kbAlways).toLocaleString("pt-BR")} tokens em toda mensagem · o resto entra quando o assunto aparece`
-                : "Nenhuma base importada. Importe o manual (.md): fichas de produto, textos aprovados, objeções."}
-            </small>
-          </div>
-          <Link href="/admin/knowledge" className="btn-line btn-sm">
-            {kbCount ? "Abrir" : "Importar"}
-          </Link>
-        </div>
-      </section>
-
-      <section className="sec">
         <div className="setting-text">
           <h2 className="t-label">Agente de IA: instruções gerais</h2>
           <small>Valem para todas as conversas. O texto de cada campanha é somado a estas instruções.</small>
@@ -152,16 +110,6 @@ export default async function AdminPage() {
       <section className="sec">
         <h2 className="t-label">Limites diários</h2>
         <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} />
-      </section>
-
-      <section className="sec">
-        <h2 className="t-label">Horário de trabalho</h2>
-        <WorkHoursForm
-          start={settings.workStartHour}
-          end={settings.workEndHour}
-          weekdaysOnly={settings.workWeekdaysOnly}
-          replyAnytime={settings.replyAnytime}
-        />
       </section>
 
       <section className="sec">

@@ -34,7 +34,12 @@ export function UserActions({ id, active }: { id: string; active: boolean }) {
           className="btn-text"
           disabled={pending}
           onClick={() => {
-            if (!active || window.confirm("Desativar? A pessoa perde o acesso na próxima vez que abrir uma página.")) start(() => setPanelUserActive(id, !active));
+            if (!active || window.confirm("Desativar? A pessoa perde o acesso na próxima vez que abrir uma página.")) {
+              start(async () => {
+                const r = await setPanelUserActive(id, !active);
+                setError(r.error ?? null);
+              });
+            }
           }}
         >
           {active ? "Desativar" : "Reativar"}

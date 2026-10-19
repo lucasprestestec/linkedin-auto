@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/session";
 import { createIdentity, deleteIdentity, extractConnections, getIdentity } from "@/lib/edges";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { sendPush } from "@/lib/push";
@@ -205,4 +206,27 @@ export async function refreshLeadPhotos(): Promise<{ updated?: number; error?: s
   }
   revalidatePath("/", "layout");
   return { updated };
+}
+
+export async function updateWorkHours(_prevState: unknown, formData: FormData) {
+  await requireSession();
+  const workStartHour = Number(formData.get("workStartHour"));
+  const workEndHour = Number(formData.get("workEndHour"));
+  const workWeekdaysOnly = formData.get("workWeekdaysOnly") === "on";
+  const replyAnytime = formData.get("replyAnytime") === "on";
+  if (!Number.isInteger(workStartHour) || !Number.isInteger(workEndHour) || workStartHour < 0 || workEndHour > 24 || workStartHour >= workEndHour) {
+    return { error: "O início precisa ser antes do fim." };
+  }
+  await prisma.settings.update({ where: { id: "singleton" }, data: { workStartHour, workEndHour, workWeekdaysOnly, replyAnytime } });
+  revalidatePath("/settings");
+  return { error: undefined, saved: true };
+}
+
+export async function updateAssistantIdentity(_prevState: unknown, formData: FormData) {
+  await requireSession();
+  const assistantName = String(formData.get("assistantName") ?? "").trim().slice(0, 40);
+  const assistantDiscloseAi = formData.get("assistantDiscloseAi") === "on";
+  await prisma.settings.update({ where: { id: "singleton" }, data: { assistantName: assistantName || null, assistantDiscloseAi } });
+  revalidatePath("/settings");
+  return { saved: true };
 }
