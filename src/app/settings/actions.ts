@@ -230,3 +230,18 @@ export async function updateAssistantIdentity(_prevState: unknown, formData: For
   revalidatePath("/settings");
   return { saved: true };
 }
+
+export async function updateLimits(_prevState: unknown, formData: FormData) {
+  await requireSession();
+  const dailyInviteLimit = Number(formData.get("dailyInviteLimit"));
+  const dailyMessageLimit = Number(formData.get("dailyMessageLimit"));
+  const ceiling = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { dailyInviteMax: true, dailyMessageMax: true } });
+  if (!Number.isInteger(dailyInviteLimit) || !Number.isInteger(dailyMessageLimit) || dailyInviteLimit < 1 || dailyMessageLimit < 1) {
+    return { error: "Valores inválidos." };
+  }
+  if (dailyInviteLimit > ceiling.dailyInviteMax) return { error: `Convites: o máximo é ${ceiling.dailyInviteMax} por dia.` };
+  if (dailyMessageLimit > ceiling.dailyMessageMax) return { error: `Mensagens: o máximo é ${ceiling.dailyMessageMax} por dia.` };
+  await prisma.settings.update({ where: { id: "singleton" }, data: { dailyInviteLimit, dailyMessageLimit } });
+  revalidatePath("/settings");
+  return { error: undefined, saved: true };
+}

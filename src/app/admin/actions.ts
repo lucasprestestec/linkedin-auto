@@ -103,24 +103,6 @@ export async function adminLogout() {
   revalidatePath("/admin");
 }
 
-export async function updateLimits(_prevState: unknown, formData: FormData) {
-  await requireAdmin();
-  const dailyInviteLimit = Number(formData.get("dailyInviteLimit"));
-  const dailyMessageLimit = Number(formData.get("dailyMessageLimit"));
-
-  if (!Number.isFinite(dailyInviteLimit) || !Number.isFinite(dailyMessageLimit) || dailyInviteLimit < 1 || dailyMessageLimit < 1) {
-    return { error: "Valores inválidos." };
-  }
-
-  await prisma.settings.update({
-    where: { id: "singleton" },
-    data: { dailyInviteLimit, dailyMessageLimit },
-  });
-
-  revalidatePath("/admin");
-  return { error: undefined, saved: true };
-}
-
 export async function updateAgentInstructions(_prevState: unknown, formData: FormData) {
   await requireAdmin();
   const agentInstructions = String(formData.get("agentInstructions") ?? "").trim();
