@@ -24,5 +24,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ to
   const leadId = leadIdFromUnsubscribeToken((await params).token);
   if (!leadId) return page("Link inválido", "<p>Este link não é válido.</p>");
   await prisma.lead.updateMany({ where: { id: leadId }, data: { doNotContact: true } });
+  // O que estava esperando para sair também não sai.
+  await prisma.draft.updateMany({
+    where: { leadId, status: { in: ["PENDING", "APPROVED"] } },
+    data: { status: "DISCARDED", decidedAt: new Date(), error: "A pessoa pediu para não receber mais mensagens." },
+  });
   return page("Pronto", "<p>Você não vai mais receber mensagens nossas, por nenhum canal.</p>");
 }

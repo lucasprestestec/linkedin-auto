@@ -32,5 +32,7 @@ export async function inviteLink(id: string): Promise<{ error?: string; link?: s
 export async function setPanelUserActive(id: string, active: boolean) {
   await requireAdmin();
   await prisma.panelUser.update({ where: { id }, data: { active } });
+  // Desativada: o celular dela para de receber avisos com dados de leads.
+  if (!active) await prisma.pushSubscription.deleteMany({ where: { userId: id } });
   revalidatePath("/admin/acessos");
 }

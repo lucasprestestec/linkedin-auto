@@ -136,7 +136,10 @@ export async function gmailSend(raw: Buffer, threadId?: string | null): Promise<
 
 // Mensagens que entraram na caixa de entrada desde a última leitura. Na
 // primeira vez (ou se o ponteiro for antigo demais), só marca a posição.
-export async function gmailNewInboxMessages(): Promise<{ id: string; threadId: string; raw: Buffer }[]> {
+// O ponteiro só avança quando quem chamou terminar de gravar as mensagens (commit): se o banco ou
+// outra leitura falhar no meio, a próxima rodada lê de novo (a gravação ignora o que já existe).
+export async function gmailNewInboxMessages(): Promise<{ messages: { id: string; threadId: string; raw: Buffer }[]; commit: () => Promise<void> }> {
+  const none = { messages: [], commit: async () => {} };
   const s = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { googleHistoryId: true } });
   const markNow = async () => {
     const p = await gmailFetch<{ historyId: string }>("/profile");
@@ -144,7 +147,7 @@ export async function gmailNewInboxMessages(): Promise<{ id: string; threadId: s
   };
   if (!s.googleHistoryId) {
     await markNow();
-    return [];
+    return none;
   }
 
   const ids = new Map<string, string>();
@@ -169,7 +172,7 @@ export async function gmailNewInboxMessages(): Promise<{ id: string; threadId: s
     // 404: histórico expirou (caixa sem leitura por muito tempo) — recomeça daqui.
     if ((err as { status?: number }).status === 404) {
       await markNow();
-      return [];
+      return none;
     }
     throw err;
   }
@@ -179,8 +182,7 @@ export async function gmailNewInboxMessages(): Promise<{ id: string; threadId: s
     const m = await gmailFetch<{ raw: string }>(`/messages/${id}?format=raw`);
     out.push({ id, threadId, raw: Buffer.from(m.raw, "base64url") });
   }
-  await prisma.settings.update({ where: { id: "singleton" }, data: { googleHistoryId: latest } });
-  return out;
+  return { messages: out, commit: async () => void (await prisma.settings.update({ where: { id: "singleton" }, data: { googleHistoryId: latest } })) };
 }
 
 export async function gmailCheck(): Promise<void> {

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
 import { decideResponse } from "@/lib/agent";
-import { messagesSentToday } from "@/lib/limits";
+import { effectiveLimits, messagesSentToday } from "@/lib/limits";
 import { instructionsFor } from "@/lib/campaigns";
 import { isExcluded, parseExclusionList } from "@/lib/exclusion";
 import { deliver, supersedeDrafts } from "@/lib/outbox";
@@ -20,6 +20,10 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
 
   // O lead escreveu: qualquer mensagem que esperava aprovação ficou velha.
   await supersedeDrafts(lead.id);
+
+  // Quem pediu para não receber mais, ou a conversa que o corretor assumiu: a IA não responde.
+  // (O corretor devolve a conversa pelo botão "Devolver ao assistente".)
+  if (lead.doNotContact || lead.status === "NEEDS_HUMAN") return;
 
   // Outra IA (ex.: a Sofia) está com essa pessoa: a secretária não entra em nenhum canal.
   if (lead.otherAiActive) {
@@ -63,7 +67,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   }
 
   // O limite diário protege a conta do LinkedIn; e-mail não conta.
-  if (channel === "LINKEDIN" && (await messagesSentToday()) >= settings.dailyMessageLimit) {
+  if (channel === "LINKEDIN" && (await messagesSentToday()) >= effectiveLimits(settings).linkedinMessages) {
     await markNeedsHuman(lead.id, "Limite diário de mensagens atingido");
     return;
   }
@@ -95,7 +99,7 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     // Fica nos logs da Vercel: por que o agente fez o que fez.
     console.log(
       `[agente] lead=${lead.id} canal=${channel} modelo=${decision.model} ação=${decision.action} tentativas=${decision.attempts} ` +
-        `tokens=${decision.usage.inputTokens}/${decision.usage.outputTokens} análise=${JSON.stringify(decision.analysis)}`,
+        `tokens=${decision.usage.inputTokens}/${decision.usage.outputTokens} análise=(${JSON.stringify(decision.analysis).length} caracteres, não gravada nos logs)`,
     );
   } catch (err) {
     await markNeedsHuman(lead.id, `Falha no agente de IA: ${err instanceof Error ? err.message : "erro desconhecido"}`);

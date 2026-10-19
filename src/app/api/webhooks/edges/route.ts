@@ -72,6 +72,9 @@ async function handleConnectCallback(payload: {
   const profileUrl = payload.input?.linkedin_profile_url;
   if (!profileUrl) return;
 
+  // O retorno chegou (deu certo ou não): a vaga reservada no pedido sai da conta pendente.
+  await prisma.inviteScheduled.deleteMany({ where: { profileUrl: { in: [profileUrl, normalizeLinkedinUrl(profileUrl) ?? profileUrl] } } });
+
   if (payload.run.status !== "SUCCEEDED") {
     // Convite não confirmado (limite, já conectado, perfil inacessível, etc.) — não
     // cria lead. O corretor não vê um lead "morto" na lista; pode colar o mesmo

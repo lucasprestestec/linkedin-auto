@@ -16,6 +16,7 @@ import { requireSession } from "@/lib/session";
 import { sendNoShow } from "@/lib/meetingReminders";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
+  await requireSession();
   const content = String(formData.get("content") ?? "").trim();
   if (!content) return { error: "Escreva uma mensagem." };
 
@@ -49,6 +50,7 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
 // ---------------------------------------------------------------------------
 
 export async function updateLeadNotes(leadId: string, notes: string) {
+  await requireSession();
   await prisma.lead.update({ where: { id: leadId }, data: { notes: notes.trim() || null } });
   revalidatePath(`/leads/${leadId}`);
   return { saved: true };
@@ -56,6 +58,7 @@ export async function updateLeadNotes(leadId: string, notes: string) {
 
 // Etiquetas: minúsculas, sem espaço sobrando, sem repetir, até 10 por lead.
 export async function updateLeadTags(leadId: string, tags: string[]) {
+  await requireSession();
   const clean = [...new Set(tags.map((t) => t.trim().toLowerCase().slice(0, 30)).filter(Boolean))].slice(0, 10);
   await prisma.lead.update({ where: { id: leadId }, data: { tags: clean } });
   revalidatePath(`/leads/${leadId}`);
@@ -64,6 +67,7 @@ export async function updateLeadTags(leadId: string, tags: string[]) {
 }
 
 export async function updateLeadCampaign(leadId: string, campaignId: string | null) {
+  await requireSession();
   await prisma.lead.update({ where: { id: leadId }, data: { campaignId } });
   revalidatePath(`/leads/${leadId}`);
   return { saved: true };
@@ -71,6 +75,7 @@ export async function updateLeadCampaign(leadId: string, campaignId: string | nu
 
 // Responsável pelo contato (quem da equipe atende). Vazio = ninguém em particular.
 export async function updateLeadAssignee(leadId: string, assigneeId: string | null) {
+  await requireSession();
   const member = assigneeId ? await prisma.teamMember.findUnique({ where: { id: assigneeId }, select: { id: true } }) : null;
   await prisma.lead.update({ where: { id: leadId }, data: { assigneeId: member?.id ?? null } });
   revalidatePath(`/leads/${leadId}`);
@@ -84,6 +89,7 @@ export async function updateLeadAssignee(leadId: string, assigneeId: string | nu
 export type LeadActionKind = "qualify" | "takeover" | "handback" | "lost";
 
 export async function leadAction(leadId: string, kind: LeadActionKind) {
+  await requireSession();
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
   if (kind === "qualify") {
     await prisma.lead.update({ where: { id: leadId }, data: { status: "QUALIFIED", needsHumanReason: null } });
@@ -108,6 +114,7 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
 // campo "datetime-local" (sem fuso), que tratamos como horário de Brasília.
 // Depois disso o assistente não escreve mais nesta conversa.
 export async function markMeeting(leadId: string, when: string | null) {
+  await requireSession();
   let meetingAt: Date | null = null;
   if (when) {
     // Formato exato do campo (AAAA-MM-DDTHH:MM): o parser de datas do JS aceita lixo demais.
@@ -144,6 +151,7 @@ export async function markHandoffFeedback(leadId: string, reasons: string[], not
 }
 
 export async function summarizeLead(leadId: string): Promise<{ text?: string; error?: string }> {
+  await requireSession();
   try {
     const lead = await leadWithHistory(leadId);
     if (lead.messages.length === 0) return { error: "Ainda não há mensagens pra resumir." };
@@ -154,6 +162,7 @@ export async function summarizeLead(leadId: string): Promise<{ text?: string; er
 }
 
 export async function suggestLeadReply(leadId: string, channel: MessageChannel = "LINKEDIN"): Promise<{ text?: string; error?: string }> {
+  await requireSession();
   try {
     const lead = await leadWithHistory(leadId);
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
@@ -165,6 +174,7 @@ export async function suggestLeadReply(leadId: string, channel: MessageChannel =
 
 // Regra de follow-up só desta conversa (null = volta pra da campanha/conta).
 export async function updateLeadFollowUp(leadId: string, value: { count: number; days: number } | null) {
+  await requireSession();
   if (value && !validFollowUp(value.count, value.days * 24)) return { error: "Valores fora do permitido." };
   await prisma.lead.update({
     where: { id: leadId },
@@ -177,6 +187,7 @@ export async function updateLeadFollowUp(leadId: string, value: { count: number;
 // Ficha pessoal: canais (e-mail, WhatsApp) e o que o corretor sabe da pessoa.
 // O assistente usa isso pra escolher o canal e personalizar as mensagens.
 export async function updateLeadProfile(leadId: string, data: { email: string; phone: string; personal: string; kind: string; referredBy: string }) {
+  await requireSession();
   const e = parseEmail(data.email);
   if ("error" in e) return { error: e.error };
   const p = parsePhone(data.phone);
@@ -198,6 +209,7 @@ export async function updateLeadProfile(leadId: string, data: { email: string; p
 // Abordagem: "em conversa com outra IA" (a secretária não entra) e "não quer
 // mais contato" (nada automático sai mais pra essa pessoa).
 export async function setLeadOutreach(leadId: string, field: "otherAiActive" | "doNotContact", value: boolean) {
+  await requireSession();
   if (field !== "otherAiActive" && field !== "doNotContact") return;
   await prisma.lead.update({ where: { id: leadId }, data: { [field]: value } });
   revalidatePath(`/leads/${leadId}`);

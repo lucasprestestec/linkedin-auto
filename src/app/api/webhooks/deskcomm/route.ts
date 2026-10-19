@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   after(async () => {
     try {
       const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-      const canReplyNow = settings.automationPaused || isWithinWorkHours(settings);
+      const canReplyNow = settings.automationPaused || settings.replyAnytime || isWithinWorkHours(settings);
       const identityId = await activeIdentityIdOrNull();
       for (let attempt = 0; attempt <= MEDIA_RETRIES; attempt++) {
         const r = await syncWhatsapp(conversationId);

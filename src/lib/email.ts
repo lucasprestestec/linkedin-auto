@@ -277,22 +277,23 @@ export async function parseRaw(raw: Buffer, threadId: string | null): Promise<In
 
 // Lê só o que chegou desde a última leitura. Na primeira vez, apenas marca
 // onde a caixa está — não processa e-mails antigos.
-export async function fetchNewEmails(): Promise<IncomingEmail[]> {
+// commit() avança o marcador de leitura: chame só depois de gravar os e-mails.
+export async function fetchNewEmails(): Promise<{ emails: IncomingEmail[]; commit: () => Promise<void> }> {
   const conn = await emailConnection();
-  if (!conn) return [];
+  if (!conn) return { emails: [], commit: async () => {} };
   if (conn.provider === "google") {
-    const raws = await gmailNewInboxMessages();
+    const { messages, commit } = await gmailNewInboxMessages();
     const out: IncomingEmail[] = [];
-    for (const m of raws) {
+    for (const m of messages) {
       const e = await parseRaw(m.raw, m.threadId);
       if (e) out.push(e);
     }
-    return out;
+    return { emails: out, commit };
   }
   return fetchImap(conn.cfg);
 }
 
-async function fetchImap(cfg: PasswordConfig): Promise<IncomingEmail[]> {
+async function fetchImap(cfg: PasswordConfig): Promise<{ emails: IncomingEmail[]; commit: () => Promise<void> }> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { emailLastUid: true, emailUidValidity: true } });
   const client = imapClient(cfg);
   await client.connect();
@@ -301,7 +302,7 @@ async function fetchImap(cfg: PasswordConfig): Promise<IncomingEmail[]> {
   let maxUid = 0;
   try {
     const box = client.mailbox;
-    if (!box) return [];
+    if (!box) return { emails: [], commit: async () => {} };
     const validity = String(box.uidValidity);
     const next = Number(box.uidNext);
     const firstRun = settings.emailLastUid == null || settings.emailUidValidity !== validity;
@@ -313,10 +314,10 @@ async function fetchImap(cfg: PasswordConfig): Promise<IncomingEmail[]> {
         if (e) emails.push(e);
       }
     }
-    await prisma.settings.update({ where: { id: "singleton" }, data: { emailLastUid: Math.max(0, next - 1, maxUid), emailUidValidity: validity } });
+    const commit = async () => void (await prisma.settings.update({ where: { id: "singleton" }, data: { emailLastUid: Math.max(0, next - 1, maxUid), emailUidValidity: validity } }));
+    return { emails, commit };
   } finally {
     lock.release();
     await client.logout().catch(() => {});
   }
-  return emails;
 }

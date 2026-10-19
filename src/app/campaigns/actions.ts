@@ -1,5 +1,6 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +28,7 @@ export interface FoundResult extends FoundPerson {
 export type SearchState = { ok: true; people: FoundResult[]; hasMore: boolean; left: number } | { ok: false; error: string };
 
 export async function searchPeople(filters: PeopleSearchFilters, page: number): Promise<SearchState> {
+  await requireSession();
   try {
     const { people, hasMore, left } = await searchPeopleOnGoogle(filters, Math.max(0, Math.min(9, Math.floor(page))));
 
@@ -68,6 +70,7 @@ export async function searchPeople(filters: PeopleSearchFilters, page: number): 
 }
 
 export async function inviteFound(people: FoundResult[], campaignId?: string): Promise<InviteState> {
+  await requireSession();
   try {
     const valid = [];
     for (const p of people) {
@@ -92,6 +95,7 @@ export async function inviteFound(people: FoundResult[], campaignId?: string): P
 export type ParseState = { results: ProspectResult[]; parseId: number; error?: string } | undefined;
 
 export async function parseProfiles(_prevState: ParseState, formData: FormData): Promise<ParseState> {
+  await requireSession();
   const raw = String(formData.get("urls") ?? "");
   const parseId = Date.now();
 
@@ -109,6 +113,7 @@ export async function parseProfiles(_prevState: ParseState, formData: FormData):
 export type InviteState = { scheduled: number; skippedForLimit: number; error?: string } | undefined;
 
 export async function invite(candidates: ProspectResult[], campaignId?: string): Promise<InviteState> {
+  await requireSession();
   try {
     const result = await inviteProspects(
       candidates.filter((c) => !c.alreadyLead && !c.excluded).map((c) => ({ linkedinProfileUrl: c.linkedinProfileUrl, campaignId })),
@@ -123,6 +128,7 @@ export async function invite(candidates: ProspectResult[], campaignId?: string):
 export type WarmState = (WarmResult & { ok: true }) | { ok: false; error: string };
 
 export async function loadWarmSuggestions(): Promise<WarmState> {
+  await requireSession();
   try {
     return { ok: true, ...(await findWarmSuggestions()) };
   } catch (err) {
@@ -131,6 +137,7 @@ export async function loadWarmSuggestions(): Promise<WarmState> {
 }
 
 export async function inviteWarm(candidates: WarmSuggestion[], campaignId?: string): Promise<InviteState> {
+  await requireSession();
   try {
     // A lista vem do navegador: normaliza de novo e descarta quem virou lead
     // entre a busca e o clique.
@@ -178,6 +185,7 @@ function readCampaign(formData: FormData) {
 }
 
 export async function createCampaign(_prev: CampaignFormState, formData: FormData): Promise<CampaignFormState> {
+  await requireSession();
   const data = readCampaign(formData);
   if (!data.name) return { error: "Dê um nome à campanha." };
   const campaign = await prisma.campaign.create({ data });
@@ -186,6 +194,7 @@ export async function createCampaign(_prev: CampaignFormState, formData: FormDat
 }
 
 export async function updateCampaign(id: string, _prev: CampaignFormState, formData: FormData): Promise<CampaignFormState> {
+  await requireSession();
   const data = readCampaign(formData);
   if (!data.name) return { error: "Dê um nome à campanha." };
   await prisma.campaign.update({ where: { id }, data });
@@ -194,6 +203,7 @@ export async function updateCampaign(id: string, _prev: CampaignFormState, formD
 }
 
 export async function setCampaignStatus(id: string, status: "ACTIVE" | "PAUSED" | "FINISHED") {
+  await requireSession();
   if (!["ACTIVE", "PAUSED", "FINISHED"].includes(status)) throw new Error("Status inválido.");
   await prisma.campaign.update({ where: { id }, data: { status } });
   revalidatePath("/", "layout");
@@ -201,6 +211,7 @@ export async function setCampaignStatus(id: string, status: "ACTIVE" | "PAUSED" 
 
 // As pessoas da campanha continuam em Conversas, só ficam sem campanha.
 export async function deleteCampaign(id: string) {
+  await requireSession();
   await prisma.campaign.delete({ where: { id } });
   revalidatePath("/", "layout");
   redirect("/campaigns");

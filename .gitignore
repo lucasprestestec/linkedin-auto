@@ -11,3 +11,6 @@ tsconfig.tsbuildinfo
 
 # grafo de conhecimento gerado pelo graphify
 graphify-out/
+
+entrega/
+docs/security-audit/

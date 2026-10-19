@@ -1,5 +1,6 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommUrl, saveDeskcommConnection } from "@/lib/deskcomm";
@@ -7,6 +8,7 @@ import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommU
 // Regras do canal de e-mail (tela Canais). null em fallbackDays = o assistente
 // nunca se apresenta por e-mail quando o convite fica parado.
 export async function updateEmailChannel(input: { enabled: boolean; dailyLimit: number; fallbackDays: number | null }) {
+  await requireSession();
   const dailyLimit = Math.round(input.dailyLimit);
   const fallbackDays = input.fallbackDays == null ? null : Math.round(input.fallbackDays);
   if (!Number.isFinite(dailyLimit) || dailyLimit < 1 || dailyLimit > 100) return { error: "Limite diário fora do permitido (1 a 100)." };
@@ -29,6 +31,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Confere endereço + token no Deskcomm e grava. O canal (número) é descoberto
 // por uma conversa existente, ou informado à mão.
 export async function connectDeskcomm(input: { url: string; token: string; channelId?: string }) {
+  await requireSession();
   const current = await currentConfig();
   // Com o endereço fixo do servidor (DESKCOMM_URL), o cliente informa só a chave.
   const url = fixedDeskcommUrl() ?? (input.url.trim() ? normalizeDeskcommUrl(input.url) : (current?.url ?? null));
@@ -56,12 +59,14 @@ async function currentConfig() {
 }
 
 export async function disconnectDeskcomm() {
+  await requireSession();
   await prisma.settings.update({ where: { id: "singleton" }, data: { deskcommUrl: null, deskcommToken: null, deskcommChannelId: null } });
   revalidatePath("/channels");
   revalidatePath("/settings");
 }
 
 export async function updateWhatsappChannel(input: { enabled: boolean; dailyLimit: number }) {
+  await requireSession();
   const dailyLimit = Math.round(input.dailyLimit);
   if (!Number.isFinite(dailyLimit) || dailyLimit < 1 || dailyLimit > 60) return { error: "Limite diário fora do permitido (1 a 60)." };
   await prisma.settings.update({ where: { id: "singleton" }, data: { whatsappChannelEnabled: input.enabled, dailyWhatsappLimit: dailyLimit } });

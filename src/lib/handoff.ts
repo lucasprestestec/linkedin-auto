@@ -9,7 +9,7 @@ import { notifyTeam } from "@/lib/team";
 // urgent: sinistro, reclamação, jurídico, cancelamento — a equipe marcada pra urgências também é avisada.
 export async function markNeedsHuman(leadId: string, rawReason: string, opts: { silent?: boolean; urgent?: boolean } = {}) {
   const reason = readableReason(rawReason);
-  if (reason !== rawReason.trim()) console.error(`[handoff] lead=${leadId} motivo completo:`, rawReason);
+  if (reason !== rawReason.trim()) console.error(`[handoff] lead=${leadId} motivo longo encurtado (${rawReason.length} caracteres)`);
   const lead = await prisma.lead.update({
     where: { id: leadId },
     data: { status: "NEEDS_HUMAN", needsHumanReason: reason },

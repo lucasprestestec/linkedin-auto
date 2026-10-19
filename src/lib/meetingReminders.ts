@@ -1,4 +1,5 @@
 import type { Lead, MessageChannel, Settings } from "@prisma/client";
+import { effectiveLimits, messagesSentToday } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 import { sendOnChannel } from "@/lib/channels";
 import { fillTemplate } from "@/lib/cadence";
@@ -95,7 +96,7 @@ export async function sendMeetingReminders(identityId: string | null, settings: 
   if (!settings.meetingRemindersEnabled) return 0;
   const texts = reminderTexts(settings);
   const leads = await prisma.lead.findMany({
-    where: { status: "MEETING_SCHEDULED", meetingAt: { gt: new Date() }, otherAiActive: false },
+    where: { status: "MEETING_SCHEDULED", meetingAt: { gt: new Date() }, otherAiActive: false, doNotContact: false },
     include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, channel: true, deliveredAt: true } } },
   });
   let sent = 0;
@@ -107,6 +108,8 @@ export async function sendMeetingReminders(identityId: string | null, settings: 
     if (send) {
       const channel = conversationChannel(lead.messages);
       if (!channel) continue;
+      // O limite diário protege a conta do LinkedIn: sem vaga, tenta de novo na próxima rodada.
+      if (channel === "LINKEDIN" && (await messagesSentToday()) >= effectiveLimits(settings).linkedinMessages) continue;
       try {
         await sendOnChannel(lead, channel, renderReminder(texts[send], lead, settings.ownerName), { identityId });
         resolved.push(send);

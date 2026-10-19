@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { open } from "@/lib/secretBox";
 import { composeMail, errMessage, fromName, imapClient, parseRaw, smtpTransport, type EmailInput, type IncomingEmail, type PasswordConfig, type SentEmail } from "@/lib/email";
 import { chooseMailbox, parseBounce, startOfDaySP, totalRemainingToday } from "@/lib/mailboxPolicy";
-import { emailsSentToday } from "@/lib/limits";
+import { effectiveLimits, emailsSentToday } from "@/lib/limits";
 
 // Caixas de envio da prospecção: várias, em rodízio, cada uma com limite próprio por dia.
 // Quando não há nenhuma ativa, o e-mail segue pela caixa única de antes (Google ou senha de app).
@@ -32,9 +32,9 @@ export async function sentTodayByMailbox(now = new Date()): Promise<Map<string, 
 }
 
 // Quantos e-mails novos ainda cabem hoje. Sem caixas de envio, vale o limite da caixa única (Conta).
-export async function emailLeftToday(settings: Pick<Settings, "dailyEmailLimit">, now = new Date()): Promise<number> {
+export async function emailLeftToday(settings: Pick<Settings, "dailyInviteLimit" | "dailyMessageLimit" | "dailyEmailLimit" | "dailyWhatsappLimit">, now = new Date()): Promise<number> {
   const active = await prisma.mailbox.findMany({ where: { status: "ACTIVE" } });
-  if (active.length === 0) return Math.max(0, settings.dailyEmailLimit - (await emailsSentToday()));
+  if (active.length === 0) return Math.max(0, effectiveLimits(settings).email - (await emailsSentToday()));
   const used = await sentTodayByMailbox(now);
   return totalRemainingToday(active, (id) => used.get(id) ?? 0, now);
 }
@@ -82,7 +82,8 @@ export async function imapBaseline(cfg: PasswordConfig): Promise<{ imapLastUid: 
 export type MailboxEmail = IncomingEmail & { mailbox: { id: string; address: string } };
 
 // Lê só o que chegou desde a última leitura. Na primeira vez, apenas marca onde a caixa está.
-async function fetchMailbox(mb: Mailbox): Promise<MailboxEmail[]> {
+// O marcador de leitura só avança em commit(), depois de gravar os e-mails.
+async function fetchMailbox(mb: Mailbox): Promise<{ emails: MailboxEmail[]; commit: () => Promise<void> }> {
   const client = imapClient(mailboxConfig(mb));
   await client.connect();
   const lock = await client.getMailboxLock("INBOX");
@@ -90,7 +91,7 @@ async function fetchMailbox(mb: Mailbox): Promise<MailboxEmail[]> {
   let maxUid = 0;
   try {
     const box = client.mailbox;
-    if (!box) return [];
+    if (!box) return { emails: [], commit: async () => {} };
     const validity = String(box.uidValidity);
     const next = Number(box.uidNext);
     const firstRun = mb.imapLastUid == null || mb.imapUidValidity !== validity;
@@ -102,28 +103,31 @@ async function fetchMailbox(mb: Mailbox): Promise<MailboxEmail[]> {
         if (e) out.push({ ...e, mailbox: { id: mb.id, address: mb.address } });
       }
     }
-    await prisma.mailbox.update({ where: { id: mb.id }, data: { imapLastUid: Math.max(0, next - 1, maxUid), imapUidValidity: validity } });
+    const commit = async () => void (await prisma.mailbox.update({ where: { id: mb.id }, data: { imapLastUid: Math.max(0, next - 1, maxUid), imapUidValidity: validity } }));
+    return { emails: out, commit };
   } finally {
     lock.release();
     await client.logout().catch(() => {});
   }
-  return out;
 }
 
 // Lê as caixas de entrada de todas as caixas de envio (menos as aposentadas). Uma caixa com problema
 // não atrapalha as outras: o erro fica guardado nela e aparece na tela.
-export async function fetchAllMailboxEmails(): Promise<MailboxEmail[]> {
+export async function fetchAllMailboxEmails(): Promise<{ emails: MailboxEmail[]; commit: () => Promise<void> }> {
   const boxes = await prisma.mailbox.findMany({ where: { status: { not: "RETIRED" } } });
   const out: MailboxEmail[] = [];
+  const commits: (() => Promise<void>)[] = [];
   for (const mb of boxes) {
     try {
-      out.push(...(await fetchMailbox(mb)));
+      const r = await fetchMailbox(mb);
+      out.push(...r.emails);
+      commits.push(r.commit);
       await prisma.mailbox.update({ where: { id: mb.id }, data: { lastCheckedAt: new Date(), lastError: null } });
     } catch (err) {
       await prisma.mailbox.update({ where: { id: mb.id }, data: { lastCheckedAt: new Date(), lastError: errMessage(err).slice(0, 300), lastErrorAt: new Date() } });
     }
   }
-  return out;
+  return { emails: out, commit: async () => { for (const c of commits) await c(); } };
 }
 
 // Aviso de e-mail devolvido que chegou numa caixa de envio: se for definitivo, a pessoa não recebe mais

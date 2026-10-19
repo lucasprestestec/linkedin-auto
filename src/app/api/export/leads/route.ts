@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 import { LEAD_KIND_LABEL } from "@/lib/leadKind";
 import { STATUS_LABEL } from "@/lib/status";
 
@@ -17,6 +18,8 @@ function date(d: Date | null | undefined): string {
 
 // ?ids=a,b,c exporta só os leads selecionados na tabela.
 export async function GET(request: Request) {
+  // O proxy só confere a assinatura do cookie; aqui confere no banco (pessoa desativada não exporta).
+  if (!(await getSession())) return new Response("Não autorizado", { status: 401 });
   const ids = new URL(request.url).searchParams.get("ids")?.split(",").filter(Boolean);
   const leads = await prisma.lead.findMany({
     where: ids?.length ? { id: { in: ids } } : undefined,

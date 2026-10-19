@@ -4,6 +4,8 @@ import { getActiveIdentityId } from "@/lib/identity";
 import { linkedinProfileSlug, normalizeLinkedinUrl } from "@/lib/linkedin";
 import { isExcluded, loadExclusionRules } from "@/lib/exclusion";
 import { warmUpProfiles } from "@/lib/engagement";
+import { effectiveLimits } from "@/lib/limits";
+import { startOfDaySP } from "@/lib/mailboxPolicy";
 
 // Descoberta fria fica fora da edges.run: buscar perfil novo custa crédito lá
 // (e o piso pago, US$110/mês, não fecha conta pro volume de um corretor só).
@@ -41,14 +43,15 @@ export async function parsePastedProfiles(raw: string): Promise<ProspectResult[]
 
 export async function remainingDailyInviteQuota(): Promise<number> {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = startOfDaySP(new Date());
   // Conta pelo momento do convite, não pelo status: com a detecção de aceite,
   // um convite de hoje pode já ter virado WAITING_REPLY e não pode liberar vaga.
-  const invitedToday = await prisma.lead.count({
-    where: { invitedAt: { gte: startOfDay } },
-  });
-  return settings.dailyInviteLimit - invitedToday;
+  // Convite pedido hoje e ainda sem retorno da edges.run também ocupa vaga.
+  const [invitedToday, pendingToday] = await Promise.all([
+    prisma.lead.count({ where: { invitedAt: { gte: startOfDay } } }),
+    prisma.inviteScheduled.count({ where: { createdAt: { gte: startOfDay } } }),
+  ]);
+  return effectiveLimits(settings).invites - invitedToday - pendingToday;
 }
 
 // Convite sem nota, em modo async — a edges.run espaça/limita as chamadas por
@@ -69,9 +72,10 @@ export async function inviteProspects(
   const campaignIds = [...new Set(candidates.map((c) => c.campaignId).filter((id): id is string => Boolean(id)))];
   for (const id of campaignIds) {
     const campaign = await prisma.campaign.findUnique({ where: { id }, select: { status: true, maxLeads: true, _count: { select: { leads: true } } } });
+    const pendingInCampaign = await prisma.inviteScheduled.count({ where: { campaignId: id } });
     if (!campaign || campaign.status !== "ACTIVE") throw new Error("Essa campanha está pausada ou finalizada. Reative-a para convidar pessoas.");
     if (campaign.maxLeads != null) {
-      let room = Math.max(0, campaign.maxLeads - campaign._count.leads);
+      let room = Math.max(0, campaign.maxLeads - campaign._count.leads - pendingInCampaign);
       if (room === 0) throw new Error(`A campanha já chegou ao limite de ${campaign.maxLeads} pessoas.`);
       candidates = candidates.filter((c) => c.campaignId !== id || room-- > 0);
     }
@@ -97,18 +101,30 @@ export async function inviteProspects(
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { warmupEnabled: true } });
   if (settings.warmupEnabled) await warmUpProfiles(identityId, toInvite.map((c) => c.linkedinProfileUrl));
 
-  await scheduleConnectionInvites(
-    identityId,
-    // Nome e cargo voltam no callback (custom_data) e viram o lead já identificado.
-    toInvite.map((c) => ({
-      linkedin_profile_url: c.linkedinProfileUrl,
-      full_name: c.fullName,
-      job_title: c.jobTitle,
-      icp_score: c.icpScore,
-      campaign_id: c.campaignId,
-    })),
-    `${appUrl}/api/webhooks/edges`,
-  );
+  // Reserva as vagas antes de pedir: outro lote que chegue agora já enxerga o que está a caminho.
+  await prisma.inviteScheduled.createMany({
+    data: toInvite.map((c) => ({ profileUrl: normalizeLinkedinUrl(c.linkedinProfileUrl) ?? c.linkedinProfileUrl, campaignId: c.campaignId ?? null })),
+    skipDuplicates: true,
+  });
+
+  try {
+    await scheduleConnectionInvites(
+      identityId,
+      // Nome e cargo voltam no callback (custom_data) e viram o lead já identificado.
+      toInvite.map((c) => ({
+        linkedin_profile_url: c.linkedinProfileUrl,
+        full_name: c.fullName,
+        job_title: c.jobTitle,
+        icp_score: c.icpScore,
+        campaign_id: c.campaignId,
+      })),
+      `${appUrl}/api/webhooks/edges`,
+    );
+  } catch (err) {
+    // Não saiu nada: devolve as vagas reservadas.
+    await prisma.inviteScheduled.deleteMany({ where: { profileUrl: { in: toInvite.map((c) => normalizeLinkedinUrl(c.linkedinProfileUrl) ?? c.linkedinProfileUrl) } } });
+    throw err;
+  }
 
   return { scheduled: toInvite.length, skippedForLimit };
 }

@@ -11,6 +11,8 @@ import { formatSlot } from "@/lib/slots";
 import { sendAudioMessage } from "@/lib/voice/send";
 import { campaignReviewNote } from "@/lib/campaignReview";
 import { notifyTeam } from "@/lib/team";
+import { effectiveLimits, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { emailLeftToday } from "@/lib/mailboxes";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
 // aprovação ligada (Settings.approvalMode) a mensagem vira um rascunho pro
@@ -167,7 +169,20 @@ export async function expireDrafts(): Promise<number> {
   return r.count;
 }
 
-type SendResult = { ok: true } | { ok: false; error: string };
+// deferred: não saiu porque o limite do dia acabou; continua aprovada e sai quando houver vaga.
+type SendResult = { ok: true } | { ok: false; error: string; deferred?: true };
+
+// O limite diário vale no momento de ENVIAR (não só quando o texto foi escrito): a fila de aprovados
+// e a aprovação imediata não podem passar do que o canal aguenta. Resposta a quem escreveu não conta
+// em e-mail/WhatsApp (mesma regra de respond.ts); no LinkedIn o limite protege a conta e vale sempre.
+async function overDailyLimit(draft: Draft): Promise<boolean> {
+  const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const limits = effectiveLimits(settings);
+  if (draft.channel === "LINKEDIN") return (await messagesSentToday()) >= limits.linkedinMessages;
+  if (draft.kind === "REPLY") return false;
+  if (draft.channel === "WHATSAPP") return (await whatsappSentToday()) >= limits.whatsapp;
+  return (await emailLeftToday(settings)) <= 0;
+}
 
 // Envia um rascunho já aprovado e aplica o que muda no lead.
 async function sendApproved(draft: Draft): Promise<SendResult> {
@@ -176,6 +191,24 @@ async function sendApproved(draft: Draft): Promise<SendResult> {
     await prisma.draft.update({ where: { id: draft.id }, data: { status: "FAILED", error: "Lead não existe mais." } });
     return { ok: false, error: "Lead não existe mais." };
   }
+
+  // Quem se descadastrou não recebe mais nada, nem o que já estava aprovado.
+  if (lead.doNotContact) {
+    const error = "A pessoa pediu para não receber mais mensagens.";
+    await prisma.draft.update({ where: { id: draft.id }, data: { status: "DISCARDED", error, decidedAt: new Date() } });
+    return { ok: false, error };
+  }
+
+  // Sem vaga no dia: fica aprovada (não vira erro) e sai quando houver.
+  if (await overDailyLimit(draft)) return { ok: false, error: "Limite diário atingido: sai quando houver vaga.", deferred: true };
+
+  // Reserva o rascunho: dois robôs rodando juntos não mandam a mesma mensagem duas vezes.
+  // (a reserva troca decidedAt; quem chegar com o valor antigo não consegue reservar)
+  const claimed = await prisma.draft.updateMany({
+    where: { id: draft.id, status: "APPROVED", decidedAt: draft.decidedAt },
+    data: { decidedAt: new Date() },
+  });
+  if (claimed.count === 0) return { ok: false, error: "Essa mensagem já está sendo enviada." };
 
   // O lead escreveu depois de a mensagem ser escrita: ela responderia a uma conversa que andou.
   const replied = await prisma.message.count({ where: { leadId: lead.id, sender: "LEAD", deliveredAt: { gt: draft.createdAt } } });
@@ -234,6 +267,7 @@ export async function approveDraft(id: string, editedContent?: string): Promise<
 
   const approved = await prisma.draft.findUniqueOrThrow({ where: { id } });
   const result = await sendApproved(approved);
+  if (!result.ok && result.deferred) return { status: "waiting" };
   return result.ok ? { status: "sent" } : { error: result.error };
 }
 

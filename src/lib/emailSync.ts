@@ -10,11 +10,21 @@ import { captureContactsSafely } from "@/lib/contactCapture";
 // lead é ignorado: a caixa é pessoal, não uma fila de atendimento.
 // Devolve os leads que escreveram, pra secretária responder.
 export async function syncEmailInbox(): Promise<{ read: number; saved: number; leads: Lead[] }> {
-  const mailboxEmails = await fetchAllMailboxEmails().catch((err) => {
+  const noMailbox = { emails: [] as MailboxEmail[], commit: async () => {} };
+  const mailboxes = await fetchAllMailboxEmails().catch((err) => {
     console.error("Falha ao ler as caixas de envio", err);
-    return [] as MailboxEmail[];
+    return noMailbox;
   });
-  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...(await fetchNewEmails()), ...mailboxEmails];
+  const main = await fetchNewEmails();
+  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...main.emails, ...mailboxes.emails];
+  // Os marcadores de leitura só avançam depois de gravar tudo (ver gmail.ts): falha no meio = lê de novo.
+  const result = await saveEmails(all);
+  await main.commit();
+  await mailboxes.commit();
+  return result;
+}
+
+async function saveEmails(all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[]): Promise<{ read: number; saved: number; leads: Lead[] }> {
   // E-mail devolvido: trata e tira da fila (não é conversa).
   const emails: typeof all = [];
   for (const e of all) {

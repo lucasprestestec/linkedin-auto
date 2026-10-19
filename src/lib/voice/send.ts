@@ -42,15 +42,22 @@ export async function sendAudioMessage(lead: Lead, text: string, opts: { draftId
     // Mesmo áudio pra mesma pessoa no mesmo minuto = não reenvia (retry).
     idempotencyKey: `la-audio-${lead.id}-${createHash("sha256").update(token).digest("hex").slice(0, 16)}-${Math.floor(Date.now() / 60000)}`,
   });
-  return prisma.message.create({
-    data: {
-      leadId: lead.id,
-      sender: opts.sender ?? "AGENT",
-      channel: "WHATSAPP",
-      content: text,
-      mediaKind: "audio",
-      whatsappMessageId: r.messageId,
-      deliveredAt: r.sentAt,
-    },
-  });
+  // O áudio já saiu: falha ao gravar aqui NÃO pode virar erro (quem chama mandaria o texto também, e a
+  // pessoa receberia a mesma resposta duas vezes). A leitura do WhatsApp grava a mensagem depois, pelo id.
+  try {
+    return await prisma.message.create({
+      data: {
+        leadId: lead.id,
+        sender: opts.sender ?? "AGENT",
+        channel: "WHATSAPP",
+        content: text,
+        mediaKind: "audio",
+        whatsappMessageId: r.messageId,
+        deliveredAt: r.sentAt,
+      },
+    });
+  } catch (err) {
+    console.error(`[voz] áudio enviado, mas não consegui gravar (lead=${lead.id}):`, err instanceof Error ? err.message : err);
+    return null;
+  }
 }

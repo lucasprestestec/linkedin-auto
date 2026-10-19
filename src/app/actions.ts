@@ -1,5 +1,6 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -7,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { COOKIE_NAME } from "@/lib/auth";
 
 export async function toggleAutomation(): Promise<{ error?: string }> {
+  await requireSession();
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
   // Ligar exige o nome: é com ele que o assistente se apresenta aos leads.
   if (settings.automationPaused && !settings.ownerName?.trim()) {
