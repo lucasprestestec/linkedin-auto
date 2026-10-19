@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/session";
+import { OWNER_LOGINS } from "@/lib/panelUsers";
 
 // Área de administração (configurações técnicas: IA, limites, horários...).
 // Só existe onde ADMIN_PASSWORD estiver definido — sem a variável, /admin dá
@@ -13,7 +14,6 @@ import { getSession } from "@/lib/session";
 // nova, só a senha única do painel), quem entra é o próprio instalador: vale como dono.
 
 export const ADMIN_COOKIE = "admin_session";
-const OWNER_LOGINS = ["lucas"];
 
 export function adminEnabled(): boolean {
   return Boolean(process.env.ADMIN_PASSWORD);

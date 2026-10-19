@@ -23,6 +23,8 @@ import { DailySummaryToggle } from "./DailySummaryToggle";
 import { CalendarForm } from "./CalendarForm";
 import { MeetingRemindersForm } from "./MeetingRemindersForm";
 import { TeamForm } from "./TeamForm";
+import { AssistantIdentityForm } from "./AssistantIdentityForm";
+import { WorkHoursForm } from "./WorkHoursForm";
 
 export const dynamic = "force-dynamic";
 
@@ -204,6 +206,19 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <OwnerNameForm value={settings.ownerName ?? ""} />
           </Row>
           <Row
+            title="Nome da assistente"
+            summary={settings.assistantName?.trim() ? `Ela se apresenta como ${settings.assistantName.trim()}` : "Sem nome: o assistente escreve como você"}
+          >
+            <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
+          </Row>
+          <Row
+            id="horario"
+            title="Horário de trabalho"
+            summary={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}${settings.replyAnytime ? " · responde a qualquer hora" : ""}`}
+          >
+            <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} replyAnytime={settings.replyAnytime} />
+          </Row>
+          <Row
             id="agenda"
             title="Agenda de reuniões"
             summary={
@@ -222,6 +237,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               notice={noticeLabel({ fromNextBusinessDay: Boolean(settings.assistantName?.trim()) })}
             />
           </Row>
+          <LinkRow href="/assistente/conhecimento" title="Base de conhecimento" sub="Manual, produtos e textos aprovados que o assistente consulta" />
           <Row title="Lembretes da reunião" summary={settings.meetingRemindersEnabled ? "Na véspera, 5h e 1h antes, e aviso se a pessoa faltar" : "Desligados"}>
             <MeetingRemindersForm
               enabled={settings.meetingRemindersEnabled}
@@ -257,6 +273,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               }))}
             />
           </Row>
+          <LinkRow href="/settings/acessos" title="Acessos ao painel" sub="Quem da equipe entra, cada um com login e senha próprios" />
           <Row title="Resumo do dia" summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}>
             <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
           </Row>

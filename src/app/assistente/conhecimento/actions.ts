@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { KnowledgeMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/admin";
+import { requireSession } from "@/lib/session";
 import { parseKnowledgeMarkdown, pickSections, replaceKnowledge } from "@/lib/knowledge";
 
 const MODES: KnowledgeMode[] = ["ALWAYS", "ON_DEMAND", "OFF"];
@@ -13,7 +13,7 @@ export type ImportState = { error?: string; imported?: number } | undefined;
 
 // Importa um markdown (arquivo ou texto colado) e SUBSTITUI a base inteira.
 export async function importKnowledge(_prev: ImportState, formData: FormData): Promise<ImportState> {
-  await requireAdmin();
+  await requireSession();
   const file = formData.get("file");
   let markdown = String(formData.get("markdown") ?? "");
   if (file instanceof File && file.size > 0) markdown = await file.text();
@@ -24,44 +24,40 @@ export async function importKnowledge(_prev: ImportState, formData: FormData): P
   const sections = parseKnowledgeMarkdown(markdown);
   if (sections.length === 0) return { error: "Não encontrei conteúdo no arquivo." };
   await replaceKnowledge(sections);
-  revalidatePath("/admin/knowledge");
-  revalidatePath("/admin");
+  revalidatePath("/assistente/conhecimento");
   return { imported: sections.length };
 }
 
 export async function setSectionMode(id: string, mode: KnowledgeMode) {
-  await requireAdmin();
+  await requireSession();
   if (!MODES.includes(mode)) return;
   await prisma.knowledgeSection.update({ where: { id }, data: { mode } });
-  revalidatePath("/admin/knowledge");
-  revalidatePath("/admin");
+  revalidatePath("/assistente/conhecimento");
 }
 
 export async function updateSection(id: string, title: string, content: string): Promise<{ error?: string }> {
-  await requireAdmin();
+  await requireSession();
   if (!title.trim() || !content.trim()) return { error: "Título e texto não podem ficar vazios." };
   await prisma.knowledgeSection.update({ where: { id }, data: { title: title.trim().slice(0, 300), content: content.trim() } });
-  revalidatePath("/admin/knowledge");
+  revalidatePath("/assistente/conhecimento");
   return {};
 }
 
 export async function deleteSection(id: string) {
-  await requireAdmin();
+  await requireSession();
   await prisma.knowledgeSection.delete({ where: { id } });
-  revalidatePath("/admin/knowledge");
-  revalidatePath("/admin");
+  revalidatePath("/assistente/conhecimento");
 }
 
 export async function clearKnowledge() {
-  await requireAdmin();
+  await requireSession();
   await prisma.knowledgeSection.deleteMany({});
-  revalidatePath("/admin/knowledge");
-  revalidatePath("/admin");
+  revalidatePath("/assistente/conhecimento");
 }
 
 // Simula a escolha: dada uma mensagem de lead, quais seções entrariam.
 export async function testPick(leadMessage: string): Promise<{ titles?: string[]; error?: string }> {
-  await requireAdmin();
+  await requireSession();
   const text = leadMessage.trim();
   if (!text) return { error: "Escreva uma mensagem de exemplo." };
   const candidates = await prisma.knowledgeSection.findMany({ where: { mode: "ON_DEMAND" }, orderBy: { position: "asc" } });

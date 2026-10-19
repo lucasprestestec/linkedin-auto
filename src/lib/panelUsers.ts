@@ -5,6 +5,9 @@ import { signWith } from "@/lib/auth";
 
 export const MIN_PASSWORD = 10;
 
+// Logins do suporte (o dono do sistema): a equipe do cliente não vê nem altera estes acessos.
+export const OWNER_LOGINS = ["lucas"];
+
 // "Maria Eduarda" -> "maria.eduarda": minúsculas, sem acento, sem espaço. Vale no cadastro e no login.
 export function normalizeLogin(raw: string): string {
   return raw
