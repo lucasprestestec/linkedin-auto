@@ -107,6 +107,9 @@ function Pairing() {
   const router = useRouter();
   const [st, setSt] = useState<Awaited<ReturnType<typeof whatsappPairingState>> | null>(null);
   const [asking, setAsking] = useState(false);
+  // slow: o QR passa de ~1 minuto sem sair; gaveUp: parou de tentar (4 minutos).
+  const [slow, setSlow] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
   const tries = useRef(0);
 
   const check = useCallback(async (withQr: boolean) => {
@@ -138,9 +141,11 @@ function Pairing() {
         return;
       }
       if (r.state === "error" || ++tries.current > 60) {
+        setGaveUp(r.state !== "error");
         setAsking(false);
         return;
       }
+      if (tries.current > 15) setSlow(true);
       timer = setTimeout(tick, 4000);
     };
     void tick();
@@ -203,18 +208,32 @@ function Pairing() {
           <small>Leia o QR Code com o celular que vai usar o WhatsApp do assistente.</small>
         </div>
         {!asking && (
-          <button type="button" className="btn-solid btn-sm" onClick={() => setAsking(true)}>
+          <button
+            type="button"
+            className="btn-solid btn-sm"
+            onClick={() => {
+              setSlow(false);
+              setGaveUp(false);
+              setAsking(true);
+            }}
+          >
             Conectar com QR Code
           </button>
         )}
       </div>
+      {gaveUp && !asking && (
+        <p className="field-error">O QR Code não saiu. O servidor de WhatsApp pode estar com problema: avise o suporte e tente de novo depois.</p>
+      )}
       {asking && (
         <div className="note stack" style={{ gap: 10, alignItems: "flex-start" }}>
           {st.state === "qr" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`data:image/png;base64,${st.qr}`} alt="QR Code para conectar o WhatsApp" width={220} height={220} style={{ background: "#fff", padding: 12, borderRadius: 8 }} />
           ) : (
-            <p>Gerando o QR Code… aguarde alguns segundos.</p>
+            <>
+              <p>Gerando o QR Code… aguarde alguns segundos.</p>
+              {slow && <p>Está demorando mais que o normal. Se não sair, o servidor de WhatsApp pode estar com problema: avise o suporte.</p>}
+            </>
           )}
           <p>
             No celular: <b>WhatsApp → Aparelhos conectados → Conectar um aparelho</b> e aponte para o código. O QR Code se renova sozinho.

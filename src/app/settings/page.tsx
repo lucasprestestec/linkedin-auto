@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
-import { deskcommConfigOf, fixedDeskcommToken, fixedDeskcommUrl } from "@/lib/deskcomm";
+import { deskcommConfigOf, fixedDeskcommToken, fixedDeskcommUrl, whatsappLiveStatus } from "@/lib/deskcomm";
 import { emailLeftToday } from "@/lib/mailboxes";
 import { pushPublicKey } from "@/lib/push";
 import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
@@ -77,7 +77,8 @@ function LinkRow({ href, download, title, sub }: { href: string; download?: bool
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const emailResult = (await searchParams).email;
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [email, team, status, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, boxProblems, emailLeft] = await Promise.all([
+  const whatsapp = deskcommConfigOf(settings);
+  const [email, team, status, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, boxProblems, emailLeft, whatsappLive] = await Promise.all([
     emailConnection(),
     prisma.teamMember.findMany({ orderBy: { createdAt: "asc" } }),
     linkedinStatus(settings),
@@ -88,11 +89,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     prisma.mailbox.count({ where: { status: "ACTIVE" } }),
     prisma.mailbox.count({ where: { status: "ACTIVE", lastError: { not: null } } }),
     emailLeftToday(settings),
+    whatsapp ? whatsappLiveStatus(whatsapp) : null,
   ]);
 
   const emailOn = Boolean(email) || activeBoxes > 0;
-  const whatsapp = deskcommConfigOf(settings);
-  const whatsappOn = Boolean(whatsapp && settings.deskcommChannelId);
+  // O número está pareado de verdade (o Deskcomm diz WORKING), não só configurado.
+  const whatsappOn = whatsappLive === "connected";
   const ok = { label: "Conectado", cls: "tg-ok" };
   const off = { label: "Não conectado", cls: "tg-q" };
 
@@ -172,8 +174,16 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             id="whatsapp"
             channel="WHATSAPP"
             title="WhatsApp"
-            summary={whatsappOn ? `${settings.whatsappChannelEnabled ? "Em uso" : "Conectado, mas desligado"} · hoje ${whatsappToday} de ${settings.dailyWhatsappLimit}` : "Conversas e áudios pelo WhatsApp"}
-            tag={whatsappOn ? ok : off}
+            summary={
+              whatsappOn
+                ? `${settings.whatsappChannelEnabled ? "Em uso" : "Conectado, mas desligado"} · hoje ${whatsappToday} de ${settings.dailyWhatsappLimit}`
+                : whatsappLive === "down"
+                  ? "Número desconectado: nenhuma mensagem entra nem sai. Leia o QR Code para voltar"
+                  : whatsappLive === "unknown"
+                    ? "Não consegui falar com o WhatsApp agora. Abra para tentar de novo"
+                    : "Conversas e áudios pelo WhatsApp"
+            }
+            tag={whatsappOn ? ok : whatsappLive === "down" ? { label: "Caiu", cls: "tg-stop" } : whatsappLive === "unknown" ? { label: "Sem resposta", cls: "tg-q" } : off}
           >
             <WhatsappCard
               configured={whatsapp !== null}
