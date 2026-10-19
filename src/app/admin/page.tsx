@@ -15,6 +15,8 @@ import { adminLogout } from "./actions";
 import { AgentEval } from "./eval/AgentEval";
 import { EmailStatus } from "./EmailStatus";
 import { RunRobotButton } from "./RunRobotButton";
+import { WhatsappKeyForm } from "./WhatsappKeyForm";
+import { deskcommConfigOf, fixedDeskcommToken } from "@/lib/deskcomm";
 import { emailConnection } from "@/lib/email";
 import { googleConfigured, googleRedirectUri } from "@/lib/gmail";
 import { headers } from "next/headers";
@@ -77,6 +79,14 @@ export default async function AdminPage() {
           <small>Roda situações difíceis de conversa em cada modelo e mostra quem decide melhor, escreve mais natural e erra menos.</small>
         </div>
         <AgentEval />
+      </section>
+
+      <section className="sec">
+        <div className="setting-text">
+          <h2 className="t-label">WhatsApp: chave do CRM</h2>
+          <small>Crie a chave na organização deste cliente no CRM (Configurações › API Tokens, com mcp:read, mcp:write e role:manager). Aqui ela é testada e guardada cifrada, sem passar pela Vercel.</small>
+        </div>
+        <WhatsappKeyForm hasKey={deskcommConfigOf(settings) !== null} fromServer={fixedDeskcommToken() !== null} />
       </section>
 
       <section className="sec">

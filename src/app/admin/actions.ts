@@ -5,6 +5,34 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_COOKIE, adminEnabled, checkAdminPassword, createAdminToken, requireAdmin } from "@/lib/admin";
 import { testEmailConnection } from "@/lib/email";
+import { fixedDeskcommUrl, inspectDeskcomm, saveDeskcommConnection } from "@/lib/deskcomm";
+
+// Chave de acesso do CRM deste cliente (a do WhatsApp). Fica cifrada no banco dele: não passa pela Vercel.
+// A chave vem da organização do cliente no CRM, com permissão de leitura, escrita e papel de gerente.
+export async function saveWhatsappKey(_prev: { error?: string; saved?: boolean } | undefined, formData: FormData) {
+  await requireAdmin();
+  const token = String(formData.get("token") ?? "").trim();
+  if (!token) return { error: "Cole a chave." };
+  const url = fixedDeskcommUrl();
+  try {
+    const found = await inspectDeskcomm({ url, token });
+    if (found.missingTools.length) return { error: "A chave não tem todas as permissões. Ela precisa de leitura, escrita e papel de gerente (mcp:read, mcp:write, role:manager)." };
+    const current = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { deskcommChannelId: true } });
+    await saveDeskcommConnection(url, token, found.channelId ?? current.deskcommChannelId);
+    revalidatePath("/admin");
+    revalidatePath("/settings");
+    return { saved: true };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível testar a chave." };
+  }
+}
+
+export async function removeWhatsappKey() {
+  await requireAdmin();
+  await prisma.settings.update({ where: { id: "singleton" }, data: { deskcommUrl: null, deskcommToken: null, deskcommChannelId: null } });
+  revalidatePath("/admin");
+  revalidatePath("/settings");
+}
 
 export async function adminLogin(_prev: { error?: string } | undefined, formData: FormData) {
   if (!adminEnabled()) return { error: "Admin desativado." };
