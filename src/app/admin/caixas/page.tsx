@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { MailboxStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { adminEnabled, isAdmin } from "@/lib/admin";
+import { adminVisible, isAdmin } from "@/lib/admin";
 import { Help } from "@/components/Help";
 import { effectiveLimit } from "@/lib/mailboxPolicy";
 import { sentTodayByMailbox } from "@/lib/mailboxes";
@@ -19,7 +19,7 @@ const dateBR = (d: Date) => d.toLocaleString("pt-BR", { day: "2-digit", month: "
 
 // Caixas de envio da prospecção: o sistema gira entre elas e respeita o limite de cada uma por dia.
 export default async function MailboxesPage() {
-  if (!adminEnabled()) notFound();
+  if (!(await adminVisible())) notFound();
   if (!(await isAdmin())) redirect("/admin");
   const now = new Date();
   const [boxes, today, sentRows, replyRows] = await Promise.all([

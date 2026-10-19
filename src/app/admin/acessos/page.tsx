@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { adminEnabled, isAdmin } from "@/lib/admin";
+import { adminVisible, isAdmin } from "@/lib/admin";
 import { UserForm } from "./UserForm";
 import { UserActions } from "./UserActions";
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 // Quem entra no painel, cada um com o próprio e-mail e a própria senha.
 export default async function AccessPage() {
-  if (!adminEnabled()) notFound();
+  if (!(await adminVisible())) notFound();
   if (!(await isAdmin())) redirect("/admin");
   const users = await prisma.panelUser.findMany({ orderBy: { createdAt: "asc" } });
   const withPassword = users.filter((u) => u.passwordHash).length;

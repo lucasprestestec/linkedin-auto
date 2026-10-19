@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { adminEnabled, isAdmin } from "@/lib/admin";
+import { adminVisible, isAdmin } from "@/lib/admin";
 import { approxTokens } from "@/lib/knowledge";
 import { KnowledgeImport } from "./KnowledgeImport";
 import { KnowledgeList } from "./KnowledgeList";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function KnowledgePage() {
-  if (!adminEnabled()) notFound();
+  if (!(await adminVisible())) notFound();
   if (!(await isAdmin())) redirect("/admin");
 
   const sections = await prisma.knowledgeSection.findMany({ orderBy: { position: "asc" } });
