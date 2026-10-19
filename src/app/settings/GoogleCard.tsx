@@ -4,24 +4,26 @@ import { useState, useTransition } from "react";
 import { disconnectEmail } from "./actions";
 
 const RESULT: Record<string, { ok: boolean; text: string }> = {
-  conectado: { ok: true, text: "E-mail conectado." },
+  conectado: { ok: true, text: "Conta Google conectada." },
   cancelado: { ok: false, text: "Conexão cancelada no Google." },
   expirou: { ok: false, text: "A tela do Google demorou demais. Tente de novo." },
   falhou: { ok: false, text: "Não foi possível conectar. Tente de novo; se persistir, fale com o suporte." },
   "nao-configurado": { ok: false, text: "O login com Google ainda não foi ativado no sistema. Fale com o suporte." },
 };
 
-// E-mail é uma camada extra: o LinkedIn continua sendo o principal. Conectar é
-// um clique no Google, sem senha, e dá pra revogar quando quiser.
-export function EmailCard({
+// Conta Google do corretor: serve à agenda (reuniões marcadas sozinhas) e aos avisos por e-mail (resumo do dia e
+// equipe). NÃO é usada para prospectar: o envio de e-mail da prospecção sai pelas caixas de envio, em outra linha.
+export function GoogleCard({
   googleAddress,
   expired,
-  fallbackAddress,
+  calendarEnabled,
+  configured,
   result,
 }: {
   googleAddress: string | null;
   expired: boolean;
-  fallbackAddress: string | null;
+  calendarEnabled: boolean;
+  configured: boolean;
   result: string | null;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -30,24 +32,16 @@ export function EmailCard({
   const connected = Boolean(googleAddress) && !expired;
 
   return (
-    <div id="email" className="stack" aria-label="E-mail" style={{ scrollMarginTop: 90 }}>
+    <div id="google" className="stack" aria-label="Conta Google" style={{ scrollMarginTop: 90 }}>
       <div className="setting" style={{ padding: 0 }}>
         <div className="setting-text">
-          <b>
-            {connected
-              ? `Conectado · ${googleAddress}`
-              : fallbackAddress
-                ? `Conectado pelo suporte · ${fallbackAddress}`
-                : expired
-                  ? "Precisa reconectar"
-                  : "Não conectado"}
-          </b>
+          <b>{connected ? `Conectada · ${googleAddress}` : expired ? "Precisa reconectar" : "Não conectada"}</b>
           <small>
-            {connected || fallbackAddress
-              ? "O assistente envia e lê e-mails por esta conta."
+            {connected
+              ? "Usada para a agenda de reuniões e para os avisos por e-mail (resumo do dia e equipe). Não é usada para prospectar."
               : expired
                 ? "O Google pediu para confirmar o acesso de novo."
-                : "Você entra pelo Google, sem passar senha."}
+                : "Você entra pelo Google, sem passar senha. Serve para a agenda de reuniões e para os avisos por e-mail."}
           </small>
         </div>
         {googleAddress && !confirming && (
@@ -59,19 +53,33 @@ export function EmailCard({
 
       {feedback && <p className={feedback.ok ? "ok-text" : "field-error"}>{feedback.text}</p>}
 
-      {!connected && (
-        <div>
-          <a href="/api/email/google/start" className="btn-solid">
-            {expired ? "Reconectar com Google" : "Conectar com Google"}
-          </a>
-          <p className="hint">Se o Google avisar que o app não foi verificado, toque em Avançado e depois em Continuar.</p>
+      {connected && !calendarEnabled && (
+        <div className="note stack" style={{ gap: 8, alignItems: "flex-start" }}>
+          <p>A conta está conectada, mas sem a permissão da agenda: o assistente não consegue marcar reuniões. Reconecte e marque a permissão de agenda.</p>
+          {configured && (
+            <a href="/api/email/google/start" className="btn-solid btn-sm">
+              Reconectar o Google
+            </a>
+          )}
         </div>
       )}
+
+      {!connected &&
+        (configured ? (
+          <div>
+            <a href="/api/email/google/start" className="btn-solid">
+              {expired ? "Reconectar com Google" : "Conectar com Google"}
+            </a>
+            <p className="hint">Entre com a conta em que você mantém a sua agenda. Se o Google avisar que o app não foi verificado, toque em Avançado e depois em Continuar.</p>
+          </div>
+        ) : (
+          <p className="hint">O login do Google ainda não foi ativado neste sistema. Fale com o suporte.</p>
+        ))}
 
       {googleAddress && confirming && (
         <div className="note stack" style={{ gap: 10 }}>
           <p>
-            <b>Desconectar o e-mail?</b> O assistente para de enviar e ler e-mails. As conversas continuam aqui.
+            <b>Desconectar a conta Google?</b> O assistente deixa de ver seus horários e de marcar reuniões, e os avisos por e-mail param. As conversas continuam aqui.
           </p>
           <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn-line btn-sm btn-danger-line" disabled={pending} onClick={() => start(() => disconnectEmail())}>

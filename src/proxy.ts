@@ -15,6 +15,8 @@ export function proxy(request: NextRequest) {
   // cookie de sessão: cada uma confere o próprio segredo.
   if (
     pathname.startsWith("/api/cron/") ||
+    // Operações da central do dono (segredo próprio no cabeçalho): sem cookie de sessão.
+    pathname.startsWith("/api/ops/") ||
     pathname.startsWith("/api/webhooks/") ||
     // Imagem de abertura dos e-mails: carregada pelo app de e-mail do cliente.
     pathname.startsWith("/api/o/") ||

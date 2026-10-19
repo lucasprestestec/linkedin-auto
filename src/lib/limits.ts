@@ -13,10 +13,13 @@ export interface DailyLimits {
   whatsapp: number;
 }
 
-export function effectiveLimits(settings: Pick<Settings, "dailyInviteLimit" | "dailyMessageLimit" | "dailyEmailLimit" | "dailyWhatsappLimit">): DailyLimits {
+export type LimitSettings = Pick<Settings, "dailyInviteLimit" | "dailyMessageLimit" | "dailyEmailLimit" | "dailyWhatsappLimit" | "dailyInviteMax" | "dailyMessageMax">;
+
+export function effectiveLimits(settings: LimitSettings): DailyLimits {
   return {
-    invites: settings.dailyInviteLimit,
-    linkedinMessages: settings.dailyMessageLimit,
+    // O teto (definido pelo dono) vale também na hora de enviar, não só ao salvar a tela de Ajustes.
+    invites: Math.min(settings.dailyInviteLimit, settings.dailyInviteMax),
+    linkedinMessages: Math.min(settings.dailyMessageLimit, settings.dailyMessageMax),
     email: settings.dailyEmailLimit,
     whatsapp: settings.dailyWhatsappLimit,
   };

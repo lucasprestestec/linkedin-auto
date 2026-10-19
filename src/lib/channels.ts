@@ -2,7 +2,6 @@ import { createHash, randomBytes } from "crypto";
 import type { Lead, MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendMessage } from "@/lib/edges";
-import { sendEmail } from "@/lib/email";
 import { pickMailboxFor, sendViaMailbox } from "@/lib/mailboxes";
 import { unsubscribeUrl } from "@/lib/unsubscribe";
 import { sendWhatsapp, WhatsappNotSentError } from "@/lib/deskcomm";
@@ -54,12 +53,13 @@ export async function sendOnChannel(
     // Código único da imagem invisível: quando ela carrega, o e-mail foi aberto.
     const openToken = simple ? null : randomBytes(18).toString("base64url");
     const input = { to: lead.email, subject, text: content, inReplyTo: thread.inReplyTo, references: thread.references, threadId: thread.threadId, openToken, unsubscribeUrl: unsubscribeUrl(lead.id), simple };
-    // Com caixas de envio ativas, sai por uma delas (a mesma da conversa, se já houver); senão, pela caixa única.
+    // Sai por uma caixa de envio ativa (a mesma da conversa, se já houver). Nunca pela conta Google do corretor.
     const { mailbox, configured } = await pickMailboxFor(lead.id);
-    if (configured && !mailbox) throw new Error("Todas as caixas de envio chegaram ao limite de hoje. O e-mail sai amanhã.");
-    const r = mailbox ? await sendViaMailbox(mailbox, input) : await sendEmail(input);
+    if (!configured) throw new Error("Não há caixa de envio ativa. O suporte precisa preparar as caixas de envio de e-mail.");
+    if (!mailbox) throw new Error("Todas as caixas de envio chegaram ao limite de hoje. O e-mail sai amanhã.");
+    const r = await sendViaMailbox(mailbox, input);
     return prisma.message.create({
-      data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date, mailboxId: mailbox?.id ?? null },
+      data: { leadId: lead.id, sender, channel, content, subject, emailMessageId: r.messageId, emailThreadId: r.threadId, openToken, deliveredAt: r.date, mailboxId: mailbox.id },
     });
   }
   if (channel === "WHATSAPP") {

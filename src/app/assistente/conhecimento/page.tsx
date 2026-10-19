@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { adminEnabled, isAdmin } from "@/lib/admin";
+import { getSession } from "@/lib/session";
 import { approxTokens } from "@/lib/knowledge";
 import { KnowledgeImport } from "./KnowledgeImport";
 import { KnowledgeList } from "./KnowledgeList";
@@ -12,8 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function KnowledgePage() {
-  if (!adminEnabled()) notFound();
-  if (!(await isAdmin())) redirect("/admin");
+  if (!(await getSession())) redirect("/login");
 
   const sections = await prisma.knowledgeSection.findMany({ orderBy: { position: "asc" } });
   const size = (mode: string) => sections.filter((s) => s.mode === mode).reduce((n, s) => n + s.content.length, 0);
@@ -23,8 +22,8 @@ export default async function KnowledgePage() {
 
   return (
     <main className="page">
-      <Link href="/admin" className="btn-text" style={{ alignSelf: "flex-start" }}>
-        ← Admin
+      <Link href="/assistente" className="btn-text" style={{ alignSelf: "flex-start" }}>
+        ← Assistente
       </Link>
       <header className="p-head">
         <div>

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { open } from "@/lib/secretBox";
 import { composeMail, errMessage, fromName, imapClient, parseRaw, smtpTransport, type EmailInput, type IncomingEmail, type PasswordConfig, type SentEmail } from "@/lib/email";
 import { chooseMailbox, parseBounce, startOfDaySP, totalRemainingToday } from "@/lib/mailboxPolicy";
-import { effectiveLimits, emailsSentToday } from "@/lib/limits";
+import { effectiveLimits, emailsSentToday, type LimitSettings } from "@/lib/limits";
 
 // Caixas de envio da prospecção: várias, em rodízio, cada uma com limite próprio por dia.
 // Quando não há nenhuma ativa, o e-mail segue pela caixa única de antes (Google ou senha de app).
@@ -32,7 +32,7 @@ export async function sentTodayByMailbox(now = new Date()): Promise<Map<string, 
 }
 
 // Quantos e-mails novos ainda cabem hoje. Sem caixas de envio, vale o limite da caixa única (Conta).
-export async function emailLeftToday(settings: Pick<Settings, "dailyInviteLimit" | "dailyMessageLimit" | "dailyEmailLimit" | "dailyWhatsappLimit">, now = new Date()): Promise<number> {
+export async function emailLeftToday(settings: LimitSettings, now = new Date()): Promise<number> {
   const active = await prisma.mailbox.findMany({ where: { status: "ACTIVE" } });
   if (active.length === 0) return Math.max(0, effectiveLimits(settings).email - (await emailsSentToday()));
   const used = await sentTodayByMailbox(now);

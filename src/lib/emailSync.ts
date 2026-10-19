@@ -1,13 +1,12 @@
 import type { Lead } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fetchNewEmails, type IncomingEmail } from "@/lib/email";
+import type { IncomingEmail } from "@/lib/email";
 import { fetchAllMailboxEmails, handleBounceEmail, type MailboxEmail } from "@/lib/mailboxes";
 import { markNeedsHuman } from "@/lib/handoff";
 import { captureContactsSafely } from "@/lib/contactCapture";
 
-// Lê a caixa do corretor e grava, na conversa certa, os e-mails de pessoas que
-// já estão no sistema (casando pelo e-mail da ficha). E-mail de quem não é
-// lead é ignorado: a caixa é pessoal, não uma fila de atendimento.
+// Lê as caixas de envio (nunca a conta Google do corretor) e grava, na conversa certa, os e-mails
+// de pessoas que já estão no sistema (casando pelo e-mail da ficha). E-mail de quem não é lead é ignorado.
 // Devolve os leads que escreveram, pra secretária responder.
 export async function syncEmailInbox(): Promise<{ read: number; saved: number; leads: Lead[] }> {
   const noMailbox = { emails: [] as MailboxEmail[], commit: async () => {} };
@@ -15,11 +14,9 @@ export async function syncEmailInbox(): Promise<{ read: number; saved: number; l
     console.error("Falha ao ler as caixas de envio", err);
     return noMailbox;
   });
-  const main = await fetchNewEmails();
-  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...main.emails, ...mailboxes.emails];
-  // Os marcadores de leitura só avançam depois de gravar tudo (ver gmail.ts): falha no meio = lê de novo.
+  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...mailboxes.emails];
+  // O marcador de leitura só avança depois de gravar tudo: falha no meio = lê de novo (a gravação ignora o que já existe).
   const result = await saveEmails(all);
-  await main.commit();
   await mailboxes.commit();
   return result;
 }

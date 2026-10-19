@@ -13,7 +13,7 @@ export default function PrivacyPage() {
   return (
     <main className="legal">
       <h1 style={{ fontSize: 30, marginBottom: 4 }}>Política de Privacidade</h1>
-      <p style={{ opacity: 0.7, marginTop: 0 }}>Central Dors · Última atualização: 29/09/2026</p>
+      <p style={{ opacity: 0.7, marginTop: 0 }}>Central Dors · Última atualização: 19/10/2026</p>
 
       <h2>1. Quem somos</h2>
       <p>
@@ -31,14 +31,14 @@ export default function PrivacyPage() {
           trocadas por LinkedIn, e-mail e WhatsApp.
         </li>
         <li>
-          <strong>Dados da conta Google, somente com a sua autorização:</strong> mensagens de e-mail (leitura e envio) e eventos da agenda (leitura e criação).
+          <strong>Dados da conta Google, somente com a sua autorização:</strong> o endereço de e-mail da conta conectada, o envio de e-mails de aviso (permissão de envio, sem leitura da sua caixa de entrada) e os eventos da agenda (leitura e criação).
         </li>
       </ul>
 
       <h2>3. Como usamos os dados do Google</h2>
       <p>Usamos os dados do Google apenas para oferecer as funções que você pediu ao conectar a conta:</p>
       <ul>
-        <li>ler as respostas dos seus leads e enviar e-mails em seu nome, dentro das conversas comerciais;</li>
+        <li>enviar e-mails de aviso (resumo do dia, avisos da equipe) pela sua conta, sem ler as mensagens da sua caixa de entrada;</li>
         <li>ver quando você está ocupado, para oferecer horários livres, e criar a reunião (com link do Google Meet) na sua agenda.</li>
       </ul>
       <p>

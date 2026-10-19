@@ -325,6 +325,9 @@ model Settings {
   ownerName           String?
   dailyInviteLimit    Int     @default(18)
   dailyMessageLimit   Int     @default(25)
+  // Teto que o cliente pode escolher em Ajustes (definido pelo dono, na central).
+  dailyInviteMax      Int     @default(25)
+  dailyMessageMax     Int     @default(40)
   linkedinIdentityId  String?
   // Link de login da identidade ainda não conectada: reaproveitado enquanto
   // válido, pra não criar (e pagar) uma identidade nova a cada clique.

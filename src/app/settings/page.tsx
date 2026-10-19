@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
-import { fixedDeskcommUrl } from "@/lib/deskcomm";
+import { deskcommConfigOf, whatsappLiveStatus } from "@/lib/deskcomm";
 import { emailLeftToday } from "@/lib/mailboxes";
 import { pushPublicKey } from "@/lib/push";
 import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
@@ -15,7 +15,7 @@ import { logout } from "../actions";
 import { WhatsappCard } from "../channels/WhatsappCard";
 import { EmailChannelOptions } from "../channels/EmailChannelOptions";
 import { LinkedinCard, linkedinStatus } from "../channels/LinkedinCard";
-import { EmailCard } from "./EmailCard";
+import { GoogleCard } from "./GoogleCard";
 import { RefreshPhotosButton } from "./RefreshPhotosButton";
 import { NotificationsCard } from "./NotificationsCard";
 import { OwnerNameForm } from "./OwnerNameForm";
@@ -23,6 +23,9 @@ import { DailySummaryToggle } from "./DailySummaryToggle";
 import { CalendarForm } from "./CalendarForm";
 import { MeetingRemindersForm } from "./MeetingRemindersForm";
 import { TeamForm } from "./TeamForm";
+import { AssistantIdentityForm } from "./AssistantIdentityForm";
+import { WorkHoursForm } from "./WorkHoursForm";
+import { LimitsForm } from "./LimitsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +80,8 @@ function LinkRow({ href, download, title, sub }: { href: string; download?: bool
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const emailResult = (await searchParams).email;
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-  const [email, team, status, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, boxProblems, emailLeft] = await Promise.all([
+  const whatsapp = deskcommConfigOf(settings);
+  const [email, team, status, linkedinToday, emailToday, whatsappToday, { sentWeek, openedWeek }, activeBoxes, boxProblems, emailLeft, whatsappLive] = await Promise.all([
     emailConnection(),
     prisma.teamMember.findMany({ orderBy: { createdAt: "asc" } }),
     linkedinStatus(settings),
@@ -88,10 +92,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     prisma.mailbox.count({ where: { status: "ACTIVE" } }),
     prisma.mailbox.count({ where: { status: "ACTIVE", lastError: { not: null } } }),
     emailLeftToday(settings),
+    whatsapp ? whatsappLiveStatus(whatsapp) : null,
   ]);
 
-  const emailOn = Boolean(email) || activeBoxes > 0;
-  const whatsappOn = Boolean(settings.deskcommUrl && settings.deskcommChannelId);
+  // O número está pareado de verdade (o Deskcomm diz WORKING), não só configurado.
+  const whatsappOn = whatsappLive === "connected";
   const ok = { label: "Conectado", cls: "tg-ok" };
   const off = { label: "Não conectado", cls: "tg-q" };
 
@@ -137,47 +142,48 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <Row
             id="email"
             channel="EMAIL"
-            title="E-mail"
+            title="E-mail de prospecção"
             summary={
-              emailOn
-                ? `${settings.googleEmail ?? email?.address ?? `${activeBoxes} caixas em rodízio`} · hoje ${emailToday} enviados · 7 dias: ${openedWeek} de ${sentWeek} abertos`
-                : "Apresentar-se e acompanhar por e-mail"
+              activeBoxes > 0
+                ? `${activeBoxes} ${activeBoxes === 1 ? "caixa de envio ativa" : "caixas de envio ativas"} · hoje ${emailToday} enviados · 7 dias: ${openedWeek} de ${sentWeek} abertos`
+                : "Nenhuma caixa de envio ativa"
             }
-            tag={emailOn ? ok : off}
-            open={typeof emailResult === "string"}
+            tag={activeBoxes > 0 ? (boxProblems > 0 ? { label: "Atenção", cls: "tg-stop" } : ok) : off}
           >
-            <EmailCard
-              googleAddress={settings.googleEmail}
-              expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
-              fallbackAddress={email?.provider === "password" ? email.address : null}
-              result={typeof emailResult === "string" ? emailResult : null}
-            />
-            {activeBoxes > 0 && (
-              <p className="hint">
-                E-mail de prospecção: {activeBoxes} {activeBoxes === 1 ? "caixa ativa" : "caixas ativas"} em rodízio.
-                {boxProblems > 0 && " Alguma caixa está com problema: avise o suporte."}
-              </p>
-            )}
-            {emailOn && (
+            {activeBoxes > 0 ? (
               <>
+                <p className="hint">
+                  O e-mail da prospecção sai por {activeBoxes === 1 ? "uma caixa de envio" : "caixas de envio"} própria{activeBoxes === 1 ? "" : "s"}, em rodízio, com limite diário que sobe aos poucos.
+                  {boxProblems > 0 && " Alguma caixa está com problema: avise o suporte."}
+                </p>
                 <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
                 <p className="hint">
                   Hoje: {emailToday} enviados, ainda cabem {emailLeft} · últimos 7 dias: {openedWeek} de {sentWeek} abertos
                 </p>
               </>
+            ) : (
+              <p className="hint">
+                O e-mail da prospecção sai por caixas de envio próprias, preparadas pelo suporte (separadas da sua conta pessoal, para proteger a entrega). Quando houver uma caixa ativa, ela aparece aqui.
+              </p>
             )}
           </Row>
           <Row
             id="whatsapp"
             channel="WHATSAPP"
             title="WhatsApp"
-            summary={whatsappOn ? `${settings.whatsappChannelEnabled ? "Em uso" : "Conectado, mas desligado"} · hoje ${whatsappToday} de ${settings.dailyWhatsappLimit}` : "Conversas e áudios pelo WhatsApp"}
-            tag={whatsappOn ? ok : off}
+            summary={
+              whatsappOn
+                ? `${settings.whatsappChannelEnabled ? "Em uso" : "Conectado, mas desligado"} · hoje ${whatsappToday} de ${settings.dailyWhatsappLimit}`
+                : whatsappLive === "down"
+                  ? "Número desconectado: nenhuma mensagem entra nem sai. Leia o QR Code para voltar"
+                  : whatsappLive === "unknown"
+                    ? "Não consegui falar com o WhatsApp agora. Abra para tentar de novo"
+                    : "Conversas e áudios pelo WhatsApp"
+            }
+            tag={whatsappOn ? ok : whatsappLive === "down" ? { label: "Caiu", cls: "tg-stop" } : whatsappLive === "unknown" ? { label: "Sem resposta", cls: "tg-q" } : off}
           >
             <WhatsappCard
-              host={settings.deskcommUrl ? new URL(settings.deskcommUrl).host : null}
-              channelId={settings.deskcommChannelId}
-              fixedAddress={fixedDeskcommUrl() !== null}
+              configured={whatsapp !== null}
               enabled={settings.whatsappChannelEnabled}
               dailyLimit={settings.dailyWhatsappLimit}
               sentToday={whatsappToday}
@@ -195,12 +201,40 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <OwnerNameForm value={settings.ownerName ?? ""} />
           </Row>
           <Row
+            title="Nome da assistente"
+            summary={settings.assistantName?.trim() ? `Ela se apresenta como ${settings.assistantName.trim()}` : "Sem nome: o assistente escreve como você"}
+          >
+            <AssistantIdentityForm name={settings.assistantName ?? ""} discloseAi={settings.assistantDiscloseAi} />
+          </Row>
+          <Row
+            id="horario"
+            title="Horário de trabalho"
+            summary={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}${settings.replyAnytime ? " · responde a qualquer hora" : ""}`}
+          >
+            <WorkHoursForm start={settings.workStartHour} end={settings.workEndHour} weekdaysOnly={settings.workWeekdaysOnly} replyAnytime={settings.replyAnytime} />
+          </Row>
+          <Row
+            id="google"
+            title="Conta Google"
+            summary={settings.googleEmail && settings.googleRefreshToken ? `${settings.googleEmail} · agenda e avisos por e-mail` : "Para a agenda de reuniões e os avisos por e-mail"}
+            tag={settings.googleEmail && settings.googleRefreshToken ? ok : off}
+            open={typeof emailResult === "string"}
+          >
+            <GoogleCard
+              googleAddress={settings.googleEmail}
+              expired={Boolean(settings.googleEmail && !settings.googleRefreshToken)}
+              calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
+              configured={googleConfigured()}
+              result={typeof emailResult === "string" ? emailResult : null}
+            />
+          </Row>
+          <Row
             id="agenda"
             title="Agenda de reuniões"
             summary={
               settings.googleCalendarEnabled
-                ? `Google Agenda conectada · ${settings.meetingMinutes} min · ${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`
-                : "Não conectada: o assistente passa a conversa para você"
+                ? `Reuniões de ${settings.meetingMinutes} min na sua agenda do Google · ${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`
+                : "Precisa da Conta Google: sem ela o assistente passa a conversa para você"
             }
             tag={settings.googleCalendarEnabled ? { label: "Conectada", cls: "tg-ok" } : undefined}
           >
@@ -208,11 +242,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               minutes={settings.meetingMinutes}
               googleEmail={settings.googleEmail}
               calendarEnabled={settings.googleCalendarEnabled && Boolean(settings.googleRefreshToken)}
-              configured={googleConfigured()}
               workHours={`${settings.workStartHour}h às ${settings.workEndHour}h${settings.workWeekdaysOnly ? ", dias úteis" : ""}`}
               notice={noticeLabel({ fromNextBusinessDay: Boolean(settings.assistantName?.trim()) })}
             />
           </Row>
+          <Row id="limites" title="Limites diários do LinkedIn" summary={`${settings.dailyInviteLimit} convites e ${settings.dailyMessageLimit} mensagens por dia`}>
+            <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} inviteMax={settings.dailyInviteMax} messageMax={settings.dailyMessageMax} />
+          </Row>
+          <LinkRow href="/assistente/conhecimento" title="Base de conhecimento" sub="Manual, produtos e textos aprovados que o assistente consulta" />
           <Row title="Lembretes da reunião" summary={settings.meetingRemindersEnabled ? "Na véspera, 5h e 1h antes, e aviso se a pessoa faltar" : "Desligados"}>
             <MeetingRemindersForm
               enabled={settings.meetingRemindersEnabled}
@@ -248,6 +285,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               }))}
             />
           </Row>
+          <LinkRow href="/settings/acessos" title="Acessos ao painel" sub="Quem da equipe entra, cada um com login e senha próprios" />
           <Row title="Resumo do dia" summary={settings.dailySummaryEnabled ? `Às ${settings.workEndHour}h${email ? ", no celular e no seu e-mail" : ", no celular"}` : "Desligado"}>
             <DailySummaryToggle enabled={settings.dailySummaryEnabled} endHour={settings.workEndHour} hasEmail={Boolean(email)} hasPush={Boolean(pushPublicKey())} />
           </Row>

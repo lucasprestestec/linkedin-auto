@@ -19,18 +19,26 @@ export interface DeskcommConfig {
   channelId: string | null;
 }
 
-// Endereco unico do servidor de WhatsApp (DESKCOMM_URL). Quando definido, o cliente
-// nao informa endereco nenhum: so a chave. Mudar de servidor vira trocar uma variavel.
-export function fixedDeskcommUrl(): string | null {
+// Endereço do CRM de WhatsApp: um só para todos os clientes (cada um é uma organização lá),
+// então vem de uma constante; DESKCOMM_URL só existe para trocar de servidor sem mexer no código.
+export const DEFAULT_DESKCOMM_URL = "https://crm.lucasprestes.com";
+export function fixedDeskcommUrl(): string {
   const raw = process.env.DESKCOMM_URL?.trim();
-  return raw ? normalizeDeskcommUrl(raw) : null;
+  return (raw ? normalizeDeskcommUrl(raw) : null) ?? DEFAULT_DESKCOMM_URL;
+}
+
+// A chave de acesso de cada cliente fica cifrada no banco dele e é posta pela central, sem passar
+// pela Vercel. DESKCOMM_TOKEN continua valendo, só como atalho que vence a do banco.
+export function fixedDeskcommToken(): string | null {
+  return process.env.DESKCOMM_TOKEN?.trim() || null;
 }
 
 export function deskcommConfigOf(s: Pick<Settings, "deskcommUrl" | "deskcommToken" | "deskcommChannelId">): DeskcommConfig | null {
   const url = fixedDeskcommUrl() ?? s.deskcommUrl;
-  if (!url || !s.deskcommToken) return null;
+  const fixedToken = fixedDeskcommToken();
+  if (!url || (!fixedToken && !s.deskcommToken)) return null;
   try {
-    return { url, token: open(s.deskcommToken), channelId: s.deskcommChannelId };
+    return { url, token: fixedToken ?? open(s.deskcommToken!), channelId: s.deskcommChannelId };
   } catch {
     return null;
   }
@@ -149,11 +157,79 @@ async function detectChannelId(client: Rpc): Promise<string | null> {
 export async function inspectDeskcomm(cfg: Pick<DeskcommConfig, "url" | "token">): Promise<{ channelId: string | null; missingTools: string[] }> {
   return withClient(cfg, async (client) => {
     const names = new Set(await client.listTools());
-    const needed = ["crm_start_conversation_and_send", "crm_send_whatsapp_message", "crm_list_conversations", "crm_get_conversation_history", "crm_get_conversation"];
+    const needed = ["crm_start_conversation_and_send", "crm_send_whatsapp_message", "crm_list_conversations", "crm_get_conversation_history", "crm_get_conversation", "crm_list_whatsapp_channels", "crm_get_whatsapp_channel_qr"];
     const missingTools = needed.filter((n) => !names.has(n));
     const channelId = missingTools.length ? null : await detectChannelId(client);
     return { channelId, missingTools };
   });
+}
+
+// Pareamento do número pelo QR Code (ferramentas crm_list_whatsapp_channels e
+// crm_get_whatsapp_channel_qr). O número em si nasce no Deskcomm, na implantação
+// (criar canal exige administrador logado lá); aqui o cliente só escaneia.
+export type WhatsappPairing =
+  | { state: "none" } // nenhum número criado no Deskcomm ainda
+  | { state: "connected"; phone: string | null }
+  | { state: "pair" } // precisa escanear, mas ninguém pediu o QR ainda
+  | { state: "qr"; qr: string } // imagem PNG em base64
+  | { state: "waiting"; hint: string | null }; // sessão subindo / QR sendo gerado: tente de novo em segundos
+
+// Escolhe o número do cliente entre os canais do Deskcomm e guarda a escolha.
+// Um número que está funcionando ganha de um caído (o cliente pode ter conectado um número novo
+// e deixado o antigo para trás); entre iguais, vale o que já estava guardado.
+async function pickChannel(client: Rpc, cfg: DeskcommConfig) {
+  const names = new Set(await client.listTools());
+  if (!names.has("crm_list_whatsapp_channels") || !names.has("crm_get_whatsapp_channel_qr")) {
+    throw new DeskcommError("Esta instalação do WhatsApp ainda não conecta por QR Code. Fale com o suporte.");
+  }
+  const { channels } = await client.call<{ channels: { channel_session_id: string; phone_number: string | null; status: string; has_session: boolean }[] }>("crm_list_whatsapp_channels", {});
+  const saved = channels.find((c) => c.channel_session_id === cfg.channelId);
+  const ch = (saved?.status === "WORKING" ? saved : channels.find((c) => c.status === "WORKING")) ?? saved ?? channels.find((c) => c.has_session) ?? channels[0];
+  if (ch && ch.channel_session_id !== cfg.channelId) {
+    await prisma.settings.update({ where: { id: "singleton" }, data: { deskcommChannelId: ch.channel_session_id } });
+  }
+  return { ch, names };
+}
+
+// Desconectar (reconnect=false) ou trocar de número (reconnect=true: desloga e fica esperando um QR novo).
+// O canal e as conversas continuam os mesmos; só o celular muda.
+export async function resetWhatsapp(cfg: DeskcommConfig, reconnect: boolean): Promise<void> {
+  await withClient(cfg, async (client) => {
+    const { ch, names } = await pickChannel(client, cfg);
+    if (!ch) throw new DeskcommError("Nenhum número de WhatsApp foi criado ainda. Fale com o suporte.");
+    if (!names.has("crm_reset_whatsapp_channel")) {
+      throw new DeskcommError("Esta instalação do WhatsApp ainda não permite desconectar ou trocar o número por aqui. Fale com o suporte.");
+    }
+    await client.call("crm_reset_whatsapp_channel", { channel_session_id: ch.channel_session_id, reconnect });
+  });
+}
+
+export async function whatsappPairing(cfg: DeskcommConfig, withQr: boolean): Promise<WhatsappPairing> {
+  return withClient(cfg, async (client) => {
+    const { ch } = await pickChannel(client, cfg);
+    if (!ch) return { state: "none" };
+    if (ch.status === "WORKING") return { state: "connected", phone: ch.phone_number };
+    if (!withQr) return { state: "pair" };
+    const r = await client.call<{ status: string; qr_png_base64: string | null; message?: string }>("crm_get_whatsapp_channel_qr", { channel_session_id: ch.channel_session_id });
+    if (r.status === "WORKING") return { state: "connected", phone: ch.phone_number };
+    return r.qr_png_base64 ? { state: "qr", qr: r.qr_png_base64 } : { state: "waiting", hint: r.message ?? null };
+  });
+}
+
+// Estado real do número para a lista de Ajustes. Tempo curto: a tela não espera o Deskcomm.
+export async function whatsappLiveStatus(cfg: DeskcommConfig): Promise<"connected" | "down" | "unknown"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const r = await Promise.race([
+      whatsappPairing(cfg, false),
+      new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("timeout")), 4000))),
+    ]);
+    return r.state === "connected" ? "connected" : "down";
+  } catch {
+    return "unknown";
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function saveDeskcommConnection(url: string, token: string, channelId: string | null) {
