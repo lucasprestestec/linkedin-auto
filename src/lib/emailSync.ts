@@ -9,11 +9,19 @@ import { captureContactsSafely } from "@/lib/contactCapture";
 // de pessoas que já estão no sistema (casando pelo e-mail da ficha). E-mail de quem não é lead é ignorado.
 // Devolve os leads que escreveram, pra secretária responder.
 export async function syncEmailInbox(): Promise<{ read: number; saved: number; leads: Lead[] }> {
-  const mailboxEmails = await fetchAllMailboxEmails().catch((err) => {
+  const noMailbox = { emails: [] as MailboxEmail[], commit: async () => {} };
+  const mailboxes = await fetchAllMailboxEmails().catch((err) => {
     console.error("Falha ao ler as caixas de envio", err);
-    return [] as MailboxEmail[];
+    return noMailbox;
   });
-  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...mailboxEmails];
+  const all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[] = [...mailboxes.emails];
+  // O marcador de leitura só avança depois de gravar tudo: falha no meio = lê de novo (a gravação ignora o que já existe).
+  const result = await saveEmails(all);
+  await mailboxes.commit();
+  return result;
+}
+
+async function saveEmails(all: (IncomingEmail & { mailbox?: MailboxEmail["mailbox"] })[]): Promise<{ read: number; saved: number; leads: Lead[] }> {
   // E-mail devolvido: trata e tira da fila (não é conversa).
   const emails: typeof all = [];
   for (const e of all) {
@@ -38,16 +46,17 @@ export async function syncEmailInbox(): Promise<{ read: number; saved: number; l
       await markNeedsHuman(lead.id, "Respondeu por e-mail só com anexo — veja na sua caixa");
       continue;
     }
+    // Respondeu: conversa aberta e sem follow-up pendente. Atualiza o contato ANTES de gravar a mensagem:
+    // se algo falhar no meio, a próxima leitura refaz os dois (a mensagem só existe depois do contato atualizado).
+    const updated = await prisma.lead.update({
+      where: { id: lead.id },
+      data: { status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? lead.status : "CONVERSATION_OPEN", followUpsSent: 0, nextStep: null, nextStepAt: null },
+    });
     await prisma.message.create({
       data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, emailThreadId: e.threadId, deliveredAt: e.date, mailboxId: e.mailbox?.id ?? null },
     });
     saved++;
     await captureContactsSafely(lead.id, e.text);
-    // Respondeu: conversa aberta e sem follow-up pendente.
-    const updated = await prisma.lead.update({
-      where: { id: lead.id },
-      data: { status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? lead.status : "CONVERSATION_OPEN", followUpsSent: 0, nextStep: null, nextStepAt: null },
-    });
     touched.set(lead.id, updated);
   }
   return { read: emails.length, saved, leads: [...touched.values()] };

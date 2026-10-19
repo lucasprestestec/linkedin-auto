@@ -60,7 +60,15 @@ export async function GET(request: Request) {
   }
 
   // Canais independentes: sem LinkedIn conectado, e-mail e WhatsApp seguem sozinhos.
-  const conversations = identityId ? await extractConversations(identityId) : [];
+  // Se o LinkedIn falhar aqui, a etapa proativa (fila aprovada, e-mail, WhatsApp) ainda roda.
+  let conversations: Awaited<ReturnType<typeof extractConversations>> = [];
+  if (identityId) {
+    try {
+      conversations = await extractConversations(identityId);
+    } catch (err) {
+      console.error("Falha ao ler as conversas do LinkedIn", err);
+    }
+  }
   let updatedLeads = 0;
   let newIncomingMessages = 0;
   let fallbacks = 0;

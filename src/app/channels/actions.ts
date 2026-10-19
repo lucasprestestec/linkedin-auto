@@ -1,5 +1,6 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { deskcommConfigOf, resetWhatsapp, whatsappPairing, type WhatsappPairing } from "@/lib/deskcomm";
@@ -7,6 +8,7 @@ import { deskcommConfigOf, resetWhatsapp, whatsappPairing, type WhatsappPairing 
 // Regras do canal de e-mail (tela Canais). null em fallbackDays = o assistente
 // nunca se apresenta por e-mail quando o convite fica parado.
 export async function updateEmailChannel(input: { enabled: boolean; dailyLimit: number; fallbackDays: number | null }) {
+  await requireSession();
   const dailyLimit = Math.round(input.dailyLimit);
   const fallbackDays = input.fallbackDays == null ? null : Math.round(input.fallbackDays);
   if (!Number.isFinite(dailyLimit) || dailyLimit < 1 || dailyLimit > 100) return { error: "Limite diário fora do permitido (1 a 100)." };
@@ -32,6 +34,7 @@ async function currentConfig() {
 // Estado do número de WhatsApp. withQr=false só olha (não pede QR); true pede o QR
 // (e, se a sessão caiu, reinicia só ela). A tela chama de novo a cada poucos segundos.
 export async function whatsappPairingState(withQr: boolean): Promise<WhatsappPairing | { state: "error"; message: string }> {
+  await requireSession();
   const cfg = await currentConfig();
   if (!cfg) return { state: "error", message: "O WhatsApp ainda não foi preparado. Fale com o suporte." };
   try {
@@ -44,6 +47,7 @@ export async function whatsappPairingState(withQr: boolean): Promise<WhatsappPai
 // O cliente desconecta o número ("disconnect") ou troca de número ("switch": desloga e fica
 // esperando o QR do novo celular). O canal e as conversas continuam os mesmos.
 export async function resetWhatsappNumber(mode: "disconnect" | "switch") {
+  await requireSession();
   const cfg = await currentConfig();
   if (!cfg) return { error: "O WhatsApp ainda não foi preparado. Fale com o suporte." };
   try {
@@ -56,6 +60,7 @@ export async function resetWhatsappNumber(mode: "disconnect" | "switch") {
 }
 
 export async function updateWhatsappChannel(input: { enabled: boolean; dailyLimit: number }) {
+  await requireSession();
   const dailyLimit = Math.round(input.dailyLimit);
   if (!Number.isFinite(dailyLimit) || dailyLimit < 1 || dailyLimit > 60) return { error: "Limite diário fora do permitido (1 a 60)." };
   await prisma.settings.update({ where: { id: "singleton" }, data: { whatsappChannelEnabled: input.enabled, dailyWhatsappLimit: dailyLimit } });

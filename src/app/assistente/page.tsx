@@ -146,7 +146,7 @@ export default async function AssistantPage() {
                 {!settings.approvalMode
                   ? "Desligado: o assistente envia sozinho, menos campanha nova em revisão e resposta em que ele ficou em dúvida."
                   : stats.decided === 0
-                    ? "Ligado: nada sai sem o seu OK. Quando você aprovar as primeiras, mostro quantas o assistente acertou sem você mexer."
+                    ? "Ligado: nada sai sem o seu OK, menos os lembretes de reunião, que saem sozinhos no horário. Quando você aprovar as primeiras, mostro quantas o assistente acertou sem você mexer."
                     : trusted
                       ? `Acertou ${stats.untouched} de ${stats.decided} sem você mexer. Já dá para desligar a aprovação com segurança.`
                       : `Aprovadas sem mudar nada: ${stats.untouched} de ${stats.decided}. Com ${TRUST_MIN_DECIDED} decisões e 90% de acerto, sugiro liberar o automático.`}

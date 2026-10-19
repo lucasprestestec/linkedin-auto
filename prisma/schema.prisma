@@ -179,6 +179,7 @@ enum DraftKind {
 enum DraftStatus {
   PENDING    // esperando o corretor
   APPROVED   // aprovada; sai assim que a janela de horário permitir
+  SENDING    // reservada por um envio em andamento (ninguém mais pega)
   SENT
   DISCARDED  // corretor descartou, ou o lead respondeu antes
   EXPIRED    // ninguém decidiu a tempo
@@ -262,6 +263,8 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  // Quem cadastrou (null = aviso antigo, de antes do acesso individual).
+  userId    String?
   createdAt DateTime @default(now())
 }
 
@@ -509,4 +512,13 @@ model PanelUser {
   // scrypt$sal$hash; nulo até a pessoa abrir o link de convite e escolher a senha.
   passwordHash String?
   active       Boolean  @default(true)
+}
+
+// Convite pedido à edges.run e ainda sem retorno (o lead só nasce no retorno). Sem isto, dois lotes
+// seguidos enxergam a mesma vaga do dia. Apagado quando o retorno chega, qualquer que seja o resultado.
+model InviteScheduled {
+  id         String   @id @default(cuid())
+  profileUrl String   @unique
+  campaignId String?
+  createdAt  DateTime @default(now())
 }

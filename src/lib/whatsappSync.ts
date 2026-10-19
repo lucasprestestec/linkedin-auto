@@ -29,7 +29,7 @@ export async function syncWhatsapp(only?: string): Promise<{ checked: number; sa
   if (!tracked.length) return { checked: 0, saved: 0, leads: [], waiting: 0 };
   let waiting = 0;
   const byConversation = new Map(tracked.map((l) => [l.whatsappConversationId!, l]));
-  const updates = await fetchWhatsappUpdates(new Map(tracked.map((l) => [l.whatsappConversationId!, l.whatsappLastAt])));
+  const updates = await fetchWhatsappUpdates(new Map(tracked.map((l) => [l.whatsappConversationId!, l.whatsappLastAt])), only);
 
   let saved = 0;
   const wrote = new Map<string, Lead>();

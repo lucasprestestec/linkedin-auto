@@ -1,5 +1,6 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { MessageChannel } from "@prisma/client";
@@ -24,6 +25,7 @@ const field = (formData: FormData, name: string) => String(formData.get(name) ??
 // cliente antigo). Nada sai na hora — a primeira mensagem, quando pedida, é da
 // secretária dentro do horário; o convite do LinkedIn segue o fluxo de sempre.
 export async function createContact(_prev: ContactFormState, formData: FormData): Promise<ContactFormState> {
+  await requireSession();
   const firstName = field(formData, "firstName").slice(0, 80);
   const lastName = field(formData, "lastName").slice(0, 80);
   const jobTitle = field(formData, "jobTitle").slice(0, 200);

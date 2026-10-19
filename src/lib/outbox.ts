@@ -11,6 +11,8 @@ import { formatSlot } from "@/lib/slots";
 import { sendAudioMessage } from "@/lib/voice/send";
 import { campaignReviewNote } from "@/lib/campaignReview";
 import { notifyTeam } from "@/lib/team";
+import { effectiveLimits, messagesSentToday, whatsappSentToday, type Db } from "@/lib/limits";
+import { emailLeftToday } from "@/lib/mailboxes";
 
 // Modo piloto: um lugar só onde a secretária "manda uma mensagem". Com a
 // aprovação ligada (Settings.approvalMode) a mensagem vira um rascunho pro
@@ -27,9 +29,11 @@ const DRAFT_TTL_MS = 48 * 60 * 60 * 1000;
 // Aprovado fora do horário espera a janela; o cron só reenvia depois disso, pra não
 // pegar um rascunho que a própria aprovação está enviando neste instante.
 const APPROVED_GRACE_MS = 2 * 60 * 1000;
+// Reservado para envio e sem desfecho depois disso: o envio morreu no meio.
+const STUCK_SENDING_MS = 10 * 60 * 1000;
 
 // Rascunhos que ainda "seguram" o lead: ele não recebe nada novo por outro caminho.
-export const OPEN_DRAFT_FILTER = { drafts: { none: { status: { in: ["PENDING", "APPROVED"] as ("PENDING" | "APPROVED")[] } } } };
+export const OPEN_DRAFT_FILTER = { drafts: { none: { status: { in: ["PENDING", "APPROVED", "SENDING"] as ("PENDING" | "APPROVED" | "SENDING")[] } } } };
 
 export async function approvalModeOn(): Promise<boolean> {
   const s = await prisma.settings.findUnique({ where: { id: "singleton" }, select: { approvalMode: true } });
@@ -148,10 +152,10 @@ export async function deliver(lead: Lead, channel: MessageChannel, content: stri
 }
 
 // O lead escreveu de novo: o que estava esperando aprovação ficou velho.
-export async function supersedeDrafts(leadId: string): Promise<void> {
+export async function supersedeDrafts(leadId: string, reason = "O lead escreveu de novo antes de a mensagem sair."): Promise<void> {
   await prisma.draft.updateMany({
     where: { leadId, status: { in: ["PENDING", "APPROVED"] } },
-    data: { status: "DISCARDED", decidedAt: new Date(), error: "O lead escreveu de novo antes de a mensagem sair." },
+    data: { status: "DISCARDED", decidedAt: new Date(), error: reason },
   });
 }
 
@@ -167,7 +171,33 @@ export async function expireDrafts(): Promise<number> {
   return r.count;
 }
 
-type SendResult = { ok: true } | { ok: false; error: string };
+// deferred: não saiu porque o limite do dia acabou; continua aprovada e sai quando houver vaga.
+type SendResult = { ok: true } | { ok: false; error: string; deferred?: true };
+
+// O limite diário vale no momento de ENVIAR (não só quando o texto foi escrito): a fila de aprovados
+// e a aprovação imediata não podem passar do que o canal aguenta. Resposta a quem escreveu não conta
+// em e-mail/WhatsApp (mesma regra de respond.ts); no LinkedIn o limite protege a conta e vale sempre.
+// Conta também o que está sendo enviado agora (SENDING) por outro robô.
+async function overDailyLimit(draft: Draft, db: Db): Promise<boolean> {
+  const settings = await db.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  const limits = effectiveLimits(settings);
+  const inFlight = await db.draft.count({ where: { status: "SENDING", channel: draft.channel, id: { not: draft.id } } });
+  if (draft.channel === "LINKEDIN") return (await messagesSentToday(db)) + inFlight >= limits.linkedinMessages;
+  if (draft.kind === "REPLY") return false;
+  if (draft.channel === "WHATSAPP") return (await whatsappSentToday(db)) + inFlight >= limits.whatsapp;
+  return (await emailLeftToday(settings, new Date(), db)) - inFlight <= 0;
+}
+
+// Confere a vaga do dia e reserva o rascunho (APPROVED -> SENDING) de uma vez, com trava no banco:
+// dois envios simultâneos não usam a mesma última vaga, e o mesmo rascunho nunca é pego duas vezes.
+async function claimForSending(draft: Draft): Promise<"ok" | "taken" | "limit"> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(73001)`;
+    if (await overDailyLimit(draft, tx)) return "limit" as const;
+    const claimed = await tx.draft.updateMany({ where: { id: draft.id, status: "APPROVED" }, data: { status: "SENDING", decidedAt: new Date() } });
+    return claimed.count === 0 ? ("taken" as const) : ("ok" as const);
+  });
+}
 
 // Envia um rascunho já aprovado e aplica o que muda no lead.
 async function sendApproved(draft: Draft): Promise<SendResult> {
@@ -176,6 +206,25 @@ async function sendApproved(draft: Draft): Promise<SendResult> {
     await prisma.draft.update({ where: { id: draft.id }, data: { status: "FAILED", error: "Lead não existe mais." } });
     return { ok: false, error: "Lead não existe mais." };
   }
+
+  // Quem se descadastrou não recebe mais nada, nem o que já estava aprovado.
+  if (lead.doNotContact) {
+    const error = "A pessoa pediu para não receber mais mensagens.";
+    await prisma.draft.update({ where: { id: draft.id }, data: { status: "DISCARDED", error, decidedAt: new Date() } });
+    return { ok: false, error };
+  }
+
+  // Outra IA assumiu a pessoa: a mensagem aprovada antes não sai.
+  if (lead.otherAiActive) {
+    const error = "A pessoa está em conversa com outra IA.";
+    await prisma.draft.update({ where: { id: draft.id }, data: { status: "DISCARDED", error, decidedAt: new Date() } });
+    return { ok: false, error };
+  }
+
+  // Sem vaga no dia: fica aprovada (não vira erro) e sai quando houver. Com vaga, reserva o rascunho.
+  const claim = await claimForSending(draft);
+  if (claim === "limit") return { ok: false, error: "Limite diário atingido: sai quando houver vaga.", deferred: true };
+  if (claim === "taken") return { ok: false, error: "Essa mensagem já está sendo enviada." };
 
   // O lead escreveu depois de a mensagem ser escrita: ela responderia a uma conversa que andou.
   const replied = await prisma.message.count({ where: { leadId: lead.id, sender: "LEAD", deliveredAt: { gt: draft.createdAt } } });
@@ -234,6 +283,7 @@ export async function approveDraft(id: string, editedContent?: string): Promise<
 
   const approved = await prisma.draft.findUniqueOrThrow({ where: { id } });
   const result = await sendApproved(approved);
+  if (!result.ok && result.deferred) return { status: "waiting" };
   return result.ok ? { status: "sent" } : { error: result.error };
 }
 
@@ -248,15 +298,35 @@ export async function discardDraft(id: string): Promise<{ error?: string }> {
 }
 
 // Roda no cron, dentro do horário de trabalho: envia o que foi aprovado fora dele.
+// Quem está sem vaga no dia é pulado (não toma o lugar de quem tem vaga em outro canal).
 export async function flushApprovedDrafts(limit = 10): Promise<number> {
-  const due = await prisma.draft.findMany({
-    where: { status: "APPROVED", decidedAt: { lt: new Date(Date.now() - APPROVED_GRACE_MS) } },
-    orderBy: { decidedAt: "asc" },
-    take: limit,
-  });
+  // Reservado há muito tempo e nunca concluído: o robô caiu no meio. Não reenvia (poderia duplicar): avisa.
+  const stuck = await prisma.draft.findMany({ where: { status: "SENDING", decidedAt: { lt: new Date(Date.now() - STUCK_SENDING_MS) } } });
+  for (const d of stuck) {
+    const error = "Não sei se esta mensagem saiu. Confira a conversa antes de mandar de novo.";
+    await prisma.draft.update({ where: { id: d.id }, data: { status: "FAILED", error } });
+    await markNeedsHuman(d.leadId, error).catch((err) => console.error("Falha ao avisar rascunho preso", err));
+  }
+
   let sent = 0;
-  for (const draft of due) {
-    if ((await sendApproved(draft)).ok) sent++;
+  let tried = 0;
+  // Os sem vaga ficam na fila (deferred): a próxima página pula só eles, para não esconder os que têm vaga.
+  let deferred = 0;
+  for (let rounds = 0; rounds < 50 && tried < limit; rounds++) {
+    const page = await prisma.draft.findMany({
+      where: { status: "APPROVED", decidedAt: { lt: new Date(Date.now() - APPROVED_GRACE_MS) } },
+      orderBy: { decidedAt: "asc" },
+      skip: deferred,
+      take: 50,
+    });
+    if (page.length === 0) break;
+    for (const draft of page) {
+      if (tried >= limit) break;
+      const r = await sendApproved(draft);
+      if (r.ok) sent++;
+      if (!r.ok && r.deferred) deferred++;
+      else tried++;
+    }
   }
   return sent;
 }

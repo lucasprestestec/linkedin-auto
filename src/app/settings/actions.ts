@@ -1,8 +1,8 @@
 "use server";
 
+import { getSession, requireSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
 import { createIdentity, deleteIdentity, extractConnections, getIdentity } from "@/lib/edges";
 import { linkedinProfileSlug } from "@/lib/linkedin";
 import { sendPush } from "@/lib/push";
@@ -18,6 +18,7 @@ const LOGIN_LINK_REUSE_MS = 12 * 60 * 60 * 1000;
 // enquanto a identidade pendente existir e o link for recente, devolve o
 // MESMO link; só cria outra se o link expirou ou se pediram um novo (fresh).
 export async function getOrCreateIdentityLoginLink(fresh = false): Promise<string> {
+  await requireSession();
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   if (settings.linkedinIdentityId) {
@@ -50,6 +51,7 @@ export async function getOrCreateIdentityLoginLink(fresh = false): Promise<strin
 }
 
 export async function updateTargetAudience(_prevState: unknown, formData: FormData) {
+  await requireSession();
   const targetAudience = String(formData.get("targetAudience") ?? "").trim();
   await prisma.settings.update({ where: { id: "singleton" }, data: { targetAudience: targetAudience || null } });
   revalidatePath("/settings");
@@ -59,6 +61,7 @@ export async function updateTargetAudience(_prevState: unknown, formData: FormDa
 }
 
 export async function updateExclusionList(_prevState: unknown, formData: FormData) {
+  await requireSession();
   const exclusionList = String(formData.get("exclusionList") ?? "")
     .split("\n")
     .map((l) => l.trim())
@@ -76,24 +79,30 @@ export async function updateExclusionList(_prevState: unknown, formData: FormDat
 // ---------------------------------------------------------------------------
 
 export async function savePushSubscription(sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+  await requireSession();
+  const session = await getSession();
+  const userId = session?.kind === "user" ? session.user.id : null;
   if (!sub?.endpoint?.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) throw new Error("Inscrição inválida.");
   await prisma.pushSubscription.upsert({
     where: { endpoint: sub.endpoint },
-    update: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
-    create: { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+    update: { p256dh: sub.keys.p256dh, auth: sub.keys.auth, userId },
+    create: { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, userId },
   });
 }
 
 export async function removePushSubscription(endpoint: string) {
+  await requireSession();
   await prisma.pushSubscription.deleteMany({ where: { endpoint } });
 }
 
 export async function sendTestPush() {
+  await requireSession();
   const delivered = await sendPush({ title: "Notificações ativadas", body: "É assim que você vai saber quando um lead precisar de você.", url: "/" });
   return { delivered };
 }
 
 export async function updateOwnerName(_prevState: unknown, formData: FormData) {
+  await requireSession();
   const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 60);
   // Obrigatório: o assistente se apresenta com esse nome. Nome em branco não apaga o que já existe.
   if (!ownerName) return { error: "Escreva o seu nome. É assim que o assistente vai se apresentar nas conversas." };
@@ -104,6 +113,7 @@ export async function updateOwnerName(_prevState: unknown, formData: FormData) {
 
 // Duração da reunião que o assistente marca na agenda.
 export async function updateMeetingMinutes(minutes: number) {
+  await requireSession();
   if (![15, 20, 30, 45, 60].includes(minutes)) return { error: "Duração fora do permitido." };
   await prisma.settings.update({ where: { id: "singleton" }, data: { meetingMinutes: minutes } });
   revalidatePath("/settings");
@@ -114,6 +124,7 @@ export async function updateMeetingMinutes(minutes: number) {
 // Follow-up padrão da conta: vale pra toda conversa sem regra própria (nem da
 // campanha, nem da conversa).
 export async function updateFollowUpDefault(count: number, days: number) {
+  await requireSession();
   const delayHours = days * 24;
   if (!validFollowUp(count, delayHours)) return { error: "Valores fora do permitido." };
   await prisma.settings.update({ where: { id: "singleton" }, data: { followUpMaxCount: count, followUpDelayHours: delayHours } });
@@ -137,6 +148,7 @@ function linkedinLeadsWhere() {
 }
 
 export async function linkedinDataCount() {
+  await requireSession();
   return prisma.lead.count({ where: linkedinLeadsWhere() });
 }
 
@@ -144,6 +156,7 @@ export async function linkedinDataCount() {
 // Desconecta a conta. Com deleteData, apaga também as pessoas e conversas que
 // vieram do LinkedIn (irreversível: a tela avisa antes).
 export async function disconnectLinkedin(deleteData = false) {
+  await requireSession();
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { linkedinIdentityId: true } });
   if (settings.linkedinIdentityId) await deleteIdentity(settings.linkedinIdentityId).catch(() => {});
   await prisma.settings.update({
@@ -156,6 +169,7 @@ export async function disconnectLinkedin(deleteData = false) {
 
 // Apaga as pessoas e conversas que vieram do LinkedIn (a conta já pode estar desconectada).
 export async function deleteLinkedinData() {
+  await requireSession();
   const ids = (await prisma.lead.findMany({ where: linkedinLeadsWhere(), select: { id: true } })).map((l) => l.id);
   // Mensagens primeiro: elas não apagam junto com a pessoa. Rascunhos sim.
   await prisma.$transaction([prisma.message.deleteMany({ where: { leadId: { in: ids } } }), prisma.lead.deleteMany({ where: { id: { in: ids } } })]);
@@ -164,6 +178,7 @@ export async function deleteLinkedinData() {
 
 // E-mail do Google: revoga o acesso e para de enviar/ler por lá.
 export async function disconnectEmail() {
+  await requireSession();
   await disconnectGoogle();
   revalidatePath("/settings");
   revalidatePath("/assistente");
@@ -171,6 +186,7 @@ export async function disconnectEmail() {
 }
 
 export async function updateDailySummary(enabled: boolean) {
+  await requireSession();
   await prisma.settings.update({ where: { id: "singleton" }, data: { dailySummaryEnabled: enabled } });
   revalidatePath("/settings");
   revalidatePath("/assistente");
@@ -179,6 +195,7 @@ export async function updateDailySummary(enabled: boolean) {
 // Traz a foto de perfil de quem jÃ¡ estÃ¡ conectado no LinkedIn. Usa a lista de conexÃµes do Edges
 // (aÃ§Ã£o gratuita) e sÃ³ preenche quem ainda nÃ£o tem foto.
 export async function refreshLeadPhotos(): Promise<{ updated?: number; error?: string }> {
+  await requireSession();
   const settings = await prisma.settings.findUnique({ where: { id: "singleton" } });
   if (!settings?.linkedinIdentityId) return { error: "Conecte o LinkedIn primeiro." };
 

@@ -328,12 +328,22 @@ export interface WhatsappHistoryMessage {
 
 // Conversas que tiveram mensagem nova desde `since` (entre as conhecidas) e
 // o histórico recente de cada uma.
+// Com `only` (aviso instantâneo do Deskcomm), lê a conversa avisada direto, sem depender de ela estar
+// entre as últimas da lista.
+const HISTORY_LIMIT = 100;
 export async function fetchWhatsappUpdates(
   known: Map<string, Date | null>,
+  only?: string,
 ): Promise<{ conversationId: string; lastAt: Date; messages: WhatsappHistoryMessage[] }[]> {
   const cfg = await deskcommConfig();
   if (!cfg || known.size === 0) return [];
   return withClient(cfg, async (client) => {
+    if (only) {
+      if (!known.has(only)) return [];
+      const h = await client.call<{ messages: WhatsappHistoryMessage[] }>("crm_get_conversation_history", { conversation_id: only, limit: HISTORY_LIMIT });
+      const times = h.messages.map((m) => (m.sent_at ? new Date(m.sent_at).getTime() : 0));
+      return [{ conversationId: only, lastAt: new Date(Math.max(0, ...times) || Date.now()), messages: h.messages }];
+    }
     const list = await client.call<{ conversations: { id: string; last_message_at: string | null }[] }>("crm_list_conversations", { limit: 50 });
     const changed = list.conversations.filter((c) => {
       if (!known.has(c.id) || !c.last_message_at) return false;
@@ -342,7 +352,9 @@ export async function fetchWhatsappUpdates(
     });
     const out: { conversationId: string; lastAt: Date; messages: WhatsappHistoryMessage[] }[] = [];
     for (const c of changed) {
-      const h = await client.call<{ messages: WhatsappHistoryMessage[] }>("crm_get_conversation_history", { conversation_id: c.id, limit: 20 });
+      const h = await client.call<{ messages: WhatsappHistoryMessage[] }>("crm_get_conversation_history", { conversation_id: c.id, limit: HISTORY_LIMIT });
+      // Cheio = pode ter mais mensagens antigas do que coube; avisa nos logs em vez de sumir em silêncio.
+      if (h.messages.length >= HISTORY_LIMIT) console.warn(`[deskcomm] histórico da conversa ${c.id.slice(0, 8)} veio cheio (${HISTORY_LIMIT}); pode haver mensagens não lidas`);
       out.push({ conversationId: c.id, lastAt: new Date(c.last_message_at!), messages: h.messages });
     }
     return out;

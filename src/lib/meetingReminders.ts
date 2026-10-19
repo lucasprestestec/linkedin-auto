@@ -1,4 +1,6 @@
 import type { Lead, MessageChannel, Settings } from "@prisma/client";
+import { effectiveLimits, messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { emailLeftToday } from "@/lib/mailboxes";
 import { prisma } from "@/lib/prisma";
 import { sendOnChannel } from "@/lib/channels";
 import { fillTemplate } from "@/lib/cadence";
@@ -90,12 +92,20 @@ function conversationChannel(messages: { sender: string; channel: MessageChannel
   return [...messages].reverse().find((m) => m.sender === "LEAD")?.channel ?? messages.at(-1)?.channel ?? null;
 }
 
+// O limite diário do canal já foi usado? (LinkedIn protege a conta; e-mail e WhatsApp seguem o limite do cliente.)
+async function channelFullToday(channel: MessageChannel, settings: Settings): Promise<boolean> {
+  const limits = effectiveLimits(settings);
+  if (channel === "LINKEDIN") return (await messagesSentToday()) >= limits.linkedinMessages;
+  if (channel === "WHATSAPP") return (await whatsappSentToday()) >= limits.whatsapp;
+  return (await emailLeftToday(settings)) <= 0;
+}
+
 // Rodada do cron (dentro do horário de trabalho).
 export async function sendMeetingReminders(identityId: string | null, settings: Settings): Promise<number> {
   if (!settings.meetingRemindersEnabled) return 0;
   const texts = reminderTexts(settings);
   const leads = await prisma.lead.findMany({
-    where: { status: "MEETING_SCHEDULED", meetingAt: { gt: new Date() }, otherAiActive: false },
+    where: { status: "MEETING_SCHEDULED", meetingAt: { gt: new Date() }, otherAiActive: false, doNotContact: false },
     include: { messages: { orderBy: { deliveredAt: "asc" }, select: { sender: true, channel: true, deliveredAt: true } } },
   });
   let sent = 0;
@@ -107,6 +117,8 @@ export async function sendMeetingReminders(identityId: string | null, settings: 
     if (send) {
       const channel = conversationChannel(lead.messages);
       if (!channel) continue;
+      // Canal sem vaga hoje: tenta de novo na próxima rodada.
+      if (await channelFullToday(channel, settings)) continue;
       try {
         await sendOnChannel(lead, channel, renderReminder(texts[send], lead, settings.ownerName), { identityId });
         resolved.push(send);
@@ -126,5 +138,7 @@ export async function sendMeetingReminders(identityId: string | null, settings: 
 export async function sendNoShow(lead: Lead & { messages: { sender: string; channel: MessageChannel }[] }, identityId: string | null, settings: Settings) {
   const channel = conversationChannel(lead.messages);
   if (!channel) throw new Error("Não há conversa com essa pessoa para mandar a mensagem.");
+  if (lead.doNotContact) throw new Error("A pessoa pediu para não receber mais mensagens.");
+  if (await channelFullToday(channel, settings)) throw new Error("O limite diário de mensagens desse canal já foi atingido hoje. Tente amanhã.");
   await sendOnChannel(lead, channel, renderReminder(reminderTexts(settings).noShow, lead, settings.ownerName), { identityId });
 }

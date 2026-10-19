@@ -7,9 +7,14 @@ import { notifyTeam } from "@/lib/team";
 // lugar pra isso: resposta da IA, follow-up, abertura e anexo usam daqui.
 // silent: não manda push (mensagem automática do outro lado; fica na lista "Precisa de você" com o motivo).
 // urgent: sinistro, reclamação, jurídico, cancelamento — a equipe marcada pra urgências também é avisada.
+// Motivo gravado quando o corretor assume a conversa: enquanto ele não devolver, nada o sobrescreve.
+export const TAKEOVER_REASON = "Você assumiu a conversa";
+
 export async function markNeedsHuman(leadId: string, rawReason: string, opts: { silent?: boolean; urgent?: boolean } = {}) {
+  const current = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true, needsHumanReason: true } });
+  if (current?.status === "NEEDS_HUMAN" && current.needsHumanReason === TAKEOVER_REASON) return;
   const reason = readableReason(rawReason);
-  if (reason !== rawReason.trim()) console.error(`[handoff] lead=${leadId} motivo completo:`, rawReason);
+  if (reason !== rawReason.trim()) console.error(`[handoff] lead=${leadId} motivo longo encurtado (${rawReason.length} caracteres)`);
   const lead = await prisma.lead.update({
     where: { id: leadId },
     data: { status: "NEEDS_HUMAN", needsHumanReason: reason },

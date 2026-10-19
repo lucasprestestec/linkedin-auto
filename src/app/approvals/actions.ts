@@ -21,12 +21,14 @@ function refresh() {
 // Aprova (com o texto editado, se o corretor mudou). Fora do horário de
 // trabalho a mensagem fica aprovada e sai quando a janela abrir.
 export async function approve(id: string, content: string): Promise<ApproveResult> {
+  await requireSession();
   const result = await approveDraft(id, content);
   refresh();
   return result;
 }
 
 export async function discard(id: string): Promise<{ error?: string }> {
+  await requireSession();
   const result = await discardDraft(id);
   refresh();
   return result;
@@ -76,6 +78,7 @@ export async function setDraftAudio(id: string, on: boolean): Promise<{ error?: 
 }
 
 export async function setApprovalMode(on: boolean) {
+  await requireSession();
   await prisma.settings.update({ where: { id: "singleton" }, data: { approvalMode: on } });
   refresh();
 }

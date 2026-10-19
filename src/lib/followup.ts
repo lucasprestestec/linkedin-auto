@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { markNeedsHuman } from "@/lib/handoff";
 import { extractConnections, type EdgesConnection } from "@/lib/edges";
 import { decideNextStep, generateBookingNudge, generateFirstContact, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
-import { messagesSentToday, whatsappSentToday } from "@/lib/limits";
+import { effectiveLimits, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { emailLeftToday } from "@/lib/mailboxes";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { emailEnabled } from "@/lib/email";
@@ -413,7 +413,7 @@ async function sendFollowUps(
           signals: signalsFor(lead, history, lead.rule, now),
           extraTouch,
         });
-        console.log(`[próximo passo] lead=${lead.id} opções=${options.join(",")} ação=${decision.action} canal=${decision.channel ?? "-"} motivo=${JSON.stringify(decision.reason)}`);
+        console.log(`[próximo passo] lead=${lead.id} opções=${options.join(",")} ação=${decision.action} canal=${decision.channel ?? "-"} motivo=(${decision.reason?.length ?? 0} caracteres, não gravado nos logs)`);
         if (decision.action === "stop") {
           await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST", nextStep: decision.reason, nextStepAt: null } });
           lost++;
@@ -676,10 +676,10 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   if ((await pendingDraftCount()) >= MAX_PENDING_DRAFTS) return { ...result, skipped: "aprovações pendentes demais: abra Aprovações" };
 
   const emailReady = await emailChannelReady(settings);
-  const linkedinLeft = identityId ? settings.dailyMessageLimit - (await messagesSentToday()) : 0;
+  const linkedinLeft = identityId ? effectiveLimits(settings).linkedinMessages - (await messagesSentToday()) : 0;
   const emailLeft = emailReady ? await emailLeftToday(settings) : 0;
   const whatsappReady = whatsappChannelReady(settings);
-  const whatsappLeft = whatsappReady ? settings.dailyWhatsappLimit - (await whatsappSentToday()) : 0;
+  const whatsappLeft = whatsappReady ? effectiveLimits(settings).whatsapp - (await whatsappSentToday()) : 0;
   const budget: Budget = {
     total: MAX_PROACTIVE_PER_RUN,
     LINKEDIN: Math.max(0, linkedinLeft),
@@ -694,7 +694,7 @@ export async function runProactive(identityId: string | null): Promise<Proactive
   const firstBudget: Budget = {
     ...budget,
     EMAIL: emailReady ? budget.EMAIL : await emailLeftToday(settings),
-    WHATSAPP: whatsappReady ? budget.WHATSAPP : Math.max(0, settings.dailyWhatsappLimit - (await whatsappSentToday())),
+    WHATSAPP: whatsappReady ? budget.WHATSAPP : Math.max(0, effectiveLimits(settings).whatsapp - (await whatsappSentToday())),
   };
   result.firstContactsSent = await sendFirstContacts(
     settings,

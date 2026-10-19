@@ -48,6 +48,8 @@ export async function setPanelUserActive(id: string, active: boolean): Promise<{
   const session = await getSession();
   if (!active && session?.kind === "user" && session.user.id === id) return { error: "Você não pode desativar o seu próprio acesso." };
   await prisma.panelUser.update({ where: { id }, data: { active } });
+  // Desativada: o celular dela para de receber avisos com dados de leads.
+  if (!active) await prisma.pushSubscription.deleteMany({ where: { userId: id } });
   revalidatePath("/settings/acessos");
   return {};
 }
