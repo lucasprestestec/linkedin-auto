@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommUrl, saveDeskcommConnection, whatsappPairing, type WhatsappPairing } from "@/lib/deskcomm";
+import { deskcommConfigOf, fixedDeskcommUrl, inspectDeskcomm, normalizeDeskcommUrl, resetWhatsapp, saveDeskcommConnection, whatsappPairing, type WhatsappPairing } from "@/lib/deskcomm";
 
 // Regras do canal de e-mail (tela Canais). null em fallbackDays = o assistente
 // nunca se apresenta por e-mail quando o convite fica parado.
@@ -64,6 +64,20 @@ export async function whatsappPairingState(withQr: boolean): Promise<WhatsappPai
     return await whatsappPairing(cfg, withQr);
   } catch (err) {
     return { state: "error", message: err instanceof Error ? err.message : "Não foi possível falar com o WhatsApp." };
+  }
+}
+
+// O cliente desconecta o número ("disconnect") ou troca de número ("switch": desloga e fica
+// esperando o QR do novo celular). O canal e as conversas continuam os mesmos.
+export async function resetWhatsappNumber(mode: "disconnect" | "switch") {
+  const cfg = await currentConfig();
+  if (!cfg) return { error: "O WhatsApp ainda não foi preparado. Fale com o suporte." };
+  try {
+    await resetWhatsapp(cfg, mode === "switch");
+    revalidatePath("/settings");
+    return { saved: true as const };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível agora. Tente de novo em instantes." };
   }
 }
 
