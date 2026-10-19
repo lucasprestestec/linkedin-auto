@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { MAX_AI_PER_CONVERSATION, aiInteractionsForLeadThisMonth, withLeadScope } from "@/lib/aiUsage";
 import { markNeedsHuman } from "@/lib/handoff";
 import { decideResponse } from "@/lib/agent";
 import { effectiveLimits, messagesSentToday } from "@/lib/limits";
@@ -15,7 +16,7 @@ import { publicBaseUrl } from "@/lib/voice/outgoingAudio";
 // Chamado depois que uma mensagem nova do lead é gravada no banco.
 // Decide: responder automaticamente (no MESMO canal em que ele escreveu), ou
 // marcar NEEDS_HUMAN com o motivo certo.
-export async function handleIncomingMessage(lead: Lead, identityId: string | null) {
+async function handleIncomingMessageImpl(lead: Lead, identityId: string | null) {
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
 
   // O lead escreveu: qualquer mensagem que esperava aprovação ficou velha.
@@ -24,6 +25,12 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
   // Quem pediu para não receber mais, ou a conversa que o corretor assumiu: a IA não responde.
   // (O corretor devolve a conversa pelo botão "Devolver ao assistente".)
   if (lead.doNotContact || lead.status === "NEEDS_HUMAN") return;
+
+  // Uso justo: conversa muito longa no mês passa para o corretor (limita o custo de uma única pessoa).
+  if ((await aiInteractionsForLeadThisMonth(lead.id)) >= MAX_AI_PER_CONVERSATION) {
+    await markNeedsHuman(lead.id, "Conversa muito longa neste mês: a assistente parou e passou para você (limite de uso justo)");
+    return;
+  }
 
   // Outra IA (ex.: a Sofia) está com essa pessoa: a secretária não entra em nenhum canal.
   if (lead.otherAiActive) {
@@ -159,3 +166,5 @@ export async function handleIncomingMessage(lead: Lead, identityId: string | nul
     await markNeedsHuman(lead.id, `Falha ao enviar mensagem: ${err instanceof Error ? err.message : "erro desconhecido"}`);
   }
 }
+
+export const handleIncomingMessage = withLeadScope(handleIncomingMessageImpl, ([lead]) => lead.id);
