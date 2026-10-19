@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { recordAiUsage } from "@/lib/aiUsage";
 import type { LeadKind, LeadStatus, MessageChannel, Message as DbMessage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LEAD_KIND_PROMPT } from "@/lib/leadKind";
@@ -64,7 +65,7 @@ const toolChoiceMode = new Map<string, "named" | "required" | "auto">();
 
 export async function completeWithTool(
   client: OpenAI,
-  params: { model: string; messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]; tool: OpenAI.Chat.Completions.ChatCompletionTool },
+  params: { model: string; messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]; tool: OpenAI.Chat.Completions.ChatCompletionTool; purpose: string },
 ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
   const name = params.tool.type === "function" ? params.tool.function.name : "";
   const modes: ("named" | "required" | "auto")[] = ["named", "required", "auto"];
@@ -75,6 +76,7 @@ export async function completeWithTool(
     try {
       const response = await client.chat.completions.create({ model: params.model, messages: params.messages, tools: [params.tool], tool_choice });
       toolChoiceMode.set(params.model, mode);
+      await recordAiUsage(params.purpose, params.model, response);
       return response;
     } catch (err) {
       lastError = err;
@@ -515,7 +517,7 @@ Use SEMPRE a ferramenta respond_to_lead: primeiro a análise, depois a decisão.
 
   // Até 2 tentativas: se a mensagem não passar na conferência, pede pra reescrever.
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = opts.complete ? await opts.complete({ messages, tool: RESPOND_TOOL }) : await completeWithTool(client!, { model, messages, tool: RESPOND_TOOL });
+    const response = opts.complete ? await opts.complete({ messages, tool: RESPOND_TOOL }) : await completeWithTool(client!, { model, messages, tool: RESPOND_TOOL, purpose: "resposta" });
     usage = addUsage(usage, usageOf(response));
 
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
@@ -666,7 +668,7 @@ async function writeMessage(
 
   let issues: string[] = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await completeWithTool(client, { model, messages, tool: WRITE_TOOL });
+    const response = await completeWithTool(client, { model, messages, tool: WRITE_TOOL, purpose: "mensagem" });
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.type !== "function") throw new Error("O agente não retornou uma mensagem.");
     const message = (JSON.parse(toolCall.function.arguments) as { message?: string }).message?.trim();
@@ -836,6 +838,7 @@ Use a ferramenta next_step. Nunca responda em texto livre.`;
 
   const response = await completeWithTool(client, {
     model,
+    purpose: "proximo_passo",
     messages: [
       { role: "system", content: system },
       { role: "user", content: `Histórico (mais antigo primeiro):\n${transcriptOf(input.history) || "(vazio)"}\n\nQual o próximo passo?` },
@@ -966,6 +969,7 @@ export async function scoreProfiles(idealCustomer: string, profiles: ProfileToSc
     const batch = profiles.slice(i, i + SCORE_BATCH);
     const response = await completeWithTool(client, {
       model,
+      purpose: "pontuacao",
       messages: [
         {
           role: "system",

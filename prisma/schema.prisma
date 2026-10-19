@@ -522,3 +522,17 @@ model InviteScheduled {
   campaignId String?
   createdAt  DateTime @default(now())
 }
+
+// Cada chamada à IA: base do limite de "interações com IA" por plano e do custo real por cliente.
+// costUsd vem do provedor quando ele informa (senão fica vazio e o custo se estima pelos tokens).
+model AiUsage {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  purpose      String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costUsd      Float?
+
+  @@index([createdAt])
+}

@@ -1,4 +1,5 @@
 import { nousClient } from "@/lib/agent";
+import { recordAiUsage } from "@/lib/aiUsage";
 
 // Entende áudio, foto e vídeo que o lead manda: baixa o arquivo e pede a um modelo que entende mídia
 // (pelo Nous) o texto dele (transcrição ou descrição). O assistente continua a conversa em cima desse
@@ -85,6 +86,7 @@ async function defaultAsk(model: string, prompt: string, parts: Part[]): Promise
     max_tokens: 1500,
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...parts] as never }],
   });
+  await recordAiUsage("midia", model, r);
   return String(r.choices[0]?.message?.content ?? "").trim();
 }
 

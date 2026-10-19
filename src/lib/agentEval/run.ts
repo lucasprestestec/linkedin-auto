@@ -198,7 +198,7 @@ async function judge(s: Scenario, out: { action: string; message?: string; reaso
     ],
     tool: JUDGE_TOOL,
   };
-  const response = complete ? await complete({ messages: judgeParams.messages, tool: judgeParams.tool }) : await completeWithTool(client!, judgeParams);
+  const response = complete ? await complete({ messages: judgeParams.messages, tool: judgeParams.tool }) : await completeWithTool(client!, { ...judgeParams, purpose: "avaliacao" });
   const call = response.choices[0]?.message?.tool_calls?.[0];
   if (!call || call.type !== "function") throw new Error("avaliador não respondeu");
   const g = JSON.parse(call.function.arguments);

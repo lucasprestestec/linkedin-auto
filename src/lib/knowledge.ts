@@ -169,6 +169,7 @@ export async function pickSections(candidates: Pick<KnowledgeSection, "id" | "ti
 
   const response = await completeWithTool(nousClient(), {
     model: fastModel(),
+    purpose: "trechos",
     messages: [
       {
         role: "system",
