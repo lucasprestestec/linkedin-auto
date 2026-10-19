@@ -11,10 +11,12 @@ import { loginBlocked, loginFailed, loginSucceeded } from "@/lib/loginLimit";
 export async function login(_prevState: { error?: string } | undefined, formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const ip = ((await headers()).get("x-forwarded-for") ?? "").split(",")[0].trim() || "sem-ip";
-  const key = `${normalizeLogin(String(formData.get("login") ?? ""))}|${ip}`;
+  // Com acesso individual a chave inclui o login; com senha única, só o aparelho (o campo login seria um atalho).
+  const individual = await hasIndividualAccess();
+  const key = individual ? `${normalizeLogin(String(formData.get("login") ?? ""))}|${ip}` : `unica|${ip}`;
   if (loginBlocked(key)) return { error: "Muitas tentativas. Espere 15 minutos e tente de novo." };
 
-  if (await hasIndividualAccess()) {
+  if (individual) {
     const login = normalizeLogin(String(formData.get("login") ?? ""));
     const user = login ? await prisma.panelUser.findUnique({ where: { login } }) : null;
     // Confere a senha mesmo sem achar a pessoa, para não revelar quais logins existem.

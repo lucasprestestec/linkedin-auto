@@ -36,7 +36,9 @@ export async function emailLeftToday(settings: LimitSettings, now = new Date()):
   const active = await prisma.mailbox.findMany({ where: { status: "ACTIVE" } });
   if (active.length === 0) return Math.max(0, effectiveLimits(settings).email - (await emailsSentToday()));
   const used = await sentTodayByMailbox(now);
-  return totalRemainingToday(active, (id) => used.get(id) ?? 0, now);
+  // Vale o menor entre o que as caixas aguentam e o limite diário do cliente (que o plano vai definir).
+  const total = effectiveLimits(settings).email - (await emailsSentToday());
+  return Math.max(0, Math.min(totalRemainingToday(active, (id) => used.get(id) ?? 0, now), total));
 }
 
 // Escolhe a caixa que manda para esta pessoa. configured = existem caixas ativas; mailbox null com

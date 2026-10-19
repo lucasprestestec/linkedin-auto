@@ -179,6 +179,7 @@ enum DraftKind {
 enum DraftStatus {
   PENDING    // esperando o corretor
   APPROVED   // aprovada; sai assim que a janela de horário permitir
+  SENDING    // reservada por um envio em andamento (ninguém mais pega)
   SENT
   DISCARDED  // corretor descartou, ou o lead respondeu antes
   EXPIRED    // ninguém decidiu a tempo

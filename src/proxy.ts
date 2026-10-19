@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionToken } from "@/lib/auth";
+import { sessionStillValid } from "@/lib/sessionCheck";
 
 // O layout precisa saber a página atual para mandar quem perdeu o acesso de volta ao login.
 function pass(request: NextRequest) {
@@ -8,7 +9,7 @@ function pass(request: NextRequest) {
   return NextResponse.next({ request: { headers } });
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rotas chamadas por serviços externos (cron-job.org, edges.run) não têm
@@ -37,7 +38,8 @@ export function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!isValidSessionToken(token)) {
+  // Assinatura ok E a pessoa ainda ativa (desativada ou com senha trocada perde o acesso em todas as páginas e rotas).
+  if (!isValidSessionToken(token) || !(await sessionStillValid(token!).catch(() => false))) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }

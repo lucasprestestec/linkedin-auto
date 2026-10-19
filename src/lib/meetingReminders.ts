@@ -129,5 +129,7 @@ export async function sendMeetingReminders(identityId: string | null, settings: 
 export async function sendNoShow(lead: Lead & { messages: { sender: string; channel: MessageChannel }[] }, identityId: string | null, settings: Settings) {
   const channel = conversationChannel(lead.messages);
   if (!channel) throw new Error("Não há conversa com essa pessoa para mandar a mensagem.");
+  if (lead.doNotContact) throw new Error("A pessoa pediu para não receber mais mensagens.");
+  if (channel === "LINKEDIN" && (await messagesSentToday()) >= effectiveLimits(settings).linkedinMessages) throw new Error("O limite diário de mensagens do LinkedIn já foi atingido hoje.");
   await sendOnChannel(lead, channel, renderReminder(reminderTexts(settings).noShow, lead, settings.ownerName), { identityId });
 }

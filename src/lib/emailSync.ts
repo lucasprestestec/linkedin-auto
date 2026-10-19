@@ -46,16 +46,17 @@ async function saveEmails(all: (IncomingEmail & { mailbox?: MailboxEmail["mailbo
       await markNeedsHuman(lead.id, "Respondeu por e-mail só com anexo — veja na sua caixa");
       continue;
     }
+    // Respondeu: conversa aberta e sem follow-up pendente. Atualiza o contato ANTES de gravar a mensagem:
+    // se algo falhar no meio, a próxima leitura refaz os dois (a mensagem só existe depois do contato atualizado).
+    const updated = await prisma.lead.update({
+      where: { id: lead.id },
+      data: { status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? lead.status : "CONVERSATION_OPEN", followUpsSent: 0, nextStep: null, nextStepAt: null },
+    });
     await prisma.message.create({
       data: { leadId: lead.id, sender: "LEAD", channel: "EMAIL", content: e.text, subject: e.subject || null, emailMessageId: e.messageId, emailThreadId: e.threadId, deliveredAt: e.date, mailboxId: e.mailbox?.id ?? null },
     });
     saved++;
     await captureContactsSafely(lead.id, e.text);
-    // Respondeu: conversa aberta e sem follow-up pendente.
-    const updated = await prisma.lead.update({
-      where: { id: lead.id },
-      data: { status: lead.status === "NEEDS_HUMAN" || lead.status === "QUALIFIED" || lead.status === "MEETING_SCHEDULED" ? lead.status : "CONVERSATION_OPEN", followUpsSent: 0, nextStep: null, nextStepAt: null },
-    });
     touched.set(lead.id, updated);
   }
   return { read: emails.length, saved, leads: [...touched.values()] };

@@ -15,6 +15,9 @@ import { recordFeedback } from "@/lib/agentFeedback";
 import { requireSession } from "@/lib/session";
 import { sendNoShow } from "@/lib/meetingReminders";
 
+// Motivo gravado quando o corretor assume: enquanto ele não devolver, nem uma resposta manual religa a IA.
+const TAKEOVER_REASON = "Você assumiu a conversa";
+
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   await requireSession();
   const content = String(formData.get("content") ?? "").trim();
@@ -32,10 +35,14 @@ export async function sendReply(leadId: string, _prevState: { error?: string } |
     // "Conversando" só se o lead já respondeu alguma vez; senão, seguimos
     // aguardando a primeira resposta dele.
     const leadHasReplied = await prisma.message.count({ where: { leadId: lead.id, sender: "LEAD" } });
-    await prisma.lead.update({
-      where: { id: lead.id },
-      data: { status: leadHasReplied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null },
-    });
+    await supersedeDrafts(lead.id, "Você respondeu direto antes de a mensagem sair.");
+    // Conversa assumida continua sua até você devolver ao assistente.
+    if (!(lead.status === "NEEDS_HUMAN" && lead.needsHumanReason === TAKEOVER_REASON)) {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { status: leadHasReplied > 0 ? "CONVERSATION_OPEN" : "WAITING_REPLY", needsHumanReason: null },
+      });
+    }
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Falha ao enviar mensagem." };
   }
@@ -95,7 +102,8 @@ export async function leadAction(leadId: string, kind: LeadActionKind) {
     await prisma.lead.update({ where: { id: leadId }, data: { status: "QUALIFIED", needsHumanReason: null } });
   } else if (kind === "takeover") {
     // Assumir = a IA para de responder esta conversa até você devolver.
-    await prisma.lead.update({ where: { id: leadId }, data: { status: "NEEDS_HUMAN", needsHumanReason: "Você assumiu a conversa" } });
+    await supersedeDrafts(leadId, "Você assumiu a conversa antes de a mensagem sair.");
+    await prisma.lead.update({ where: { id: leadId }, data: { status: "NEEDS_HUMAN", needsHumanReason: TAKEOVER_REASON } });
   } else if (kind === "handback") {
     const replied = await prisma.message.count({ where: { leadId, sender: "LEAD" } });
     await prisma.lead.update({
