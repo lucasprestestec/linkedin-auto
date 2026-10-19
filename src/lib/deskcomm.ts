@@ -173,22 +173,40 @@ export type WhatsappPairing =
   | { state: "qr"; qr: string } // imagem PNG em base64
   | { state: "waiting"; hint: string | null }; // sessão subindo / QR sendo gerado: tente de novo em segundos
 
+// Escolhe o número do cliente entre os canais do Deskcomm e guarda a escolha.
+// Um número que está funcionando ganha de um caído (o cliente pode ter conectado um número novo
+// e deixado o antigo para trás); entre iguais, vale o que já estava guardado.
+async function pickChannel(client: Rpc, cfg: DeskcommConfig) {
+  const names = new Set(await client.listTools());
+  if (!names.has("crm_list_whatsapp_channels") || !names.has("crm_get_whatsapp_channel_qr")) {
+    throw new DeskcommError("Esta instalação do WhatsApp ainda não conecta por QR Code. Fale com o suporte.");
+  }
+  const { channels } = await client.call<{ channels: { channel_session_id: string; phone_number: string | null; status: string; has_session: boolean }[] }>("crm_list_whatsapp_channels", {});
+  const saved = channels.find((c) => c.channel_session_id === cfg.channelId);
+  const ch = (saved?.status === "WORKING" ? saved : channels.find((c) => c.status === "WORKING")) ?? saved ?? channels.find((c) => c.has_session) ?? channels[0];
+  if (ch && ch.channel_session_id !== cfg.channelId) {
+    await prisma.settings.update({ where: { id: "singleton" }, data: { deskcommChannelId: ch.channel_session_id } });
+  }
+  return { ch, names };
+}
+
+// Desconectar (reconnect=false) ou trocar de número (reconnect=true: desloga e fica esperando um QR novo).
+// O canal e as conversas continuam os mesmos; só o celular muda.
+export async function resetWhatsapp(cfg: DeskcommConfig, reconnect: boolean): Promise<void> {
+  await withClient(cfg, async (client) => {
+    const { ch, names } = await pickChannel(client, cfg);
+    if (!ch) throw new DeskcommError("Nenhum número de WhatsApp foi criado ainda. Fale com o suporte.");
+    if (!names.has("crm_reset_whatsapp_channel")) {
+      throw new DeskcommError("Esta instalação do WhatsApp ainda não permite desconectar ou trocar o número por aqui. Fale com o suporte.");
+    }
+    await client.call("crm_reset_whatsapp_channel", { channel_session_id: ch.channel_session_id, reconnect });
+  });
+}
+
 export async function whatsappPairing(cfg: DeskcommConfig, withQr: boolean): Promise<WhatsappPairing> {
   return withClient(cfg, async (client) => {
-    const names = new Set(await client.listTools());
-    if (!names.has("crm_list_whatsapp_channels") || !names.has("crm_get_whatsapp_channel_qr")) {
-      throw new DeskcommError("Esta instalação do WhatsApp ainda não conecta por QR Code. Fale com o suporte.");
-    }
-    const { channels } = await client.call<{ channels: { channel_session_id: string; phone_number: string | null; status: string; has_session: boolean }[] }>("crm_list_whatsapp_channels", {});
-    // Um número que está funcionando ganha de um caído (o cliente pode ter conectado um número novo
-    // e deixado o antigo para trás); entre iguais, vale o que já estava guardado.
-    const saved = channels.find((c) => c.channel_session_id === cfg.channelId);
-    const ch = (saved?.status === "WORKING" ? saved : channels.find((c) => c.status === "WORKING")) ?? saved ?? channels.find((c) => c.has_session) ?? channels[0];
+    const { ch } = await pickChannel(client, cfg);
     if (!ch) return { state: "none" };
-    // Guarda o número que a secretária vai usar nas conversas novas.
-    if (ch.channel_session_id !== cfg.channelId) {
-      await prisma.settings.update({ where: { id: "singleton" }, data: { deskcommChannelId: ch.channel_session_id } });
-    }
     if (ch.status === "WORKING") return { state: "connected", phone: ch.phone_number };
     if (!withQr) return { state: "pair" };
     const r = await client.call<{ status: string; qr_png_base64: string | null; message?: string }>("crm_get_whatsapp_channel_qr", { channel_session_id: ch.channel_session_id });

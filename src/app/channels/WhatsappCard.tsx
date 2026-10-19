@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
-import { connectDeskcomm, disconnectDeskcomm, updateWhatsappChannel, whatsappPairingState } from "./actions";
+import { connectDeskcomm, disconnectDeskcomm, resetWhatsappNumber, updateWhatsappChannel, whatsappPairingState } from "./actions";
 
 // WhatsApp pelo Deskcomm. O cliente só escaneia o QR Code; endereço e chave são
 // postos uma vez pelo suporte (variáveis do servidor, ou o formulário dobrado
@@ -111,12 +111,30 @@ function Pairing() {
   const [slow, setSlow] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
   const tries = useRef(0);
+  // Desconectar / trocar de número: pede confirmação antes (descarta o vínculo do celular).
+  const [confirm, setConfirm] = useState<"disconnect" | "switch" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const check = useCallback(async (withQr: boolean) => {
     const r = await whatsappPairingState(withQr);
     setSt(r);
     return r;
   }, []);
+
+  async function doReset(mode: "disconnect" | "switch") {
+    setBusy(true);
+    setResetError(null);
+    const r = await resetWhatsappNumber(mode);
+    setBusy(false);
+    setConfirm(null);
+    if (r.error) return setResetError(r.error);
+    setSlow(false);
+    setGaveUp(false);
+    await check(false);
+    if (mode === "switch") setAsking(true);
+    router.refresh();
+  }
 
   useEffect(() => {
     let alive = true;
@@ -167,11 +185,42 @@ function Pairing() {
 
   if (st.state === "connected") {
     return (
-      <div className="setting" style={{ padding: 0 }}>
-        <div className="setting-text">
-          <b>Conectado{st.phone ? ` · ${st.phone}` : ""}</b>
-          <small>O assistente usa o WhatsApp só com quem já deu sinal de interesse.</small>
+      <div className="stack" style={{ gap: 12 }}>
+        <div className="setting" style={{ padding: 0 }}>
+          <div className="setting-text">
+            <b>Conectado{st.phone ? ` · ${st.phone}` : ""}</b>
+            <small>O assistente usa o WhatsApp só com quem já deu sinal de interesse.</small>
+          </div>
+          {!confirm && (
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn-line btn-sm" onClick={() => setConfirm("switch")}>
+                Trocar de número
+              </button>
+              <button type="button" className="btn-line btn-sm" onClick={() => setConfirm("disconnect")}>
+                Desconectar
+              </button>
+            </div>
+          )}
         </div>
+        {resetError && <p className="field-error">{resetError}</p>}
+        {confirm && (
+          <div className="note stack" style={{ gap: 10 }}>
+            <p>
+              <b>{confirm === "switch" ? "Trocar de número?" : "Desconectar o WhatsApp?"}</b>{" "}
+              {confirm === "switch"
+                ? "O número atual é desconectado agora e você lê o QR Code do novo celular. As conversas continuam."
+                : "O assistente para de enviar e de ler mensagens até você conectar de novo."}
+            </p>
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn-line btn-sm btn-danger-line" disabled={busy} onClick={() => void doReset(confirm)}>
+                {busy ? "Aguarde…" : confirm === "switch" ? "Trocar de número" : "Desconectar"}
+              </button>
+              <button type="button" className="btn-text" disabled={busy} onClick={() => setConfirm(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -221,8 +270,14 @@ function Pairing() {
           </button>
         )}
       </div>
+      {resetError && <p className="field-error">{resetError}</p>}
       {gaveUp && !asking && (
-        <p className="field-error">O QR Code não saiu. O servidor de WhatsApp pode estar com problema: avise o suporte e tente de novo depois.</p>
+        <div className="stack" style={{ gap: 8, alignItems: "flex-start" }}>
+          <p className="field-error">O QR Code não saiu. Tente reiniciar a conexão; se continuar, avise o suporte.</p>
+          <button type="button" className="btn-line btn-sm" disabled={busy} onClick={() => void doReset("switch")}>
+            {busy ? "Reiniciando…" : "Reiniciar a conexão"}
+          </button>
+        </div>
       )}
       {asking && (
         <div className="note stack" style={{ gap: 10, alignItems: "flex-start" }}>
@@ -232,7 +287,14 @@ function Pairing() {
           ) : (
             <>
               <p>Gerando o QR Code… aguarde alguns segundos.</p>
-              {slow && <p>Está demorando mais que o normal. Se não sair, o servidor de WhatsApp pode estar com problema: avise o suporte.</p>}
+              {slow && (
+                <>
+                  <p>Está demorando mais que o normal. Reiniciar a conexão costuma resolver (é o caso de um número que foi desvinculado pelo celular).</p>
+                  <button type="button" className="btn-line btn-sm" disabled={busy} onClick={() => void doReset("switch")}>
+                    {busy ? "Reiniciando…" : "Reiniciar a conexão"}
+                  </button>
+                </>
+              )}
             </>
           )}
           <p>
