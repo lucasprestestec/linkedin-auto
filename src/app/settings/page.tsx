@@ -249,7 +249,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <Row id="limites" title="Limites diários do LinkedIn" summary={`${settings.dailyInviteLimit} convites e ${settings.dailyMessageLimit} mensagens por dia`}>
             <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} inviteMax={settings.dailyInviteMax} messageMax={settings.dailyMessageMax} />
           </Row>
-          <LinkRow href="/assistente/conhecimento" title="Base de conhecimento" sub="Manual, produtos e textos aprovados que o assistente consulta" />
+          <LinkRow href="/assistente/conhecimento" title={`O que ${settings.assistantName?.trim() || "o assistente"} sabe`} sub="Produtos, regras e textos aprovados que ela usa nas respostas. Dá para corrigir e acrescentar" />
           <Row title="Lembretes da reunião" summary={settings.meetingRemindersEnabled ? "Na véspera, 5h e 1h antes, e aviso se a pessoa faltar" : "Desligados"}>
             <MeetingRemindersForm
               enabled={settings.meetingRemindersEnabled}

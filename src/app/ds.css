@@ -3118,7 +3118,7 @@ textarea.field {
   color: #4cc47a;
 }
 
-/* ---------- Base de conhecimento (admin) ---------- */
+/* ---------- O que a assistente sabe (tela do cliente) ---------- */
 
 .know-summary {
   display: grid;
@@ -3208,7 +3208,7 @@ textarea.field {
 }
 
 .know-title small {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--text-3);
 }
@@ -3228,6 +3228,67 @@ textarea.field {
 
 .know-body {
   padding: 0 0 12px 20px;
+}
+
+.know-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.know-bar .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.know-new {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.know-group + .know-group {
+  margin-top: 14px;
+}
+
+.know-group-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+.know-chip {
+  flex: none;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+}
+
+.know-adv > summary,
+.know-adv-sec > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.know-choice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.know-choice small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12.5px;
 }
 
 .know-picks {
