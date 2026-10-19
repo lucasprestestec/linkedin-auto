@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { ADMIN_COOKIE, adminEnabled, checkAdminPassword, createAdminToken, requireAdmin } from "@/lib/admin";
+import { ADMIN_COOKIE, adminVisible, checkAdminPassword, createAdminToken, requireAdmin } from "@/lib/admin";
 import { testEmailConnection } from "@/lib/email";
 import { fixedDeskcommUrl, inspectDeskcomm, saveDeskcommConnection } from "@/lib/deskcomm";
 
@@ -35,7 +35,8 @@ export async function removeWhatsappKey() {
 }
 
 export async function adminLogin(_prev: { error?: string } | undefined, formData: FormData) {
-  if (!adminEnabled()) return { error: "Admin desativado." };
+  // Ações de servidor aceitam POST direto: quem não é o dono nem chega a tentar a senha.
+  if (!(await adminVisible())) return { error: "Admin desativado." };
   if (!checkAdminPassword(String(formData.get("password") ?? ""))) return { error: "Senha incorreta." };
   (await cookies()).set(ADMIN_COOKIE, createAdminToken(), {
     httpOnly: true,

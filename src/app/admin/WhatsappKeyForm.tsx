@@ -31,7 +31,9 @@ export function WhatsappKeyForm({ hasKey, fromServer }: { hasKey: boolean; fromS
         type="password"
         className="field"
         style={{ maxWidth: 420 }}
-        autoComplete="off"
+        autoComplete="new-password"
+        data-1p-ignore
+        data-lpignore="true"
         placeholder="Cole a chave de acesso (dsk_…)"
         value={token}
         onChange={(e) => setToken(e.target.value)}
