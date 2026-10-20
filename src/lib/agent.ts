@@ -1013,6 +1013,20 @@ Use a ferramenta write_message (o campo message recebe o resumo).`,
   );
 }
 
+// Preparo da reunião: o que o corretor precisa ler em 1 minuto antes de entrar na chamada.
+async function prepareMeetingImpl(lead: LeadContext, history: HistoryItem[], extra: { when: string; notes: string | null }): Promise<string> {
+  return writeMessage(
+    `Você prepara um corretor de seguros para uma reunião. Com base SÓ no histórico e nas anotações abaixo, escreva em português do Brasil
+um roteiro curto com estes títulos, um por linha, cada um seguido de 1 a 3 tópicos começando com "• ":
+Contexto da empresa · Necessidade · Objeções e dúvidas · Quem participa · Pontos a confirmar na reunião.
+Se um item não aparece no histórico, escreva "• Não apareceu na conversa" (nunca invente número, nome, operadora ou promessa).
+Em "Pontos a confirmar", liste o que ainda falta saber para fazer uma boa proposta.
+Use a ferramenta write_message (o campo message recebe o roteiro).`,
+    `${leadBlock(lead)}\n\nReunião: ${extra.when}\nAnotações do corretor: ${extra.notes?.trim() || "(nenhuma)"}\n\nConversa (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
+    { model: fastModel(), style: null },
+  );
+}
+
 async function suggestReplyImpl(
   instructions: string | null,
   lead: LeadContext,
@@ -1042,5 +1056,6 @@ export const generateFollowUp = withLeadScope(generateFollowUpImpl, ([, lead]) =
 export const generateBookingNudge = withLeadScope(generateBookingNudgeImpl, ([, lead]) => (lead as { id?: string }).id);
 export const suggestReply = withLeadScope(suggestReplyImpl, ([, lead]) => (lead as { id?: string }).id);
 export const summarizeConversation = withLeadScope(summarizeConversationImpl, ([lead]) => (lead as { id?: string }).id);
+export const prepareMeeting = withLeadScope(prepareMeetingImpl, ([lead]) => (lead as { id?: string }).id);
 export const decideNextStep = withLeadScope(decideNextStepImpl, ([input]) => (input.lead as { id?: string }).id);
 export const decideResponse = withLeadScope(decideResponseImpl, ([input]) => (input.lead as { id?: string }).id);
