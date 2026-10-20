@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { userBlockedByPlan } from "@/lib/plan";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getSession, requireSession } from "@/lib/session";
@@ -23,6 +24,8 @@ export async function addPanelUser(data: { name: string; login: string }): Promi
   if (OWNER_LOGINS.includes(login) || (await prisma.panelUser.findUnique({ where: { login }, select: { id: true } }))) {
     return { error: `O login "${login}" já está em uso. Escolha outro.` };
   }
+  const blocked = await userBlockedByPlan();
+  if (blocked) return { error: blocked };
   await prisma.panelUser.create({ data: { name, login } });
   revalidatePath("/settings/acessos");
   return {};
