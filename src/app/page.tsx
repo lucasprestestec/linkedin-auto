@@ -2,7 +2,7 @@ import Link from "next/link";
 import { elevenUsage, voiceNotice } from "@/lib/voice/usage";
 import { prisma } from "@/lib/prisma";
 import { clockTime, todayLabel } from "@/lib/format";
-import { getConversationItems, type ConvItem } from "@/lib/conversations";
+import { getConversationItems } from "@/lib/conversations";
 import { loadApprovalItems } from "@/lib/approvalItems";
 import { MobileHeader } from "@/components/MobileHeader";
 import { Avatar } from "@/components/Avatar";
@@ -19,6 +19,7 @@ import { ApprovalCard } from "./approvals/ApprovalCard";
 import { AutomationBar } from "./AutomationBar";
 import { linkedinDataCount } from "./settings/actions";
 import { dealBoard } from "@/lib/dealStats";
+import { getHotLeads } from "@/lib/hotLeads";
 import { syncAlerts } from "@/lib/syncReport";
 import { formatBRL } from "@/lib/deal";
 
@@ -38,13 +39,6 @@ function Flaps({ value }: { value: number }) {
     </span>
   );
 }
-
-const HOT_TAG: Partial<Record<ConvItem["status"], { label: string; cls: string }>> = {
-  NEEDS_HUMAN: { label: "Com você", cls: "tg-you" },
-  MEETING_SCHEDULED: { label: "Reunião", cls: "tg-ok" },
-  QUALIFIED: { label: "Oportunidade", cls: "tg-ok" },
-  CONVERSATION_OPEN: { label: "Conversando", cls: "tg-ok" },
-};
 
 function fullName(c: { firstName: string | null; lastName: string | null }) {
   return [c.firstName, c.lastName].filter(Boolean).join(" ") || "Contato";
@@ -88,7 +82,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const now = new Date();
   const raw = (await searchParams).periodo;
   const period = PERIODS.find((p) => p.key === raw) ?? PERIODS[1];
-  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals] = await Promise.all([
+  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals, hot] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     getConversationItems(),
     loadApprovalItems({ status: "PENDING" }),
@@ -101,6 +95,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
     emailsSentToday(),
     whatsappSentToday(),
     dealBoard(sinceOf(period.key, now)),
+    getHotLeads(3, now),
   ]);
 
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
@@ -136,11 +131,6 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
     voiceAlert && { key: "voice", title: voiceAlert.title, sub: voiceAlert.sub, href: "/assistente#voz", cta: "Ver", tag: voiceAlert.level === "acabou" ? "Parado" : "Aviso" },
   ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string; tag: string } => Boolean(a));
   const waiting = alerts.length + needYou.length + drafts.length;
-
-  const hot = conversations
-    .filter((c) => HOT_TAG[c.status])
-    .sort((a, b) => b.whenTs - a.whenTs)
-    .slice(0, 3);
 
   const capacity = [
     linkedinOk && { key: "LINKEDIN" as ChannelKey, label: "Convites", used: settings.dailyInviteLimit - invitesLeft, limit: settings.dailyInviteLimit },
@@ -350,9 +340,9 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
                       <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={32} />
                       <span className="grow">
                         {fullName(c)}
-                        <small>{c.when}</small>
+                        <small>{c.signals.slice(0, 3).map((s) => s.label).join(" · ")}</small>
+                        {c.signals.find((s) => s.quote && s.key !== "decider") && <small>&ldquo;{c.signals.find((s) => s.quote && s.key !== "decider")!.quote}&rdquo;</small>}
                       </span>
-                      <span className={`tg ${HOT_TAG[c.status]!.cls}`}>{HOT_TAG[c.status]!.label}</span>
                     </Link>
                   </li>
                 ))}
