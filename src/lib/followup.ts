@@ -1,5 +1,6 @@
 import type { Lead, MessageChannel, Settings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isBlocked, usableChannels } from "@/lib/channelPrefs";
 import { markNeedsHuman } from "@/lib/handoff";
 import { extractConnections, type EdgesConnection } from "@/lib/edges";
 import { decideNextStep, generateBookingNudge, generateFirstContact, generateFollowUp, generateIntroEmail, generateOpeningMessage } from "@/lib/agent";
@@ -158,6 +159,7 @@ async function sendOpenings(identityId: string, settings: Settings, budget: Budg
       linkedinConnected: true,
       linkedinThreadId: null,
       messages: { none: { channel: "LINKEDIN" } },
+      NOT: { blockedChannels: { has: "LINKEDIN" } },
       ...CAN_APPROACH,
       ...IN_ACTIVE_CAMPAIGN,
       ...OPEN_DRAFT_FILTER,
@@ -216,6 +218,7 @@ async function sendIntroEmails(settings: Settings, emailReady: boolean, budget: 
       status: "INVITE_SENT",
       email: { not: null },
       emailBouncedAt: null,
+      NOT: { blockedChannels: { has: "EMAIL" } },
       messages: { none: {} },
       OR: [{ invitedAt: { lte: cutoff } }, { invitedAt: null, createdAt: { lte: cutoff } }],
       ...CAN_APPROACH,
@@ -265,7 +268,7 @@ async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WH
   for (const lead of leads) {
     const channel = lead.firstContactChannel as "EMAIL" | "WHATSAPP";
     if (budget.total <= 0) break;
-    if (!ready[channel] || budget[channel] <= 0) continue;
+    if (!ready[channel] || budget[channel] <= 0 || isBlocked(lead, channel)) continue;
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
     try {
       const instructions = await instructionsFor(lead, settings, {
@@ -387,10 +390,12 @@ async function sendFollowUps(
     }
     if (budget.total <= 0) continue;
 
-    const options: MessageChannel[] = [];
-    if (identityId && lead.linkedinConnected && budget.LINKEDIN > 0) options.push("LINKEDIN");
-    if (emailReady && lead.email && !lead.emailBouncedAt && budget.EMAIL > 0) options.push("EMAIL");
-    if (whatsappReady && lead.phone && budget.WHATSAPP > 0 && showedInterest(lead, history)) options.push("WHATSAPP");
+    const available: MessageChannel[] = [];
+    if (identityId && lead.linkedinConnected && budget.LINKEDIN > 0) available.push("LINKEDIN");
+    if (emailReady && lead.email && !lead.emailBouncedAt && budget.EMAIL > 0) available.push("EMAIL");
+    if (whatsappReady && lead.phone && budget.WHATSAPP > 0 && showedInterest(lead, history)) available.push("WHATSAPP");
+    // Canais que a pessoa bloqueou saem; havendo canal preferido disponível, é o único tentado.
+    const options = usableChannels(lead, available);
     // Nenhum canal disponível agora (limite do dia, LinkedIn desconectado...): tenta na próxima rodada.
     if (options.length === 0) continue;
 
@@ -510,7 +515,13 @@ async function sendCadenceSteps(
     if (budget.total <= 0) break;
 
     const can = (c: MessageChannel) =>
-      c === "LINKEDIN" ? Boolean(identityId && lead.linkedinConnected) : c === "EMAIL" ? ready.EMAIL && Boolean(lead.email) && !lead.emailBouncedAt : ready.WHATSAPP && Boolean(lead.phone);
+      isBlocked(lead, c)
+        ? false
+        : c === "LINKEDIN"
+          ? Boolean(identityId && lead.linkedinConnected)
+          : c === "EMAIL"
+            ? ready.EMAIL && Boolean(lead.email) && !lead.emailBouncedAt
+            : ready.WHATSAPP && Boolean(lead.phone);
     // Canal do passo; sem ele (ou indisponível), o mesmo da última mensagem.
     const channel = next.channel && can(next.channel) ? next.channel : last.channel;
     if (!can(channel) || budget[channel] <= 0) continue;
@@ -612,7 +623,7 @@ async function sendBookingNudges(
     if (!last || last.sender === "LEAD") continue;
     const channel = last.channel;
     if (!ready[channel] || budget[channel] <= 0) continue;
-    if (channel === "EMAIL" && lead.emailBouncedAt) continue;
+    if ((channel === "EMAIL" && lead.emailBouncedAt) || isBlocked(lead, channel)) continue;
     try {
       const content = await generateBookingNudge(
         await instructionsFor(lead, settings, { task: "lembrete leve: sugerimos horários de reunião e a pessoa não escolheu", history }),

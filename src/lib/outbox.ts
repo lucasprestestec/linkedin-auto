@@ -1,5 +1,6 @@
 import type { Draft, DraftKind, Lead, MessageChannel, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { CHANNEL_NAME, isBlocked } from "@/lib/channelPrefs";
 import { CHANNEL_LABEL, sendOnChannel } from "@/lib/channels";
 import { activeIdentityIdOrNull } from "@/lib/identity";
 import { markNeedsHuman } from "@/lib/handoff";
@@ -116,6 +117,8 @@ async function sendNow(
 }
 
 export async function deliver(lead: Lead, channel: MessageChannel, content: string, opts: DeliverOptions): Promise<"sent" | "queued"> {
+  // Canal que a pessoa bloqueou: o assistente não puxa conversa por ele (responder a quem escreveu por lá segue valendo).
+  if (opts.kind !== "REPLY" && isBlocked(lead, channel)) throw new Error(`A pessoa pediu para não ser abordada pelo ${CHANNEL_NAME[channel]}.`);
   let approval = opts.approval ?? (await approvalModeOn());
   // Com a aprovação geral desligada, ainda passam pelo corretor: a mensagem em
   // que a IA ficou em dúvida e as de campanha nova em revisão.
@@ -217,6 +220,13 @@ async function sendApproved(draft: Draft): Promise<SendResult> {
   // Outra IA assumiu a pessoa: a mensagem aprovada antes não sai.
   if (lead.otherAiActive) {
     const error = "A pessoa está em conversa com outra IA.";
+    await prisma.draft.update({ where: { id: draft.id }, data: { status: "DISCARDED", error, decidedAt: new Date() } });
+    return { ok: false, error };
+  }
+
+  // Bloqueou o canal depois de a mensagem ser aprovada: ela não sai.
+  if (draft.kind !== "REPLY" && isBlocked(lead, draft.channel)) {
+    const error = `A pessoa pediu para não ser abordada pelo ${CHANNEL_NAME[draft.channel]}.`;
     await prisma.draft.update({ where: { id: draft.id }, data: { status: "DISCARDED", error, decidedAt: new Date() } });
     return { ok: false, error };
   }

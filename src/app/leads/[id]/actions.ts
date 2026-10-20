@@ -238,6 +238,17 @@ export async function setLeadOutreach(leadId: string, field: "otherAiActive" | "
   revalidatePath(`/leads/${leadId}`);
 }
 
+// Preferência de canal: por qual a pessoa gosta de ser chamada e em quais pediu para não ser abordada.
+export async function setChannelPrefs(leadId: string, preferred: string, blocked: string[]) {
+  await requireSession();
+  const valid = (c: unknown): c is MessageChannel => c === "LINKEDIN" || c === "EMAIL" || c === "WHATSAPP";
+  const blockedChannels = [...new Set(blocked.filter(valid))];
+  const preferredChannel = valid(preferred) && !blockedChannels.includes(preferred) ? preferred : null;
+  await prisma.lead.update({ where: { id: leadId }, data: { preferredChannel, blockedChannels } });
+  revalidatePath(`/leads/${leadId}`);
+  return { preferredChannel, blockedChannels };
+}
+
 // A pessoa faltou à reunião: o assistente manda o "senti sua falta" (texto de
 // Conta → Lembretes da reunião) e a conversa volta a andar pra remarcar.
 export async function markNoShow(leadId: string): Promise<{ error?: string }> {
