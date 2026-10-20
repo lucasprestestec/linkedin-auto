@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { countedMailboxes, countedUsers, loadPlan } from "@/lib/plan";
 import { aiUsageSummary, conversationsThisMonth, MAX_AI_PER_CONVERSATION, NON_COUNTED_PURPOSES, startOfMonthSP } from "@/lib/aiUsage";
 import { effectiveLimits, emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { effectiveLimit } from "@/lib/mailboxPolicy";
@@ -88,8 +89,11 @@ export async function buildStatus(now = new Date()) {
   const robotMinutes = settings.lastRobotRunAt ? Math.round((now.getTime() - settings.lastRobotRunAt.getTime()) / MIN) : null;
   const costDays = Math.max(1, now.getUTCDate());
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const aiBudget = envNumber("AI_BUDGET_USD");
-  const planConversations = envNumber("PLAN_CONVERSATIONS_LIMIT");
+  // O plano vem do banco (a Central LP grava). As variáveis antigas só valem se o plano não definir o número.
+  const plan = await loadPlan();
+  const [planBoxes, planUsersUsed] = await Promise.all([countedMailboxes(), countedUsers()]);
+  const aiBudget = plan.aiBudgetUsd ?? envNumber("AI_BUDGET_USD");
+  const planConversations = plan.conversations ?? envNumber("PLAN_CONVERSATIONS_LIMIT");
 
   const monthCost = ai.costUsd;
   const projection = (monthCost / costDays) * daysInMonth;
@@ -137,6 +141,13 @@ export async function buildStatus(now = new Date()) {
         : { servico: "ElevenLabs", indisponivel: true }
       : null,
     pessoas: { acessosAtivos: activeUsers },
+    plano: {
+      nome: plan.name,
+      conversas: planConversations ? used(conversations, planConversations) : null,
+      caixas: plan.mailboxes !== null ? used(planBoxes, plan.mailboxes) : null,
+      acessos: plan.users !== null ? used(planUsersUsed, plan.users) : null,
+      orcamentoIaUsd: aiBudget ? { usado: Math.round(monthCost * 100) / 100, limite: aiBudget, percentual: Math.round((monthCost / aiBudget) * 100) } : null,
+    },
   };
 
   // O que precisa de atenção, do mais grave para o menos grave.
@@ -163,6 +174,9 @@ export async function buildStatus(now = new Date()) {
   if (aiFailures > 0) add("alto", `${aiFailures} contato(s) parados por falha da IA (chave, crédito ou limite do provedor).`, "IA");
   if (aiBudget && monthCost >= aiBudget) add("alto", `O gasto de IA do mês (US$ ${monthCost.toFixed(2)}) chegou ao orçamento de US$ ${aiBudget}.`, "IA");
   else if (aiBudget && projection >= aiBudget) add("medio", `No ritmo atual, o gasto de IA do mês chega a US$ ${projection.toFixed(2)}, acima do orçamento de US$ ${aiBudget}.`, "IA");
+  if (plan.mailboxes !== null && planBoxes > plan.mailboxes) add("medio", `Há ${planBoxes} caixas cadastradas e o plano inclui ${plan.mailboxes}.`, "Plano");
+  if (plan.users !== null && planUsersUsed > plan.users) add("medio", `Há ${planUsersUsed} acessos ativos e o plano inclui ${plan.users}.`, "Plano");
+  if (!plan.name) add("info", "Nenhum plano definido para este cliente: os limites do plano não valem. Defina na Central LP.", "Plano");
   if (planConversations && conversations >= planConversations) add("alto", `As conversas do mês chegaram ao limite do plano (${planConversations}).`, "Plano");
   else if (planConversations && conversations >= planConversations * 0.8) add("medio", `${conversations} de ${planConversations} conversas do plano usadas no mês.`, "Plano");
   if (longest.length && longest[0].interacoes >= MAX_AI_PER_CONVERSATION - 5) add("info", `${longest[0].nome} está com ${longest[0].interacoes} interações de IA no mês (limite de uso justo: ${MAX_AI_PER_CONVERSATION}).`, "IA");

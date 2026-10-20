@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { mailboxBlockedByPlan } from "@/lib/plan";
 import { parseEmail } from "@/lib/contactFields";
 import { seal } from "@/lib/secretBox";
 import { testServers } from "@/lib/email";
@@ -31,6 +32,8 @@ export async function addMailbox(data: MailboxInput): Promise<{ error?: string }
   if (!smtpHost || !imapHost || !smtpPort || !imapPort) return { error: "Confira os servidores e as portas de envio e de leitura." };
   const dailyLimit = Math.min(100, Math.max(1, Math.round(data.dailyLimit) || 25));
   if (await prisma.mailbox.findUnique({ where: { address: e.email }, select: { id: true } })) return { error: "Essa caixa já está cadastrada." };
+  const blocked = await mailboxBlockedByPlan();
+  if (blocked) return { error: blocked };
 
   const fields = {
     address: e.email,

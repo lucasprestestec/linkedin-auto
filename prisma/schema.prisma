@@ -389,6 +389,13 @@ model Settings {
   dailySummarySentOn  String?
   // Última vez que o agendador chamou o robô (a central avisa se passar de 45 minutos).
   lastRobotRunAt      DateTime?
+  // Plano do cliente (a Central LP grava; vazio = sem limite): conversas por mês, caixas de e-mail, acessos ao painel
+  // e o orçamento de IA do mês (US$) que dispara o aviso.
+  planName            String?
+  planConversations   Int?
+  planMailboxes       Int?
+  planUsers           Int?
+  planAiBudgetUsd     Float?
   dailyEmailLimit     Int     @default(20)
   emailInviteFallbackDays Int? @default(5)
   // E-mail conectado com "Entrar com Google": endereço, refresh token
