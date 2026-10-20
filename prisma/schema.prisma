@@ -522,6 +522,9 @@ model Mailbox {
   imapLastUid      Int?
   imapUidValidity  String?
   bounces     Int           @default(0)
+  // Envios que o servidor de destino bloqueou (reputação, spam, autenticação): sinal de saúde da caixa, não de endereço ruim.
+  blockedBounces Int        @default(0)
+  lastBlockedAt  DateTime?
   lastCheckedAt DateTime?
   lastError   String?
   lastErrorAt DateTime?
