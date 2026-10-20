@@ -8,6 +8,7 @@ import { readContacts, type ImportProblem, type ImportRow } from "@/lib/contactI
 import { isExcluded, loadExclusionRules } from "@/lib/exclusion";
 import { emailEnabled } from "@/lib/email";
 import { deskcommConfig } from "@/lib/deskcomm";
+import { checkEmailDomains, domainOf, noMailMessage } from "@/lib/emailDomain";
 
 export type ImportFirstContact = "ME" | "EMAIL" | "WHATSAPP";
 
@@ -66,11 +67,27 @@ export async function importContacts(input: { text: string; campaignId: string; 
   }
   const rules = await loadExclusionRules();
 
+  // Domínio de e-mail que não existe: com outro contato na linha, o e-mail sai; sem outro, a linha não entra.
+  const domains = await checkEmailDomains(parsed.rows.flatMap((r) => (r.email ? [domainOf(r.email)] : [])));
+  const noMail = (r: ImportRow) => Boolean(r.email) && domains.get(domainOf(r.email!)) === "sem_servidor";
+
   const problems = [...parsed.problems];
   const fresh: ImportRow[] = [];
   let existing = 0;
   let excluded = 0;
-  for (const r of parsed.rows) {
+  let badDomain = 0;
+  for (const r0 of parsed.rows) {
+    let r = r0;
+    if (noMail(r)) {
+      const message = noMailMessage(domainOf(r.email!));
+      if (!r.phone && !r.linkedinProfileUrl) {
+        badDomain++;
+        problems.push({ line: r.line, message });
+        continue;
+      }
+      problems.push({ line: r.line, message: `${message} Importei sem o e-mail.` });
+      r = { ...r, email: null };
+    }
     if ((r.email && haveEmail.has(r.email)) || (r.phone && havePhone.has(r.phone)) || (r.linkedinProfileUrl && haveLink.has(r.linkedinProfileUrl))) {
       existing++;
       problems.push({ line: r.line, message: "Já está no sistema." });
@@ -86,7 +103,7 @@ export async function importContacts(input: { text: string; campaignId: string; 
     toCreate: fresh.length,
     existing,
     excluded,
-    invalid: parsed.problems.length,
+    invalid: parsed.problems.length + badDomain,
     ignored: parsed.ignored,
     problems: problems.slice(0, MAX_PROBLEMS),
     sample: fresh.slice(0, 5).map((r) => ({ line: r.line, name: [r.firstName, r.lastName].filter(Boolean).join(" "), contact: contactOf(r) })),

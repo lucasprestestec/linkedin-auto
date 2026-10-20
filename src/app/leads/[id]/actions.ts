@@ -16,6 +16,7 @@ import { recordFeedback } from "@/lib/agentFeedback";
 import { requireSession } from "@/lib/session";
 import { sendNoShow } from "@/lib/meetingReminders";
 import { parseDealStage, parseMoneyCents } from "@/lib/deal";
+import { checkEmailDomain, domainOf, noMailMessage } from "@/lib/emailDomain";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   await requireSession();
@@ -226,6 +227,7 @@ export async function updateLeadProfile(leadId: string, data: { email: string; p
   await requireSession();
   const e = parseEmail(data.email);
   if ("error" in e) return { error: e.error };
+  if (e.email && (await checkEmailDomain(domainOf(e.email))) === "sem_servidor") return { error: noMailMessage(domainOf(e.email)) };
   const p = parsePhone(data.phone);
   if ("error" in p) return { error: p.error };
   await prisma.lead.update({

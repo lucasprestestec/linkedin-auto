@@ -137,6 +137,11 @@ export async function fetchAllMailboxEmails(): Promise<{ emails: MailboxEmail[];
 export async function handleBounceEmail(e: MailboxEmail): Promise<boolean> {
   const b = parseBounce(e, e.mailbox.address);
   if (!b) return false;
+  // Bloqueio por reputação: o endereço pode estar certo. Não marca a pessoa; conta na saúde da caixa.
+  if (b.blocked) {
+    await prisma.mailbox.update({ where: { id: e.mailbox.id }, data: { blockedBounces: { increment: Math.max(1, b.recipients.length) }, lastBlockedAt: new Date() } });
+    return true;
+  }
   if (b.permanent && b.recipients.length > 0) {
     const r = await prisma.lead.updateMany({
       where: { email: { in: b.recipients, mode: "insensitive" }, emailBouncedAt: null },

@@ -50,7 +50,18 @@ const hard = parseBounce(
   },
   "helena@dors-contato.com",
 );
-assert.deepEqual(hard, { permanent: true, recipients: ["maria@empresa.com.br"] });
+assert.deepEqual(hard, { permanent: true, blocked: false, recipients: ["maria@empresa.com.br"] });
+// Bloqueio por reputação/política (5.7.x): o endereço pode estar certo, o problema é o nosso envio.
+const blocked = parseBounce(
+  { from: "mailer-daemon@googlemail.com", subject: "Delivery Status Notification (Failure)", text: "ana@empresa.com.br: 550 5.7.1 Message rejected as spam by Gmail policy. Poor reputation of the sending domain." },
+  "helena@dors-contato.com",
+);
+assert.deepEqual(blocked, { permanent: false, blocked: true, recipients: ["ana@empresa.com.br"] });
+// Caixa cheia (5.2.2) é passageira, e usuário desconhecido junto com a palavra "blocked" continua sendo endereço inexistente.
+const full = parseBounce({ from: "postmaster@x.com", subject: "Undelivered Mail", text: "pedro@x.com: 552 5.2.2 mailbox is full, try again later" }, "helena@d.com");
+assert.deepEqual([full?.permanent, full?.blocked], [false, false]);
+const unknownBlocked = parseBounce({ from: "postmaster@x.com", subject: "Undelivered Mail", text: "rita@x.com: 550 5.1.1 user unknown. Spam blocked by firewall header." }, "helena@d.com");
+assert.deepEqual([unknownBlocked?.permanent, unknownBlocked?.blocked], [true, false]);
 const soft = parseBounce({ from: "postmaster@x.com", subject: "Delivery Status Notification (Delay)", text: "Delayed: pedro@x.com 4.4.1 will keep trying" }, "helena@d.com");
 assert.equal(soft?.permanent, false);
 assert.equal(parseBounce({ from: "lead@x.com", subject: "Re: Oi", text: "Pode ser terça" }, "helena@d.com"), null);

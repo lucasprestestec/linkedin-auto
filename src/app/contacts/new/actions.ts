@@ -7,6 +7,7 @@ import type { MessageChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseLeadKind } from "@/lib/leadKind";
 import { parseEmail, parsePhone } from "@/lib/contactFields";
+import { checkEmailDomain, domainOf, noMailMessage } from "@/lib/emailDomain";
 import { normalizeLinkedinUrl } from "@/lib/linkedin";
 import { findLeadByProfileUrl } from "@/lib/leads";
 import { isExcluded, loadExclusionRules } from "@/lib/exclusion";
@@ -38,6 +39,7 @@ export async function createContact(_prev: ContactFormState, formData: FormData)
   if (!firstName) return { error: "Informe pelo menos o nome." };
   const e = parseEmail(field(formData, "email"));
   if ("error" in e) return { error: e.error };
+  if (e.email && (await checkEmailDomain(domainOf(e.email))) === "sem_servidor") return { error: noMailMessage(domainOf(e.email)) };
   const p = parsePhone(field(formData, "phone"));
   if ("error" in p) return { error: p.error };
   const rawLinkedin = field(formData, "linkedin");

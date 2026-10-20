@@ -63,9 +63,16 @@ const BOUNCE_SUBJECT = /undeliver|delivery status|delivery failure|failure notic
 const PERMANENT = /\b5\.\d{1,3}\.\d{1,3}\b|\b55\d[ -]|user unknown|no such user|does not exist|address not found|n[ãa]o existe|recipient (address )?rejected|unknown (user|recipient)|account (has been )?disabled|invalid recipient/i;
 const TEMPORARY = /\b4\.\d{1,3}\.\d{1,3}\b|will keep trying|delayed|mailbox (is )?full|caixa cheia|try again later|tentar(emos)? novamente/i;
 
+// O endereço da pessoa não existe (5.1.x e frases de "usuário desconhecido").
+const UNKNOWN_USER = /\b5\.1\.\d{1,3}\b|user unknown|no such user|does not exist|address not found|n[ãa]o existe|unknown (user|recipient)|invalid recipient|recipient (address )?rejected|account (has been )?disabled/i;
+// O servidor da pessoa recusou o NOSSO envio (5.7.x: reputação, spam, política, autenticação). Culpa é nossa, não do endereço.
+const BLOCKED = /\b5\.7\.\d{1,3}\b|blocked|black ?list|block ?list|spamhaus|reputation|rejected as spam|detected as spam|spam (filter|detected|message)|policy (violation|rejection)|not authenticated|authentication (required|failed)|dmarc|\bspf\b/i;
+
 export interface BounceInfo {
-  // Falha definitiva (endereço não existe). Falha passageira (caixa cheia, atraso) não conta.
+  // Falha definitiva por endereço que não existe. Falha passageira (caixa cheia, atraso) e bloqueio não contam.
   permanent: boolean;
+  // O servidor de destino bloqueou o nosso envio: sinal de reputação/autenticação, o endereço pode estar certo.
+  blocked: boolean;
   recipients: string[];
 }
 
@@ -75,7 +82,10 @@ export function parseBounce(mail: { from: string; subject: string; text: string 
   const own = ownAddress.toLowerCase();
   const recipients = [...new Set((mail.text.match(EMAIL_RE) ?? []).map((a) => a.toLowerCase()))].filter((a) => a !== own && !BOUNCE_SENDER.test(a));
   const body = `${mail.subject}\n${mail.text}`;
-  return { permanent: PERMANENT.test(body) && !TEMPORARY.test(body), recipients };
+  const temporary = TEMPORARY.test(body);
+  // Endereço inexistente ganha de "bloqueio" quando os dois aparecem (o código 5.1.x é claro).
+  const blocked = !temporary && BLOCKED.test(body) && !UNKNOWN_USER.test(body);
+  return { permanent: PERMANENT.test(body) && !temporary && !blocked, blocked, recipients };
 }
 
 // ---------------------------------------------------------------------------

@@ -221,17 +221,23 @@ export async function sendEmail(input: EmailInput): Promise<SentEmail> {
 export function stripQuoted(text: string): string {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
-  for (const line of lines) {
-    const t = line.trim();
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    // O Gmail quebra a linha longa: "Em qua., 30 de set. ... Lucas <lucas@x.com>" e, embaixo, "escreveu:".
+    const wrapped = /^(em|on)\s/i.test(t) && /^(escreveu|wrote):?$/i.test((lines[i + 1] ?? "").trim());
     if (
       /^>/.test(t) ||
       /^(em|on)\s.+(escreveu|wrote):?$/i.test(t) ||
+      wrapped ||
       /^-{2,}\s*(mensagem original|original message|forwarded message)/i.test(t) ||
-      /^(de|from):\s.+/i.test(t)
+      /^_{5,}$/.test(t) || // traço de separação do Outlook
+      /^(de|from):\s.+/i.test(t) ||
+      // Assinatura automática do celular ou do aplicativo: o que vem depois não é da pessoa.
+      /^(enviado do meu|enviado de meu|sent from my|obter o outlook|get outlook for)\b/i.test(t)
     ) {
       break;
     }
-    out.push(line);
+    out.push(lines[i]);
   }
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }

@@ -13,6 +13,8 @@ export interface BoxHealth {
   sent30: number;
   sentTotal: number;
   bounces: number;
+  blockedBounces: number;
+  lastBlockedAt: Date | null;
   lastError: string | null;
   auth: DomainAuth | null; // null = não consegui consultar o DNS agora
 }
@@ -43,8 +45,12 @@ export async function domainAuth(domain: string): Promise<DomainAuth> {
 }
 
 // Traduz os números em ações claras para quem opera. Devolução: acima de 2% já pede atenção, acima de 5% é grave.
-export function adviceFor(h: BoxHealth): Advice[] {
+export function adviceFor(h: BoxHealth, now = new Date()): Advice[] {
   const out: Advice[] = [];
+  // Servidor de destino bloqueou o envio nos últimos 14 dias: reputação ou autenticação, não endereço ruim.
+  if (h.blockedBounces > 0 && h.lastBlockedAt && now.getTime() - h.lastBlockedAt.getTime() < 14 * 86_400_000) {
+    out.push({ level: "erro", text: `Servidores de destino bloquearam ${h.blockedBounces} ${h.blockedBounces === 1 ? "envio" : "envios"} (último em ${h.lastBlockedAt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}). Não aumente o limite diário; confira SPF, DKIM e DMARC e fale com o suporte.` });
+  }
   if (h.lastError) out.push({ level: "erro", text: `A caixa não está conectando: ${h.lastError}. Confira a senha de app e avise o suporte.` });
   const rate = h.sentTotal >= 20 ? h.bounces / h.sentTotal : null;
   if (rate !== null && rate > 0.05) out.push({ level: "erro", text: `${Math.round(rate * 100)}% dos e-mails voltaram. Pare de enviar para listas antigas e confira os endereços antes de importar.` });
@@ -71,7 +77,7 @@ export async function emailHealth(): Promise<BoxHealth[]> {
         prisma.message.count({ where: sentWhere(mb.id) }),
         domain ? domainAuth(domain).catch(() => null) : Promise.resolve(null),
       ]);
-      return { address: mb.address, domain, sent30, sentTotal, bounces: mb.bounces, lastError: mb.lastError, auth };
+      return { address: mb.address, domain, sent30, sentTotal, bounces: mb.bounces, blockedBounces: mb.blockedBounces, lastBlockedAt: mb.lastBlockedAt, lastError: mb.lastError, auth };
     }),
   );
 }

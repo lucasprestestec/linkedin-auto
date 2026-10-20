@@ -76,6 +76,7 @@ export async function buildStatus(now = new Date()) {
       diasDeUso: days,
       aquecendo: cap < mb.dailyLimit,
       rejeitados: mb.bounces,
+      bloqueadosPeloDestino: mb.blockedBounces,
       ultimoErro: mb.lastError,
       ultimoErroEm: mb.lastErrorAt,
       ultimaLeitura: mb.lastCheckedAt,
