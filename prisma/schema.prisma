@@ -515,7 +515,7 @@ model Mailbox {
   // Senha guardada cifrada (ver lib/secretBox.ts).
   passwordEnc String
   // Teto de e-mails por dia depois do aquecimento.
-  dailyLimit  Int           @default(25)
+  dailyLimit  Int           @default(40)
   // Dia em que a caixa começou a enviar: o limite do dia sobe a partir dele.
   startedAt   DateTime      @default(now())
   // Leitura da caixa de entrada (IMAP): até onde já foi lida.
