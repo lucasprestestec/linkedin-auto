@@ -3,6 +3,7 @@
 import { requireSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { EMAIL_DAILY_RANGE } from "@/lib/settings-ranges";
 import { deskcommConfigOf, resetWhatsapp, whatsappPairing, type WhatsappPairing } from "@/lib/deskcomm";
 
 // Regras do canal de e-mail (tela Canais). null em fallbackDays = o assistente
@@ -11,7 +12,7 @@ export async function updateEmailChannel(input: { enabled: boolean; dailyLimit: 
   await requireSession();
   const dailyLimit = Math.round(input.dailyLimit);
   const fallbackDays = input.fallbackDays == null ? null : Math.round(input.fallbackDays);
-  if (!Number.isFinite(dailyLimit) || dailyLimit < 1 || dailyLimit > 100) return { error: "Limite diário fora do permitido (1 a 100)." };
+  if (!Number.isFinite(dailyLimit) || dailyLimit < EMAIL_DAILY_RANGE[0] || dailyLimit > EMAIL_DAILY_RANGE[1]) return { error: `Limite diário fora do permitido (${EMAIL_DAILY_RANGE[0]} a ${EMAIL_DAILY_RANGE[1]}).` };
   if (fallbackDays != null && (!Number.isFinite(fallbackDays) || fallbackDays < 1 || fallbackDays > 30)) return { error: "Dias fora do permitido (1 a 30)." };
   await prisma.settings.update({
     where: { id: "singleton" },

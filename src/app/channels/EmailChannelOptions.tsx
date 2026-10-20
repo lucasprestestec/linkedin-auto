@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Help } from "@/components/Help";
 import { Stepper } from "@/components/Stepper";
+import { EMAIL_DAILY_RANGE } from "@/lib/settings-ranges";
 import { updateEmailChannel } from "./actions";
 
 // O que o assistente pode fazer sozinha por e-mail. Salva a cada mudança.
@@ -76,7 +77,7 @@ export function EmailChannelOptions({ enabled, dailyLimit, fallbackDays }: { ena
                 E-mails por dia <Help>Apresentações e retomadas param no limite. Respostas a quem escreveu sempre saem.</Help>
               </b>
             </label>
-            <Stepper id="dailyEmailLimit" name="dailyEmailLimit" value={value.dailyLimit} min={1} max={100} onChange={(v) => save({ ...value, dailyLimit: v })} />
+            <Stepper id="dailyEmailLimit" name="dailyEmailLimit" value={value.dailyLimit} min={EMAIL_DAILY_RANGE[0]} max={EMAIL_DAILY_RANGE[1]} step={5} onChange={(v) => save({ ...value, dailyLimit: v })} />
           </div>
         </>
       )}

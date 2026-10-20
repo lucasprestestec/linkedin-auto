@@ -17,3 +17,8 @@ export function validFollowUp(count: number, delayHours: number): boolean {
     delayHours % 24 === 0
   );
 }
+
+// E-mails por dia do cliente (limite geral do canal). O que realmente sai ainda é limitado pelas caixas
+// (cada uma com o próprio aquecimento e teto), então este número só precisa acompanhar o maior plano:
+// o Escala, com 4.950 e-mails por mês, são uns 225 por dia útil.
+export const EMAIL_DAILY_RANGE = [1, 300] as const;
