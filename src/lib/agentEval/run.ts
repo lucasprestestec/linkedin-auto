@@ -7,6 +7,7 @@ import { parseWritingStyle, renderStyleBlock } from "@/lib/writingStyle";
 import { readFileSync } from "node:fs";
 import { identityBlock } from "@/lib/campaigns";
 import { knowledgeFor, parseKnowledgeMarkdown } from "@/lib/knowledge";
+import { FEEDBACK_PREFIX, loadFeedbackScenario } from "./feedbackCases";
 
 const HELENA_PERSONA = { name: "Helena", discloseAi: true };
 
@@ -207,7 +208,7 @@ async function judge(s: Scenario, out: { action: string; message?: string; reaso
 }
 
 export async function runScenario(scenarioId: string, model: string, judgeModel: string | null, io: { complete?: Completer; judgeComplete?: Completer } = {}): Promise<EvalResult> {
-  const s = SCENARIOS.find((x) => x.id === scenarioId);
+  const s = SCENARIOS.find((x) => x.id === scenarioId) ?? (scenarioId.startsWith(FEEDBACK_PREFIX) ? await loadFeedbackScenario(scenarioId) : null);
   if (!s) return { scenarioId, model, ok: false, error: "cenário não existe" };
   const started = Date.now();
   try {
