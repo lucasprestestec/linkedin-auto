@@ -11,6 +11,7 @@ import { syncEmailInbox } from "@/lib/emailSync";
 import { syncWhatsapp } from "@/lib/whatsappSync";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { maybeSendDailySummary } from "@/lib/dailySummary";
+import { recordSyncRound } from "@/lib/syncReport";
 
 // Geração de texto + envio por lead somam alguns segundos; a parte proativa é
 // limitada por rodada (ver lib/followup.ts), mas o padrão da função é curto.
@@ -64,11 +65,14 @@ export async function GET(request: Request) {
   // Canais independentes: sem LinkedIn conectado, e-mail e WhatsApp seguem sozinhos.
   // Se o LinkedIn falhar aqui, a etapa proativa (fila aprovada, e-mail, WhatsApp) ainda roda.
   let conversations: Awaited<ReturnType<typeof extractConversations>> = [];
+  let linkedinError: string | null | undefined;
   if (identityId) {
     try {
       conversations = await extractConversations(identityId);
+      linkedinError = null;
     } catch (err) {
       console.error("Falha ao ler as conversas do LinkedIn", err);
+      linkedinError = err instanceof Error ? err.message : "erro desconhecido";
     }
   }
   let updatedLeads = 0;
@@ -114,6 +118,15 @@ export async function GET(request: Request) {
     console.error("Falha no resumo do dia", err);
     summary = { error: err instanceof Error ? err.message : "erro desconhecido" };
   }
+
+  // Rodada concluída: guarda por canal se funcionou (distingue "ligado" de "conseguindo trabalhar").
+  // A leitura das caixas de e-mail não lança erro (fica em Mailbox.lastError), então olhamos lá.
+  const boxError = await prisma.mailbox.findFirst({ where: { status: "ACTIVE", lastError: { not: null } }, select: { address: true, lastError: true } }).catch(() => null);
+  await recordSyncRound(settings.syncReport, {
+    email: email.error ?? (boxError ? `${boxError.address}: ${boxError.lastError}` : null),
+    whatsapp: deskcommConfigOf(settings) ? (whatsapp.error ?? null) : undefined,
+    linkedin: linkedinError,
+  }).catch((err) => console.error("Falha ao registrar o resultado da rodada", err));
 
   return NextResponse.json({ summary, email, whatsapp, linkedin: identityId ? "conectado" : "não conectado", updatedLeads, newIncomingMessages, fallbacks, failed, proactive });
 }

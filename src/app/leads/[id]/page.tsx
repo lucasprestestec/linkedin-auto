@@ -29,6 +29,9 @@ import { getConversationItems } from "@/lib/conversations";
 import { loadApprovalItems } from "@/lib/approvalItems";
 import { ChannelDrafts } from "./ChannelDrafts";
 import { OnChannel } from "./OnChannel";
+import { LeadDeal } from "./LeadDeal";
+import { DEAL_LABEL, formatBRL } from "@/lib/deal";
+import type { DealStage } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +42,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const [lead, settings, campaigns, tagRows, conversations, drafts, team] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
-      include: { messages: { orderBy: { deliveredAt: "asc" } }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
+      include: { messages: { orderBy: { deliveredAt: "asc" } }, stageEvents: { orderBy: { createdAt: "asc" } }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
     }),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
@@ -75,11 +78,17 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     firstIn && { when: firstIn.deliveredAt, text: `${firstName} respondeu pela primeira vez` },
     lead.followUpsSent > 0 && lastMsg && { when: lastMsg.deliveredAt, text: `${lead.followUpsSent} mensagem${lead.followUpsSent > 1 ? "s" : ""} de acompanhamento sem resposta` },
     lead.status === "NEEDS_HUMAN" && { when: lead.updatedAt, text: `Passou para você: ${readableReason(lead.needsHumanReason ?? "precisa de resposta")}` },
-    lead.status === "QUALIFIED" && { when: lead.updatedAt, text: "Marcado como oportunidade" },
     lead.archivedAt && { when: lead.archivedAt, text: "Conversa arquivada" },
+    // Etapas com a data em que aconteceram (o registro é do banco; "estimada" = anterior ao registro).
+    ...lead.stageEvents.flatMap((e) => {
+      const est = e.backfill ? " (data aproximada)" : "";
+      if (e.kind === "STATUS" && e.toValue === "QUALIFIED") return [{ when: e.createdAt, text: `Marcado como oportunidade${est}` }];
+      if (e.kind === "MEETING" && e.meetingAt) return [{ when: e.createdAt, text: `Reunião marcada para ${e.meetingAt.toLocaleString("pt-BR", WHEN_FORMAT)}${est}` }];
+      if (e.kind === "DEAL" && e.toValue) return [{ when: e.createdAt, text: `${DEAL_LABEL[e.toValue as DealStage] ?? e.toValue}${e.amountCents ? ` · ${formatBRL(e.amountCents)}` : ""}` }];
+      return [];
+    }),
   ]
-    .filter((e): e is { when: Date; text: string } => Boolean(e))
-    .sort((a, b) => b.when.getTime() - a.when.getTime());
+    .filter((e): e is { when: Date; text: string } => Boolean(e))    .sort((a, b) => b.when.getTime() - a.when.getTime());
 
   const statusLabel =
     lead.status === "MEETING_SCHEDULED" && lead.meetingAt
@@ -153,6 +162,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         kind={lead.kind}
         referredBy={lead.referredBy}
       />
+      {(lead.status === "MEETING_SCHEDULED" || lead.meetingAt || lead.dealStage) && (
+        <LeadDeal leadId={lead.id} stage={lead.dealStage} valueCents={lead.dealValueCents} reason={lead.dealReason} />
+      )}
       <LeadOutreach leadId={lead.id} otherAiActive={lead.otherAiActive} doNotContact={lead.doNotContact} />
       <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
       <LeadTags leadId={lead.id} tags={lead.tags} knownTags={knownTags} />

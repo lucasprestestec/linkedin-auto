@@ -17,6 +17,14 @@ enum LeadStatus {
   LOST             // sem resposta / recusou
 }
 
+enum DealStage {
+  HELD      // a reunião aconteceu
+  NO_SHOW   // a pessoa faltou
+  PROPOSAL  // virou proposta
+  WON       // ganhou
+  LOST      // perdeu
+}
+
 enum LeadKind {
   PERSON    // pessoa física, profissional, família
   BUSINESS  // empresa (benefícios, saúde, vida em grupo)
@@ -113,6 +121,11 @@ model Lead {
   // Lembretes da reunião já resolvidos ("day", "5h", "1h"): enviados ou pulados.
   // Zera quando a reunião é marcada de novo.
   meetingReminders  String[]  @default([])
+  // Resultado comercial depois da reunião (o histórico de cada mudança fica em LeadStageEvent).
+  dealStage         DealStage?
+  dealValueCents    Int?
+  dealReason        String?
+  stageEvents       LeadStageEvent[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -389,6 +402,8 @@ model Settings {
   dailySummarySentOn  String?
   // Última vez que o agendador chamou o robô (a central avisa se passar de 45 minutos).
   lastRobotRunAt      DateTime?
+  // Resultado da última rodada por canal: { email|whatsapp|linkedin: { okAt, error } }. okAt só avança quando o canal funcionou.
+  syncReport          Json?
   // Plano do cliente (a Central LP grava; vazio = sem limite): conversas por mês, caixas de e-mail, acessos ao painel
   // e o orçamento de IA do mês (US$) que dispara o aviso.
   planName            String?
@@ -530,6 +545,25 @@ model InviteScheduled {
   profileUrl String   @unique
   campaignId String?
   createdAt  DateTime @default(now())
+}
+
+// Quando cada etapa aconteceu de verdade. Quem escreve é um gatilho do banco (ver a migração 20261020190000),
+// então vale para qualquer caminho que mude a ficha. kind: STATUS (to/from = LeadStatus), MEETING (reunião marcada
+// para meetingAt) ou DEAL (to/from = DealStage, amountCents). backfill = data estimada (histórico anterior ao registro).
+model LeadStageEvent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()"))
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String
+  kind        String
+  fromValue   String?
+  toValue     String?
+  meetingAt   DateTime?
+  amountCents Int?
+  backfill    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([kind, toValue, createdAt])
+  @@index([leadId])
 }
 
 // Cada chamada à IA: base do limite de "interações com IA" por plano e do custo real por cliente.

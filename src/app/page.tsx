@@ -18,6 +18,9 @@ import { remainingDailyInviteQuota } from "@/lib/prospect";
 import { ApprovalCard } from "./approvals/ApprovalCard";
 import { AutomationBar } from "./AutomationBar";
 import { linkedinDataCount } from "./settings/actions";
+import { dealBoard } from "@/lib/dealStats";
+import { syncAlerts } from "@/lib/syncReport";
+import { formatBRL } from "@/lib/deal";
 
 export const dynamic = "force-dynamic";
 
@@ -62,20 +65,22 @@ function sinceOf(period: PeriodKey, now: Date): Date | null {
   return new Date(now.getTime() - (period === "7d" ? 7 : 30) * 86_400_000);
 }
 
-// Números do painel no período. "Oportunidades" usa a última mudança da ficha (o sistema não guarda a data
-// exata em que a pessoa virou oportunidade), como o resumo do dia; "Reuniões" conta as marcadas do início do período em diante.
-async function boardNumbers(since: Date | null) {
+// Números do painel no período. Oportunidades e reuniões marcadas vêm do histórico de etapas (LeadStageEvent):
+// contam quando a coisa aconteceu, não quando a ficha foi mexida por último. "Já aconteceram" são as reuniões
+// cuja data caiu no período e já passou.
+async function boardNumbers(since: Date | null, now: Date) {
   const at = since ? { gte: since } : undefined;
   const outbound = { some: { sender: { in: ["AGENT" as const, "HUMAN" as const] }, createdAt: at } };
-  const [contacted, replied, qualified, meetings, sent, invites] = await Promise.all([
+  const [contacted, replied, qualified, meetings, held, sent, invites] = await Promise.all([
     prisma.lead.count({ where: { messages: outbound } }),
     prisma.lead.count({ where: { AND: [{ messages: outbound }, { messages: { some: { sender: "LEAD", createdAt: at } } }] } }),
-    prisma.lead.count({ where: { status: "QUALIFIED", updatedAt: at } }),
-    prisma.lead.count({ where: { meetingAt: at ?? { not: null } } }),
+    prisma.lead.count({ where: { stageEvents: { some: { kind: "STATUS", toValue: { in: ["QUALIFIED", "MEETING_SCHEDULED"] }, createdAt: at } } } }),
+    prisma.lead.count({ where: { stageEvents: { some: { kind: "MEETING", createdAt: at } } } }),
+    prisma.lead.count({ where: { meetingAt: { ...(since ? { gte: since } : {}), lt: now } } }),
     prisma.message.count({ where: { sender: { in: ["AGENT", "HUMAN"] }, createdAt: at } }),
     prisma.lead.count({ where: { invitedAt: at ?? { not: null } } }),
   ]);
-  return { contacted, replied, qualified, meetings, sent, invites };
+  return { contacted, replied, qualified, meetings, held, sent, invites };
 }
 
 // Tela Hoje: o que precisa de você (aprovar, responder, consertar), o painel de números e como o dia está indo.
@@ -83,18 +88,19 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const now = new Date();
   const raw = (await searchParams).periodo;
   const period = PERIODS.find((p) => p.key === raw) ?? PERIODS[1];
-  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent] = await Promise.all([
+  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     getConversationItems(),
     loadApprovalItems({ status: "PENDING" }),
     dailyReport(),
-    boardNumbers(sinceOf(period.key, now)),
+    boardNumbers(sinceOf(period.key, now), now),
     prisma.lead.findFirst({ where: { meetingAt: { gte: now } }, orderBy: { meetingAt: "asc" }, select: { id: true, firstName: true, lastName: true, jobTitle: true, meetingAt: true, meetingLink: true } }),
     emailEnabled(),
     remainingDailyInviteQuota(),
     messagesSentToday(),
     emailsSentToday(),
     whatsappSentToday(),
+    dealBoard(sinceOf(period.key, now)),
   ]);
 
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
@@ -116,6 +122,10 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const alerts = [
     settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/settings#linkedin", cta: "Reconectar", tag: "Parado" },
     leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/settings#linkedin", cta: "Ver", tag: "Aviso" },
+    ...syncAlerts(settings.syncReport, now, settings.lastRobotRunAt)
+      // O LinkedIn desconectado já tem aviso próprio acima.
+      .filter((s) => !(s.key === "sync-linkedin" && settings.linkedinNeedsReconnect))
+      .map((s) => ({ ...s, href: "/settings#canais", cta: "Ver", tag: "Aviso" })),
     voiceAlert && { key: "voice", title: voiceAlert.title, sub: voiceAlert.sub, href: "/assistente#voz", cta: "Ver", tag: voiceAlert.level === "acabou" ? "Parado" : "Aviso" },
   ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string; tag: string } => Boolean(a));
   const waiting = alerts.length + needYou.length + drafts.length;
@@ -137,7 +147,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
     { label: "Contatados", value: nums.contacted, note: <><b>+{nums.invites}</b> convites</> },
     { label: "Responderam", value: nums.replied, note: <><b>{rate}%</b> de resposta</> },
     { label: "Oportunidades", value: nums.qualified, note: "mostraram interesse", hot: true },
-    { label: "Reuniões", value: nums.meetings, note: "marcadas na agenda" },
+    { label: "Reuniões", value: nums.meetings, note: <><b>{nums.held}</b> já aconteceram</> },
     { label: "Mensagens", value: nums.sent, note: "enviadas" },
   ];
 
@@ -295,6 +305,31 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
               <p className="muted small">Nenhuma reunião marcada.</p>
             )}
           </section>
+
+          {(deals.total.proposals > 0 || deals.total.won > 0 || deals.total.lost > 0) && (
+            <section className="panel">
+              <h2 className="panel-h">Resultado das reuniões</h2>
+              <p className="small">
+                <b>{deals.total.proposals}</b> propostas · <b>{deals.total.won}</b> {deals.total.won === 1 ? "venda" : "vendas"}
+                {deals.total.wonCents > 0 && <> ({formatBRL(deals.total.wonCents)})</>} · <b>{deals.total.lost}</b> {deals.total.lost === 1 ? "perdida" : "perdidas"}
+              </p>
+              {deals.byCampaign.length > 1 && (
+                <ul className="hot">
+                  {deals.byCampaign.slice(0, 5).map((r) => (
+                    <li key={r.campaign}>
+                      <span className="grow">
+                        {r.campaign}
+                        <small>
+                          {r.proposals} {r.proposals === 1 ? "proposta" : "propostas"} · {r.won} {r.won === 1 ? "venda" : "vendas"}
+                          {r.wonCents > 0 && ` · ${formatBRL(r.wonCents)}`}
+                        </small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           {hot.length > 0 && (
             <section className="panel">
