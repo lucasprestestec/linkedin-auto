@@ -91,6 +91,9 @@ model Lead {
   otherAiActive     Boolean   @default(false)
   // Recusou ou pediu pra parar: nada automático sai mais, nem em campanha nova.
   doNotContact      Boolean   @default(false)
+  // Canal preferido da pessoa (a retomada tenta este primeiro) e canais em que ela pediu para não ser abordada.
+  preferredChannel  MessageChannel?
+  blockedChannels   MessageChannel[] @default([])
   // Quem da equipe atende este contato (os avisos de reunião e "precisa de você" vão pra essa pessoa).
   // E-mail devolvido (caixa inexistente etc.): não tentamos de novo.
   emailBouncedAt    DateTime?

@@ -30,6 +30,7 @@ import { loadApprovalItems } from "@/lib/approvalItems";
 import { ChannelDrafts } from "./ChannelDrafts";
 import { OnChannel } from "./OnChannel";
 import { LeadDeal } from "./LeadDeal";
+import { LeadChannels } from "./LeadChannels";
 import { DEAL_LABEL, formatBRL } from "@/lib/deal";
 import type { DealStage } from "@prisma/client";
 
@@ -165,6 +166,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       {(lead.status === "MEETING_SCHEDULED" || lead.meetingAt || lead.dealStage) && (
         <LeadDeal leadId={lead.id} stage={lead.dealStage} valueCents={lead.dealValueCents} reason={lead.dealReason} />
       )}
+      <LeadChannels leadId={lead.id} preferred={lead.preferredChannel} blocked={lead.blockedChannels} />
       <LeadOutreach leadId={lead.id} otherAiActive={lead.otherAiActive} doNotContact={lead.doNotContact} />
       <LeadNotes leadId={lead.id} notes={lead.notes ?? ""} author={author} />
       <LeadTags leadId={lead.id} tags={lead.tags} knownTags={knownTags} />
