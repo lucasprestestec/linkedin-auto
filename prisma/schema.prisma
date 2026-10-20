@@ -387,6 +387,8 @@ model Settings {
   // dia (AAAA-MM-DD, fuso de SP) em que já foi enviado.
   dailySummaryEnabled Boolean @default(true)
   dailySummarySentOn  String?
+  // Última vez que o agendador chamou o robô (a central avisa se passar de 45 minutos).
+  lastRobotRunAt      DateTime?
   dailyEmailLimit     Int     @default(20)
   emailInviteFallbackDays Int? @default(5)
   // E-mail conectado com "Entrar com Google": endereço, refresh token

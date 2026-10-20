@@ -5,7 +5,7 @@ import { setAudioMode } from "@/app/voz/actions";
 import { AUDIO_MODES, hasVoice, type AudioMode, type VoiceSettings } from "@/lib/voice/settings";
 
 // "Quando mandar áudio" em Assistente: a voz do usuário e a escolha PESSOAL de quando o assistente responde em áudio.
-export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; configured: boolean }) {
+export function VoiceOverview({ voice, configured, notice }: { voice: VoiceSettings; configured: boolean; notice?: { level: string; title: string; sub: string } | null }) {
   const [mode, setMode] = useState<AudioMode>(voice.mode);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -26,6 +26,11 @@ export function VoiceOverview({ voice, configured }: { voice: VoiceSettings; con
 
   return (
     <div className="stack" style={{ gap: 16 }}>
+      {notice && (
+        <p className={`note ${notice.level === "acabou" ? "note-danger" : "note-warn"}`}>
+          <b>{notice.title}.</b> {notice.sub}
+        </p>
+      )}
       {!configured && <p className="note note-warn">O serviço de voz ainda não foi configurado neste sistema. Peça ao suporte para ativar.</p>}
 
       {!ready ? (

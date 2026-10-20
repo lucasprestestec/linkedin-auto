@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { elevenUsage, voiceNotice } from "@/lib/voice/usage";
 import { MobileHeader } from "@/components/MobileHeader";
 import { parseExclusionLines, parseIdealClient } from "@/lib/audience";
 import { describeRule } from "@/lib/followupPolicy";
@@ -67,13 +68,15 @@ export default async function AssistantPage() {
   const style = parseWritingStyle(settings.writingStyle);
   const voice = parseVoiceSettings(settings.voiceSettings);
   const picked = voice.provider === "elevenlabs" && voice.voiceId ? voice : null;
-  const [suggestions, stats, waiting, reviewingRaw] = await Promise.all([
+  const [suggestions, stats, waiting, reviewingRaw, voiceUse] = await Promise.all([
     // As sugestões são um extra: se falharem, a tela abre do mesmo jeito.
     loadSuggestions(style).catch(() => []),
     approvalStats(),
     prisma.draft.count({ where: { status: "APPROVED" } }),
     settings.campaignReview ? prisma.campaign.findMany({ where: { status: "ACTIVE", reviewReleasedAt: null }, orderBy: { createdAt: "desc" } }) : Promise.resolve([]),
+    elevenUsage(),
   ]);
+  const voiceNote = voiceNotice(voiceUse, settings.assistantName?.trim() ? `a ${settings.assistantName.trim()}` : "a assistente");
   const reviewing = (await Promise.all(reviewingRaw.map(async (c) => ({ campaign: c, state: await reviewStateOf(c, settings) })))).filter((r) => r.state.inReview);
   const rate = stats.decided ? stats.untouched / stats.decided : 0;
   const trusted = stats.decided >= TRUST_MIN_DECIDED && rate >= TRUST_MIN_RATE;
@@ -107,7 +110,7 @@ export default async function AssistantPage() {
           <h2 className="panel-h" id="h-audio">
             Quando mandar áudio
           </h2>
-          <VoiceOverview voice={voice} configured={fishConfigured() || elevenConfigured()} />
+          <VoiceOverview voice={voice} configured={fishConfigured() || elevenConfigured()} notice={voiceNote} />
         </section>
       </div>
 
