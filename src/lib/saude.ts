@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { readSyncReport } from "@/lib/syncReport";
 import { countedMailboxes, countedUsers, loadPlan } from "@/lib/plan";
 import { aiUsageSummary, conversationsThisMonth, MAX_AI_PER_CONVERSATION, NON_COUNTED_PURPOSES, startOfMonthSP } from "@/lib/aiUsage";
 import { effectiveLimits, emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
@@ -106,6 +107,9 @@ export async function buildStatus(now = new Date()) {
     robo: {
       ultimaRodada: settings.lastRobotRunAt?.toISOString() ?? null,
       minutosDesdeUltimaRodada: robotMinutes,
+      // Última rodada que chegou ao fim e, por canal, se funcionou (ligado ≠ conseguindo trabalhar).
+      ultimaRodadaConcluida: readSyncReport(settings.syncReport)?.finishedAt ?? null,
+      sincronizacao: readSyncReport(settings.syncReport)?.channels ?? null,
       automacaoPausada: settings.automationPaused,
       aprovacaoLigada: settings.approvalMode,
       expediente: `${settings.workStartHour}h às ${settings.workEndHour}h`,

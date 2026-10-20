@@ -15,6 +15,7 @@ import { parseEmail, parsePhone } from "@/lib/contactFields";
 import { recordFeedback } from "@/lib/agentFeedback";
 import { requireSession } from "@/lib/session";
 import { sendNoShow } from "@/lib/meetingReminders";
+import { parseDealStage, parseMoneyCents } from "@/lib/deal";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   await requireSession();
@@ -135,6 +136,22 @@ export async function markMeeting(leadId: string, when: string | null) {
   });
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/conversations");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// Resultado depois da reunião (aconteceu, faltou, proposta, ganhou, perdeu), com valor e motivo.
+// Perdeu/faltou não mexem no status da conversa; o histórico de cada mudança fica sozinho (gatilho do banco).
+export async function setDeal(leadId: string, stage: string, value: string, reason: string) {
+  await requireSession();
+  const dealStage = parseDealStage(stage);
+  const dealValueCents = parseMoneyCents(value);
+  if (dealValueCents === undefined) return { error: "Valor inválido. Escreva só números, por exemplo 1.500,00." };
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { dealStage, dealValueCents: dealStage ? dealValueCents : null, dealReason: dealStage ? reason.trim().slice(0, 300) || null : null },
+  });
+  revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
   return { ok: true };
 }

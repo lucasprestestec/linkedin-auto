@@ -50,7 +50,10 @@ export async function dailyReport(since = startOfLocalDay()): Promise<DailyRepor
       where: { lastOpenedAt: { gte: since }, sender: { not: "LEAD" } },
       select: { openCount: true, lastOpenedAt: true, lead: { select: leadSelect } },
     }),
-    prisma.lead.findMany({ where: { status: "QUALIFIED", updatedAt: { gte: since } }, select: { ...leadSelect, updatedAt: true } }),
+    // Quando virou oportunidade vem do histórico de etapas (e não da última edição da ficha).
+    prisma.leadStageEvent
+      .findMany({ where: { kind: "STATUS", toValue: "QUALIFIED", createdAt: { gte: since } }, orderBy: { createdAt: "asc" }, select: { createdAt: true, lead: { select: leadSelect } } })
+      .then((evs) => [...new Map(evs.map((e) => [e.lead.id, { ...e.lead, updatedAt: e.createdAt }])).values()]),
     prisma.lead.findMany({
       where: { status: "NEEDS_HUMAN" },
       orderBy: { updatedAt: "desc" },
