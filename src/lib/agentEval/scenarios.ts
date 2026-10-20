@@ -11,7 +11,7 @@ export type Expect = "reply" | "handoff" | "book" | "either";
 export interface Scenario {
   id: string;
   title: string;
-  category: "básico" | "objeção" | "handoff" | "encerramento" | "armadilha" | "avanço" | "robô" | "whatsapp" | "e-mail" | "segurança" | "mídia" | "helena";
+  category: "básico" | "objeção" | "handoff" | "encerramento" | "armadilha" | "avanço" | "robô" | "whatsapp" | "e-mail" | "segurança" | "mídia" | "helena" | "correções";
   lead: LeadContext;
   history: { sender: "LEAD" | "AGENT" | "HUMAN"; content: string }[];
   // Canal em que o lead escreveu (padrão LinkedIn).

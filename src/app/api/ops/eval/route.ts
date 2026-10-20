@@ -3,6 +3,7 @@ import { opsAuthorized } from "@/lib/ops";
 import { conversationModel } from "@/lib/agent";
 import { listNousModels, runScenario } from "@/lib/agentEval/run";
 import { QUICK_IDS, SCENARIOS } from "@/lib/agentEval/scenarios";
+import { loadFeedbackScenarios } from "@/lib/agentEval/feedbackCases";
 
 // Um cenário × um modelo por requisição: o banco de testes precisa de várias chamadas ao mesmo tempo.
 export const maxDuration = 120;
@@ -11,7 +12,9 @@ export const maxDuration = 120;
 export async function GET(request: Request) {
   if (!opsAuthorized(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   const current = await conversationModel();
-  const scenarios = SCENARIOS.map(({ id, title, category }) => ({ id, title, category }));
+  // As correções do corretor ("não é meu jeito") entram na lista como casos de teste.
+  const fromFeedback = await loadFeedbackScenarios().catch(() => []);
+  const scenarios = [...SCENARIOS, ...fromFeedback].map(({ id, title, category }) => ({ id, title, category }));
   try {
     return NextResponse.json({ models: await listNousModels(), current, scenarios, quickIds: QUICK_IDS });
   } catch (err) {
