@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { elevenUsage, voiceNotice } from "@/lib/voice/usage";
 import { prisma } from "@/lib/prisma";
 import { clockTime, todayLabel } from "@/lib/format";
 import { getConversationItems, type ConvItem } from "@/lib/conversations";
@@ -99,7 +100,8 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
   // O assistente pode rodar só com WhatsApp: o botão de ligar não pode depender do LinkedIn.
   const whatsappOk = Boolean(deskcommConfigOf(settings));
-  const [leftover, emailLeft] = await Promise.all([settings.linkedinIdentityId ? 0 : linkedinDataCount(), emailOn ? emailLeftToday(settings) : 0]);
+  const [leftover, emailLeft, voiceUse] = await Promise.all([settings.linkedinIdentityId ? 0 : linkedinDataCount(), emailOn ? emailLeftToday(settings) : 0, elevenUsage()]);
+  const voiceAlert = voiceNotice(voiceUse, settings.assistantName?.trim() ? `a ${settings.assistantName.trim()}` : "a assistente");
   const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
 
   const steps = [
@@ -114,6 +116,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const alerts = [
     settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/settings#linkedin", cta: "Reconectar", tag: "Parado" },
     leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/settings#linkedin", cta: "Ver", tag: "Aviso" },
+    voiceAlert && { key: "voice", title: voiceAlert.title, sub: voiceAlert.sub, href: "/assistente#voz", cta: "Ver", tag: voiceAlert.level === "acabou" ? "Parado" : "Aviso" },
   ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string; tag: string } => Boolean(a));
   const waiting = alerts.length + needYou.length + drafts.length;
 

@@ -27,6 +27,8 @@ export async function GET(request: Request) {
   }
 
   const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
+  // Registra que o agendador chamou (a central local usa isto para saber se o robô parou).
+  await prisma.settings.update({ where: { id: "singleton" }, data: { lastRobotRunAt: new Date() } }).catch((err) => console.error("Falha ao registrar a rodada do robô", err));
   // Responder pode ser a qualquer hora (opção do admin); INICIAR conversa
   // (abertura, retomada) continua preso ao horário, em runProactive.
   const canReplyNow = settings.automationPaused || settings.replyAnytime || isWithinWorkHours(settings);
