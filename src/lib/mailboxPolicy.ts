@@ -11,7 +11,8 @@ export function startOfDaySP(now: Date): Date {
 }
 
 // Aquecimento: a caixa nova começa com poucos e-mails por dia e sobe 1 por dia até o teto dela
-// (com o teto padrão de 25, são uns 20 dias). Caixa que sai disparando em volume logo no começo
+// (com o teto padrão de 40, são uns 35 dias; as 3 primeiras semanas são as mesmas de antes, o teto mais alto só vale depois).
+// Caixa que sai disparando em volume logo no começo
 // costuma cair em spam.
 export const RAMP_START = 5;
 export const RAMP_STEP = 1;

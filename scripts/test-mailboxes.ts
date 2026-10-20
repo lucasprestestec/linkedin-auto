@@ -17,6 +17,12 @@ assert.equal(effectiveLimit(a, at("2026-10-01T15:00:00Z")), 5);
 assert.equal(effectiveLimit(a, at("2026-10-04T15:00:00Z")), 8);
 assert.equal(effectiveLimit(a, at("2026-11-30T15:00:00Z")), 25);
 assert.equal(effectiveLimit(mb("b", "2026-10-01T12:00:00Z", { dailyLimit: 3 }), at("2026-10-10T12:00:00Z")), 3, "teto menor que o começo");
+// Teto padrão de 40: as 3 primeiras semanas são iguais às do teto de 25; depois sobe 1 por dia até 40 (dia 36).
+const c40 = mb("c40", "2026-10-01T12:00:00Z", { dailyLimit: 40 });
+assert.equal(effectiveLimit(c40, at("2026-10-21T15:00:00Z")), 25, "dia 21");
+assert.equal(effectiveLimit(c40, at("2026-10-29T15:00:00Z")), 33, "dia 29");
+assert.equal(effectiveLimit(c40, at("2026-11-05T15:00:00Z")), 40, "dia 36");
+assert.equal(effectiveLimit(c40, at("2026-12-31T15:00:00Z")), 40);
 assert.equal(remainingToday(a, 7, at("2026-10-04T15:00:00Z")), 1);
 assert.equal(remainingToday(a, 99, at("2026-10-04T15:00:00Z")), 0);
 
