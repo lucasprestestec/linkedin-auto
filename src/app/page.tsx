@@ -106,19 +106,26 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
   // O assistente pode rodar só com WhatsApp: o botão de ligar não pode depender do LinkedIn.
   const whatsappOk = Boolean(deskcommConfigOf(settings));
+  // Qualquer canal serve para começar: o e-mail funciona sozinho, sem LinkedIn nem WhatsApp.
+  const channelOk = linkedinOk || whatsappOk || emailOn;
   const [leftover, emailLeft, voiceUse] = await Promise.all([settings.linkedinIdentityId ? 0 : linkedinDataCount(), emailOn ? emailLeftToday(settings) : 0, elevenUsage()]);
   const voiceAlert = voiceNotice(voiceUse, settings.assistantName?.trim() ? `a ${settings.assistantName.trim()}` : "a assistente");
   const sentToday = report.sent.LINKEDIN + report.sent.EMAIL + report.sent.WHATSAPP;
 
   const steps = [
     { done: Boolean(settings.ownerName?.trim()), label: "Cadastrar o seu nome (o assistente se apresenta com ele)", href: "/settings" },
-    { done: linkedinOk || whatsappOk, label: "Conectar um canal (LinkedIn ou WhatsApp)", href: "/settings#canais" },
+    { done: channelOk, label: "Conectar um canal (LinkedIn, WhatsApp ou e-mail)", href: "/settings#canais" },
     { done: Boolean(settings.targetAudience?.trim()), label: "Dizer quem você quer alcançar", href: "/assistente#alcance" },
     { done: conversations.length > 0, label: "Adicionar as primeiras pessoas", href: "/contacts" },
   ];
   const pending = steps.filter((s) => !s.done);
 
-  const needYou = conversations.filter((c) => c.status === "NEEDS_HUMAN").sort((a, b) => b.whenTs - a.whenTs);
+  // Quem espera há mais tempo vem primeiro: uma oportunidade antiga não pode sumir no meio das novas.
+  const needYou = conversations.filter((c) => c.status === "NEEDS_HUMAN").sort((a, b) => a.whenTs - b.whenTs);
+  const waitTag = (ts: number) => {
+    const hours = (now.getTime() - ts) / 3_600_000;
+    return hours >= 24 ? { label: "Esperando há dias", cls: "tg-stop" } : hours >= 4 ? { label: "Esperando", cls: "tg-you" } : null;
+  };
   const alerts = [
     settings.linkedinNeedsReconnect && { key: "li", title: "Seu LinkedIn saiu do ar", sub: whatsappOk || emailOn ? "o assistente segue pelos outros canais" : "o assistente parou de abordar", href: "/settings#linkedin", cta: "Reconectar", tag: "Parado" },
     leftover > 0 && { key: "old", title: `${leftover} ${leftover > 1 ? "conversas" : "conversa"} de um LinkedIn desconectado`, sub: "você decide se guarda ou apaga", href: "/settings#linkedin", cta: "Ver", tag: "Aviso" },
@@ -167,7 +174,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
         </div>
         <AutomationBar
           paused={settings.automationPaused}
-          connected={linkedinOk || whatsappOk}
+          connected={channelOk}
           hasName={Boolean(settings.ownerName?.trim())}
           today={`${sentToday} mensage${sentToday !== 1 ? "ns enviadas" : "m enviada"} hoje`}
         />
@@ -257,7 +264,9 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
                     </div>
                     <p className="q-meta">
                       <span className="tg tg-blue">Sua vez</span>
+                      {waitTag(c.whenTs) && <span className={`tg ${waitTag(c.whenTs)!.cls}`}>{waitTag(c.whenTs)!.label}</span>}
                       {c.when}
+                      {c.assigneeName && <> · com {c.assigneeName}</>}
                     </p>
                   </div>
                 </article>

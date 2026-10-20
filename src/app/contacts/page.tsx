@@ -5,7 +5,7 @@ import { searchesLeftThisMonth, webSearchEnabled } from "@/lib/websearch";
 import { emailEnabled } from "@/lib/email";
 import { deskcommConfigOf } from "@/lib/deskcomm";
 import { activeIdentityIdOrNull } from "@/lib/identity";
-import { getConversationItems } from "@/lib/conversations";
+import { getContactsPage } from "@/lib/contactsList";
 import { STATUS_LABEL } from "@/lib/status";
 import { MobileHeader } from "@/components/MobileHeader";
 import { Avatar } from "@/components/Avatar";
@@ -21,9 +21,6 @@ import { CONTACT_TABS, type ContactTabKey } from "./tabs";
 
 export const dynamic = "force-dynamic";
 
-// Quantos contatos a tabela mostra; o resto se acha pela busca de Conversas ou na planilha.
-const TABLE_MAX = 100;
-
 const STAGE: Partial<Record<string, string>> = { NEEDS_HUMAN: "s-you", QUALIFIED: "s-ok", MEETING_SCHEDULED: "s-meet" };
 
 // Área Contatos: os cinco jeitos de colocar gente nova (buscar, sugestões, colar, à mão, planilha) e a lista de todos.
@@ -31,15 +28,30 @@ const STAGE: Partial<Record<string, string>> = { NEEDS_HUMAN: "s-you", QUALIFIED
 export default async function ContactsPage({ searchParams }: PageProps<"/contacts">) {
   const params = await searchParams;
   const searchEnabled = webSearchEnabled();
-  const [campaigns, remaining, settings, searchesLeft, email, identity, people] = await Promise.all([
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const filter = { q: str(params.q).slice(0, 80), campaign: str(params.fc), assignee: str(params.fr), page: Number(str(params.p)) || 1 };
+  const [campaigns, remaining, settings, searchesLeft, email, identity, list, allCampaigns, team] = await Promise.all([
     prisma.campaign.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true, description: true, audience: true } }),
     remainingDailyInviteQuota(),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     searchEnabled ? searchesLeftThisMonth() : Promise.resolve(0),
     emailEnabled(),
     activeIdentityIdOrNull(),
-    getConversationItems(),
+    getContactsPage(filter),
+    prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.teamMember.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
+  const people = list.items;
+  const filtering = Boolean(filter.q || filter.campaign || filter.assignee);
+  const pageHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (filter.q) sp.set("q", filter.q);
+    if (filter.campaign) sp.set("fc", filter.campaign);
+    if (filter.assignee) sp.set("fr", filter.assignee);
+    if (p > 1) sp.set("p", String(p));
+    const qs = sp.toString();
+    return `/contacts${qs ? `?${qs}` : ""}#h-all`;
+  };
   const wanted = typeof params.campaign === "string" ? params.campaign : "";
   const initialCampaignId = campaigns.some((c) => c.id === wanted) ? wanted : "";
   const initialTab = (CONTACT_TABS.find((t) => t.key === params.aba)?.key ?? "buscar") as ContactTabKey;
@@ -88,14 +100,45 @@ export default async function ContactsPage({ searchParams }: PageProps<"/contact
       <section aria-labelledby="h-all">
         <div className="tbl-head">
           <h2 className="h2" id="h-all" style={{ margin: 0 }}>
-            Todos os contatos <span className="muted-inline">· {people.length} {people.length === 1 ? "pessoa" : "pessoas"}, as mais recentes primeiro</span>
+            Todos os contatos <span className="muted-inline">· {list.total} {list.total === 1 ? "pessoa" : "pessoas"}, as mais recentes primeiro</span>
           </h2>
           <a href="/api/export/leads" download className="link-arrow">
             Baixar planilha <IconArrowRight size={16} />
           </a>
         </div>
+        <form method="get" action="/contacts#h-all" className="row" style={{ gap: 8, flexWrap: "wrap", margin: "8px 0 12px" }}>
+          <input className="field" type="search" name="q" defaultValue={filter.q} placeholder="Buscar por nome, empresa, e-mail ou telefone" aria-label="Buscar contatos" style={{ flex: "1 1 240px" }} />
+          <select className="field" name="fc" defaultValue={filter.campaign} aria-label="Campanha" style={{ flex: "0 1 180px" }}>
+            <option value="">Todas as campanhas</option>
+            <option value="none">Sem campanha</option>
+            {allCampaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {team.length > 0 && (
+            <select className="field" name="fr" defaultValue={filter.assignee} aria-label="Responsável" style={{ flex: "0 1 180px" }}>
+              <option value="">Todos os responsáveis</option>
+              <option value="none">Sem responsável</option>
+              {team.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <button type="submit" className="btn-solid btn-sm">
+            Buscar
+          </button>
+          {filtering && (
+            <Link href="/contacts#h-all" className="btn-text">
+              Limpar
+            </Link>
+          )}
+        </form>
         {people.length === 0 ? (
-          <p className="empty">Ninguém na lista ainda. Use uma das abas acima para começar.</p>
+          <p className="empty">{filtering ? "Ninguém encontrado com esses filtros." : "Ninguém na lista ainda. Use uma das abas acima para começar."}</p>
         ) : (
           <div className="table-wrap">
             <table className="tbl">
@@ -110,7 +153,7 @@ export default async function ContactsPage({ searchParams }: PageProps<"/contact
                 </tr>
               </thead>
               <tbody>
-                {people.slice(0, TABLE_MAX).map((p) => (
+                {people.map((p) => (
                   <tr key={p.id}>
                     <td>
                       <Link href={`/leads/${p.id}`} className="tbl-person">
@@ -146,10 +189,14 @@ export default async function ContactsPage({ searchParams }: PageProps<"/contact
             </table>
           </div>
         )}
-        {people.length > TABLE_MAX && (
-          <p className="cap-note" style={{ marginTop: 10 }}>
-            Mostrando os {TABLE_MAX} mais recentes. Para achar alguém, use a busca em <Link href="/conversations">Conversas</Link> ou baixe a planilha.
-          </p>
+        {list.pages > 1 && (
+          <nav className="row" style={{ gap: 12, marginTop: 10, alignItems: "center" }} aria-label="Páginas de contatos">
+            {list.page > 1 ? <Link href={pageHref(list.page - 1)} className="btn-text">← Anterior</Link> : <span className="muted">← Anterior</span>}
+            <span className="cap-note">
+              Página {list.page} de {list.pages}
+            </span>
+            {list.page < list.pages ? <Link href={pageHref(list.page + 1)} className="btn-text">Próxima →</Link> : <span className="muted">Próxima →</span>}
+          </nav>
         )}
       </section>
     </main>
