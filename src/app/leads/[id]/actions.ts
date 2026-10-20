@@ -7,7 +7,7 @@ import { sendOnChannel } from "@/lib/channels";
 import { supersedeDrafts } from "@/lib/outbox";
 import { TAKEOVER_REASON } from "@/lib/handoff";
 import type { MessageChannel } from "@prisma/client";
-import { summarizeConversation, suggestReply } from "@/lib/agent";
+import { prepareMeeting, summarizeConversation, suggestReply } from "@/lib/agent";
 import { instructionsFor } from "@/lib/campaigns";
 import { validFollowUp } from "@/lib/settings-ranges";
 import { parseLeadKind } from "@/lib/leadKind";
@@ -181,6 +181,19 @@ export async function summarizeLead(leadId: string): Promise<{ text?: string; er
     return { text: await summarizeConversation(lead, lead.messages) };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível gerar o resumo." };
+  }
+}
+
+// Roteiro para a reunião marcada: contexto, necessidade, objeções, participantes e o que confirmar.
+export async function prepareLeadMeeting(leadId: string): Promise<{ text?: string; error?: string }> {
+  await requireSession();
+  try {
+    const lead = await leadWithHistory(leadId);
+    if (!lead.meetingAt) return { error: "Essa conversa não tem reunião marcada." };
+    const when = lead.meetingAt.toLocaleString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+    return { text: await prepareMeeting(lead, lead.messages, { when, notes: lead.notes }) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível preparar a reunião." };
   }
 }
 

@@ -127,6 +127,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const conversation = (
     <>
       {lead.messages.length > 0 && <SummaryButton leadId={lead.id} />}
+      {lead.status === "MEETING_SCHEDULED" && lead.meetingAt && <SummaryButton leadId={lead.id} kind="meeting" />}
       {lead.messages.length === 0 && (
         <p className="empty" style={{ textAlign: "center" }}>
           {lead.status === "INVITE_SENT"
