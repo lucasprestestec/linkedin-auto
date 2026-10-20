@@ -4,6 +4,8 @@ import { emailConnection } from "@/lib/email";
 import { emailsSentToday, messagesSentToday, whatsappSentToday } from "@/lib/limits";
 import { deskcommConfigOf, whatsappLiveStatus } from "@/lib/deskcomm";
 import { emailLeftToday } from "@/lib/mailboxes";
+import { emailHealth } from "@/lib/emailHealth";
+import { EmailHealthList } from "./EmailHealthList";
 import { pushPublicKey } from "@/lib/push";
 import { DEFAULT_REMINDERS } from "@/lib/meetingReminders";
 import { googleConfigured } from "@/lib/gmail";
@@ -156,6 +158,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                   O e-mail da prospecção sai por {activeBoxes === 1 ? "uma caixa de envio" : "caixas de envio"} própria{activeBoxes === 1 ? "" : "s"}, em rodízio, com limite diário que sobe aos poucos.
                   {boxProblems > 0 && " Alguma caixa está com problema: avise o suporte."}
                 </p>
+                <EmailHealthList boxes={await emailHealth()} />
                 <EmailChannelOptions enabled={settings.emailChannelEnabled} dailyLimit={settings.dailyEmailLimit} fallbackDays={settings.emailInviteFallbackDays} />
                 <p className="hint">
                   Hoje: {emailToday} enviados, ainda cabem {emailLeft} · últimos 7 dias: {openedWeek} de {sentWeek} abertos
