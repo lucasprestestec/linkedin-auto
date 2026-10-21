@@ -130,6 +130,9 @@ model Lead {
   dealReason        String?
   stageEvents       LeadStageEvent[]
   tasks             LeadTask[]
+  // Como a pessoa chegou ("FORMULARIO" = preencheu o formulário público) e quando concordou em receber mensagens.
+  source            String?
+  consentAt         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -159,6 +162,13 @@ model Campaign {
   // Revisão de campanha nova (Settings.campaignReview): liberada antes do prazo
   // pelo corretor. Sem isso, sai da revisão sozinha (dias E mensagens).
   reviewReleasedAt DateTime?
+  // Formulário público de captação (link e QR Code): quem preenche entra nesta campanha, com consentimento registrado.
+  captureOn      Boolean         @default(false)
+  captureSlug    String?         @unique
+  captureTitle   String?
+  captureText    String?
+  // Canal em que o assistente se apresenta a quem preencheu (null = o corretor começa a conversa).
+  captureChannel MessageChannel?
   leads        Lead[]
   // Cadência com texto fixo (aprovado) pra quem ainda não respondeu.
   steps        CampaignStep[]

@@ -12,6 +12,7 @@ import { linkedinProfileSlug, normalizeLinkedinUrl, type PeopleSearchFilters } f
 import { searchPeopleOnGoogle, type FoundPerson } from "@/lib/websearch";
 import { isExcluded, loadExclusionRules } from "@/lib/exclusion";
 import { scoreProfiles } from "@/lib/agent";
+import { newCaptureSlug } from "@/lib/capture";
 
 // ---------------------------------------------------------------------------
 // Busca de pessoas pelo Google (lib/websearch.ts): a lista aparece no próprio
@@ -215,4 +216,28 @@ export async function deleteCampaign(id: string) {
   await prisma.campaign.delete({ where: { id } });
   revalidatePath("/", "layout");
   redirect("/campaigns");
+}
+
+// ---------------------------------------------------------------------------
+// Formulário público de captação (link e QR Code) da campanha.
+// ---------------------------------------------------------------------------
+
+export async function saveCapture(campaignId: string, input: { on: boolean; title: string; text: string; channel: string }) {
+  await requireSession();
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { captureSlug: true } });
+  if (!campaign) return { error: "Campanha não encontrada." };
+  const channel = input.channel === "EMAIL" || input.channel === "WHATSAPP" ? input.channel : null;
+  // O endereço nasce na primeira vez que liga e nunca muda: o QR Code já impresso continua valendo.
+  let slug = campaign.captureSlug;
+  for (let i = 0; input.on && !slug && i < 5; i++) {
+    const candidate = newCaptureSlug();
+    if (!(await prisma.campaign.findUnique({ where: { captureSlug: candidate }, select: { id: true } }))) slug = candidate;
+  }
+  if (input.on && !slug) return { error: "Não consegui criar o endereço agora. Tente de novo." };
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { captureOn: Boolean(input.on), captureSlug: slug, captureTitle: input.title.trim().slice(0, 80) || null, captureText: input.text.trim().slice(0, 400) || null, captureChannel: channel },
+  });
+  revalidatePath(`/campaigns/${campaignId}`);
+  return { ok: true };
 }

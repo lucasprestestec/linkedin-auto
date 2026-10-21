@@ -262,6 +262,7 @@ async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WH
   const leads = await prisma.lead.findMany({
     where: { status: "NEW", firstContactChannel: { in: ["EMAIL", "WHATSAPP"] }, messages: { none: {} }, ...CAN_APPROACH, ...IN_ACTIVE_CAMPAIGN, ...OPEN_DRAFT_FILTER },
     orderBy: { createdAt: "asc" },
+    include: { campaign: { select: { name: true, captureTitle: true } } },
   });
   const rules = parseExclusionList(settings.exclusionList);
   let sent = 0;
@@ -270,16 +271,20 @@ async function sendFirstContacts(settings: Settings, ready: { EMAIL: boolean; WH
     if (budget.total <= 0) break;
     if (!ready[channel] || budget[channel] <= 0 || isBlocked(lead, channel)) continue;
     if (isExcluded({ ...lead, headline: lead.jobTitle }, rules)) continue;
+    // Quem preencheu o formulário público pediu contato: a abertura agradece e dá sequência ao pedido.
+    const formTitle = lead.source === "FORMULARIO" ? (lead.campaign?.captureTitle || lead.campaign?.name || "de contato") : undefined;
     try {
       const instructions = await instructionsFor(lead, settings, {
-        task: `primeira mensagem (${channel === "EMAIL" ? "e-mail" : "WhatsApp"}) para um contato que o corretor adicionou, por indicação ou conhecido`,
+        task: formTitle
+          ? `primeira mensagem (${channel === "EMAIL" ? "e-mail" : "WhatsApp"}) para quem preencheu o formulário "${formTitle}" pedindo contato`
+          : `primeira mensagem (${channel === "EMAIL" ? "e-mail" : "WhatsApp"}) para um contato que o corretor adicionou, por indicação ou conhecido`,
       });
       const initial = await initialStep(lead.campaignId);
-      const content = initial ? (await renderStep(initial, lead, channel, instructions, [])).text : await generateFirstContact(instructions, lead, channel);
+      const content = initial ? (await renderStep(initial, lead, channel, instructions, [])).text : await generateFirstContact(instructions, lead, channel, { formTitle });
       await deliver(lead, channel, content, {
         subject: channel === "EMAIL" ? `Tudo bem, ${lead.firstName ?? ""}?`.replace(" ?", "?") : undefined,
         kind: "FIRST_CONTACT",
-        reason: `Primeiro contato por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"} (você pediu).`,
+        reason: formTitle ? `Primeiro contato por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"} (a pessoa pediu pelo formulário).` : `Primeiro contato por ${channel === "EMAIL" ? "e-mail" : "WhatsApp"} (você pediu).`,
         approval: settings.approvalMode,
         effects: {
           status: "WAITING_REPLY",
