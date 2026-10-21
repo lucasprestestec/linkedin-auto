@@ -48,7 +48,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = await getSession();
   // Cookie assinado, mas a pessoa foi desativada (ou trocou a senha): volta ao login.
   const path = (await headers()).get("x-path") ?? "";
-  const open = path === "/login" || path.startsWith("/convite/") || ["/sobre", "/privacidade", "/termos"].includes(path);
+  const open = path === "/login" || path.startsWith("/convite/") || path.startsWith("/c/") || ["/sobre", "/privacidade", "/termos"].includes(path);
   if (!session && !open && path && (await cookies()).get(COOKIE_NAME)) redirect("/login");
   const base = session ? await getShellData() : null;
   const shell = base && session?.kind === "user" ? { ...base, ownerName: session.user.name } : base;

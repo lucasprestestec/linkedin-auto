@@ -13,6 +13,10 @@ import { describeRule } from "@/lib/followupPolicy";
 import { CampaignMenu } from "../CampaignMenu";
 import { reviewStateOf } from "@/lib/campaignReview";
 import { ReleaseReviewButton } from "@/app/approvals/ReleaseReviewButton";
+import { emailEnabled } from "@/lib/email";
+import { deskcommConfigOf } from "@/lib/deskcomm";
+import { qrSvg } from "@/lib/qr";
+import { CaptureCard } from "../CaptureCard";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +37,12 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" }, select: { followUpMaxCount: true, followUpDelayHours: true, campaignReview: true, campaignReviewDays: true, campaignReviewMessages: true } }),
   ]);
   if (!campaign) notFound();
+
+  // Link público do formulário (precisa do endereço do sistema, APP_URL) e se os canais de abertura estão prontos.
+  const appBase = process.env.APP_URL?.replace(/\/$/, "");
+  const captureLink = campaign.captureSlug && appBase ? `${appBase}/c/${campaign.captureSlug}` : null;
+  const [emailReady, deskcomm] = await Promise.all([emailEnabled(), prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } })]);
+  const whatsappReady = deskcommConfigOf(deskcomm) !== null;
 
   const n = campaignNumbers(campaign.leads);
   const ch = channelNumbers(campaign.leads);
@@ -157,6 +167,19 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
                 Editar campanha <IconArrowRight size={16} />
               </Link>
             </div>
+          </section>
+
+          <section aria-labelledby="h-capture">
+            <h2 className="h2" id="h-capture" style={{ marginBottom: 6 }}>
+              Formulário de captação
+            </h2>
+            <CaptureCard
+              campaignId={campaign.id}
+              initial={{ on: campaign.captureOn, title: campaign.captureTitle ?? "", text: campaign.captureText ?? "", channel: campaign.captureChannel ?? "" }}
+              link={captureLink}
+              qr={captureLink && campaign.captureOn ? qrSvg(captureLink) : null}
+              ready={{ EMAIL: emailReady, WHATSAPP: whatsappReady }}
+            />
           </section>
 
           <section aria-labelledby="h-people">

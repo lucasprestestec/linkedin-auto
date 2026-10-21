@@ -733,16 +733,21 @@ async function generateIntroEmailImpl(instructions: string | null, lead: LeadCon
 
 // Contato adicionado à mão pelo corretor (indicação, evento, conhecido): a
 // secretária faz o primeiro contato no canal escolhido por ele.
-async function generateFirstContactImpl(instructions: string | null, lead: LeadContext, channel: MessageChannel, opts: { model?: string } = {}): Promise<string> {
+async function generateFirstContactImpl(instructions: string | null, lead: LeadContext, channel: MessageChannel, opts: { model?: string; formTitle?: string } = {}): Promise<string> {
   const persona = await assistantPersona();
+  // Quem veio pelo formulário pediu contato e autorizou: a conversa começa agradecendo e dando sequência ao pedido.
+  const origin = opts.formTitle
+    ? `Essa pessoa acabou de preencher o formulário "${opts.formTitle}" pedindo contato e autorizou receber mensagens. ` +
+      "Escreva a PRIMEIRA mensagem: cumprimente pelo primeiro nome, agradeça por ter preenchido, diga em meia frase que está dando sequência ao que ela pediu " +
+      "e termine com uma pergunta leve sobre o que ela procura. Nada de pitch, preço ou anexo. Não diga que achou a pessoa no LinkedIn."
+    : "Essa pessoa foi adicionada pelo próprio corretor — vocês se conhecem ou ela veio por indicação/evento (veja a ficha pessoal, se houver). " +
+      "Escreva a PRIMEIRA mensagem: cumprimente pelo primeiro nome, faça a ponte com o que a ficha diz (como se conheceram, quem indicou) quando houver, " +
+      "diga em meia frase por que está escrevendo e termine com uma pergunta leve. Nada de pitch, preço ou anexo. Não diga que achou a pessoa no LinkedIn.";
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
       lead,
-      "Essa pessoa foi adicionada pelo próprio corretor — vocês se conhecem ou ela veio por indicação/evento (veja a ficha pessoal, se houver). " +
-        "Escreva a PRIMEIRA mensagem: cumprimente pelo primeiro nome, faça a ponte com o que a ficha diz (como se conheceram, quem indicou) quando houver, " +
-        "diga em meia frase por que está escrevendo e termine com uma pergunta leve. Nada de pitch, preço ou anexo. Não diga que achou a pessoa no LinkedIn." +
-        `\nCanal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
+      origin + `\nCanal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
       persona,
     ),
     "Escreva a primeira mensagem.",
