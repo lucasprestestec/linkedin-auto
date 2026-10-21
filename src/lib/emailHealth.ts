@@ -38,7 +38,7 @@ export async function domainAuth(domain: string): Promise<DomainAuth> {
   const dmarcRow = dmarcRows.find((r) => /^v=DMARC1\b/i.test(r));
   const policy = dmarcRow?.match(/\bp=(reject|quarantine|none)\b/i)?.[1].toLowerCase() as DomainAuth["dmarc"] | undefined;
   return {
-    spf: !spfRow ? "ausente" : /[-~]all\b/i.test(spfRow) ? "ok" : "fraco",
+    spf: !spfRow ? "ausente" : /[-~]all\b|\bredirect=/i.test(spfRow) ? "ok" : "fraco",
     dmarc: policy ?? "ausente",
     dkim: dkimRows.some((rows) => rows.some((r) => /v=DKIM1|p=/i.test(r))),
   };

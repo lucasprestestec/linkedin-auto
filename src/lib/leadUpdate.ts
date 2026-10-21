@@ -48,7 +48,9 @@ export function sanitizeProposal(raw: unknown, today = todaySP()): UpdateProposa
     .slice(0, MAX_TASKS);
   const d = r.deal && typeof r.deal === "object" ? (r.deal as Record<string, unknown>) : null;
   const stage = d ? parseDealStage(d.stage) : null;
-  const value = d && typeof d.valueReais === "number" && Number.isFinite(d.valueReais) && d.valueReais >= 0 && d.valueReais < 1e9 ? Math.round(d.valueReais * 100) : null;
+  // A IA manda em reais; a proposta já limpa volta do navegador em centavos. Aceita os dois.
+  const okNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0 && n < 1e9;
+  const value = d ? (okNum(d.valueReais) ? Math.round(d.valueReais * 100) : okNum(d.valueCents) ? Math.round(d.valueCents) : null) : null;
   return {
     summary: text(r.summary, 300) ?? "",
     note: text(r.note, 2000),
