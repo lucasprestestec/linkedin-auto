@@ -341,7 +341,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
             <section className="panel">
               <h2 className="panel-h">Resultado das reuniões</h2>
               <p className="small">
-                <b>{deals.total.proposals}</b> propostas · <b>{deals.total.won}</b> {deals.total.won === 1 ? "venda" : "vendas"}
+                <b>{deals.total.proposals}</b> {deals.total.proposals === 1 ? "proposta" : "propostas"} ·<b>{deals.total.won}</b> {deals.total.won === 1 ? "venda" : "vendas"}
                 {deals.total.wonCents > 0 && <> ({formatBRL(deals.total.wonCents)})</>} · <b>{deals.total.lost}</b> {deals.total.lost === 1 ? "perdida" : "perdidas"}
               </p>
               {deals.byCampaign.length > 1 && (

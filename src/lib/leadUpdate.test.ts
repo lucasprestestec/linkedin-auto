@@ -35,6 +35,8 @@ async function main() {
   // estágio inventado ou valor negativo não passam
   assert.equal(sanitizeProposal({ deal: { stage: "toString" } }, today).deal, null);
   assert.equal(sanitizeProposal({ deal: { stage: "WON", valueReais: -5 } }, today).deal?.valueCents, null);
+  // proposta já limpa (centavos) volta do navegador e não pode perder o valor
+  assert.equal(sanitizeProposal({ deal: { stage: "PROPOSAL", valueCents: 1250000 } }, today).deal?.valueCents, 1250000);
   assert.ok(isEmptyProposal(sanitizeProposal(null, today)));
   assert.ok(isEmptyProposal(sanitizeProposal("texto", today)));
 
