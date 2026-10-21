@@ -19,6 +19,7 @@ import { parseDealStage, parseMoneyCents } from "@/lib/deal";
 import { checkEmailDomain, domainOf, noMailMessage } from "@/lib/emailDomain";
 import { appendNote, appendPersonal, dueDate, sanitizeProposal, todaySP, validDue } from "@/lib/leadUpdate";
 import type { Prisma } from "@prisma/client";
+import { catalogForPrompt } from "@/lib/materials";
 import { addYear, formatISO, parseRenewalDate, renewalDate, renewalISO, todayISO } from "@/lib/renewal";
 import { isReplyIntent, REMIND_OPTIONS, REPLY_INTENTS } from "@/lib/replyIntents";
 
@@ -302,7 +303,11 @@ export async function suggestLeadReply(leadId: string, channel: MessageChannel =
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
     const base = isReplyIntent(intent) ? REPLY_INTENTS[intent].goal : undefined;
     const goal = base && intent === "renew" && lead.renewalAt ? `${base} Dados da ficha: ${lead.renewalNote ?? "contrato"}, vence em ${formatISO(renewalISO(lead.renewalAt))}.` : base;
-    return { text: await suggestReply(await instructionsFor(lead, settings, { task: goal ? `escrever uma mensagem: ${goal}` : "sugerir a próxima resposta ao lead", history: lead.messages }), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN", goal) };
+    const base2 = await instructionsFor(lead, settings, { task: goal ? `escrever uma mensagem: ${goal}` : "sugerir a próxima resposta ao lead", history: lead.messages });
+    // Materiais do corretor: a IA só sabe que existem (sem link); quem anexa é ele, no seletor do compositor.
+    const catalog = catalogForPrompt(await prisma.material.findMany({ where: { active: true }, orderBy: { createdAt: "desc" }, take: 12, select: { title: true, whenToUse: true } }));
+    const instructions = [base2, catalog].filter(Boolean).join("\n\n") || null;
+    return { text: await suggestReply(instructions, lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN", goal) };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
   }

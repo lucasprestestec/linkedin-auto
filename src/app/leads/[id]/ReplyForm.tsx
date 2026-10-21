@@ -7,7 +7,7 @@ import { REMIND_OPTIONS, REPLY_INTENTS, type ReplyIntent } from "@/lib/replyInte
 import { useChannel } from "./ChannelContext";
 
 // A resposta sai pelo canal que está aberto na conversa (o seletor de cima); aqui só se mostra qual é.
-export function ReplyForm({ leadId, firstName, hasRenewal = false }: { leadId: string; firstName: string; hasRenewal?: boolean }) {
+export function ReplyForm({ leadId, firstName, hasRenewal = false, materials = [] }: { leadId: string; firstName: string; hasRenewal?: boolean; materials?: { title: string; link: string }[] }) {
   const [value, setValue] = useState("");
   const { channel, reply } = useChannel();
   const canUseChannel = reply.includes(channel);
@@ -92,6 +92,26 @@ export function ReplyForm({ leadId, firstName, hasRenewal = false }: { leadId: s
             {REPLY_INTENTS[k].label}
           </button>
         ))}
+        {materials.length > 0 && (
+          <select
+            className="btn-text"
+            aria-label="Inserir material na mensagem"
+            value=""
+            onChange={(e) => {
+              const m = materials[Number(e.target.value)];
+              if (!m) return;
+              setValue((v) => `${v.trimEnd()}${v.trim() ? "\n\n" : ""}${m.title}: ${m.link}`);
+              textareaRef.current?.focus();
+            }}
+          >
+            <option value="">Inserir material…</option>
+            {materials.map((m, i) => (
+              <option key={m.link} value={i}>
+                {m.title}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="muted small" style={{ marginLeft: "auto" }}>
           Lembrar de retornar:
         </span>

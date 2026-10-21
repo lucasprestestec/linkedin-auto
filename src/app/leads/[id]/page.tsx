@@ -32,6 +32,7 @@ import { OnChannel } from "./OnChannel";
 import { LeadDeal } from "./LeadDeal";
 import { LeadRenewal } from "./LeadRenewal";
 import { renewalISO } from "@/lib/renewal";
+import { materialUrl } from "@/lib/materials";
 import { LeadChannels } from "./LeadChannels";
 import { LeadVoiceUpdate } from "./LeadVoiceUpdate";
 import { LeadTasks, type TaskRow } from "./LeadTasks";
@@ -45,7 +46,7 @@ const WHEN_FORMAT = { day: "2-digit", month: "2-digit", hour: "2-digit", minute:
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [lead, settings, campaigns, tagRows, conversations, drafts, team] = await Promise.all([
+  const [lead, settings, campaigns, tagRows, conversations, drafts, team, materialRows] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
       include: { messages: { orderBy: { deliveredAt: "asc" } }, stageEvents: { orderBy: { createdAt: "asc" } }, tasks: { orderBy: [{ doneAt: { sort: "asc", nulls: "first" } }, { dueAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }] }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
@@ -56,6 +57,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     getConversationItems(),
     loadApprovalItems({ status: "PENDING", leadId: id }),
     prisma.teamMember.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, name: true, role: true } }),
+    prisma.material.findMany({ where: { active: true }, orderBy: { title: "asc" }, select: { title: true, token: true } }),
   ]);
 
   if (!lead) notFound();
@@ -286,7 +288,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             composer={
               <>
                 <ChannelDrafts items={drafts} />
-                <ReplyForm key="composer" leadId={lead.id} firstName={firstName} hasRenewal={Boolean(lead.renewalAt)} />
+                <ReplyForm key="composer" leadId={lead.id} firstName={firstName} hasRenewal={Boolean(lead.renewalAt)} materials={process.env.APP_URL ? materialRows.map((m) => ({ title: m.title, link: materialUrl(process.env.APP_URL!, m.token) })) : []} />
               </>
             }
           />
