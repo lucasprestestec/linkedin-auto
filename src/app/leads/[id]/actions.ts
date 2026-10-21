@@ -19,6 +19,7 @@ import { parseDealStage, parseMoneyCents } from "@/lib/deal";
 import { checkEmailDomain, domainOf, noMailMessage } from "@/lib/emailDomain";
 import { appendNote, appendPersonal, dueDate, sanitizeProposal, todaySP, validDue } from "@/lib/leadUpdate";
 import type { Prisma } from "@prisma/client";
+import { isReplyIntent, REMIND_OPTIONS, REPLY_INTENTS } from "@/lib/replyIntents";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   await requireSession();
@@ -172,6 +173,20 @@ export async function addLeadTask(leadId: string, title: string, due: string) {
   return { ok: true };
 }
 
+// "Lembrar de retornar": cria o lembrete para daqui a alguns dias (amanhã, 3 dias, 1 semana).
+export async function remindLead(leadId: string, days: number) {
+  await requireSession();
+  if (!REMIND_OPTIONS.some((o) => o.days === days)) return { error: "Prazo inválido." };
+  const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { firstName: true } });
+  if (!lead) return { error: "Contato não encontrado." };
+  const target = new Date(`${todaySP()}T12:00:00Z`);
+  target.setUTCDate(target.getUTCDate() + days);
+  await prisma.leadTask.create({ data: { leadId, title: `Retornar para ${lead.firstName ?? "a pessoa"}`, dueAt: dueDate(target.toISOString().slice(0, 10)) } });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 export async function setLeadTaskDone(taskId: string, done: boolean) {
   await requireSession();
   const task = await prisma.leadTask.update({ where: { id: taskId }, data: { doneAt: done ? new Date() : null }, select: { leadId: true } });
@@ -254,12 +269,14 @@ export async function prepareLeadMeeting(leadId: string): Promise<{ text?: strin
   }
 }
 
-export async function suggestLeadReply(leadId: string, channel: MessageChannel = "LINKEDIN"): Promise<{ text?: string; error?: string }> {
+// intent = uma das ações prontas (pedir documentos, convidar, confirmar passos, retomar); sem ela, responde ao que a pessoa disse.
+export async function suggestLeadReply(leadId: string, channel: MessageChannel = "LINKEDIN", intent?: string): Promise<{ text?: string; error?: string }> {
   await requireSession();
   try {
     const lead = await leadWithHistory(leadId);
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-    return { text: await suggestReply(await instructionsFor(lead, settings, { task: "sugerir a próxima resposta ao lead", history: lead.messages }), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN") };
+    const goal = isReplyIntent(intent) ? REPLY_INTENTS[intent].goal : undefined;
+    return { text: await suggestReply(await instructionsFor(lead, settings, { task: goal ? `escrever uma mensagem: ${goal}` : "sugerir a próxima resposta ao lead", history: lead.messages }), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN", goal) };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
   }
