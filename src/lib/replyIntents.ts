@@ -13,6 +13,10 @@ export const REPLY_INTENTS = {
     label: "Confirmar próximos passos",
     goal: "agradecer e confirmar os próximos passos combinados. Cite só o que está na conversa; não crie compromissos novos.",
   },
+  renew: {
+    label: "Falar da renovação",
+    goal: "falar da renovação do contrato da pessoa, que vence na data da ficha. Pergunte se quer revisar condições e coberturas antes de renovar e ofereça uma conversa curta. Use só os dados da ficha; não invente valores, coberturas, seguradora nem promessas.",
+  },
   nudge: {
     label: "Retomar com leveza",
     goal: "retomar o contato de forma leve, sem pressionar, lembrando o assunto da conversa.",

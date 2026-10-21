@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Planilha de contatos vai como texto numa ação do servidor (o aviso da tela fala em 2 MB).
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   // Cabeçalhos de segurança: ninguém embute o painel em outro site, e o navegador não "adivinha" tipos de arquivo.
   async headers() {
     return [
