@@ -23,6 +23,7 @@ import { getHotLeads } from "@/lib/hotLeads";
 import { syncAlerts } from "@/lib/syncReport";
 import { startOfDaySP } from "@/lib/mailboxPolicy";
 import { TaskDoneButton } from "./TaskDoneButton";
+import { daysUntil, renewalISO, renewalWhen, todayISO } from "@/lib/renewal";
 import { formatBRL } from "@/lib/deal";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +85,8 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const now = new Date();
   const raw = (await searchParams).periodo;
   const period = PERIODS.find((p) => p.key === raw) ?? PERIODS[1];
-  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals, hot, dueTasks] = await Promise.all([
+  const renewalWhere = { doNotContact: false, renewalAt: { gte: new Date(startOfDaySP(now).getTime() - 30 * 86_400_000), lt: new Date(startOfDaySP(now).getTime() + 61 * 86_400_000) } };
+  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals, hot, dueTasks, renewals, renewalsTotal] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     getConversationItems(),
     loadApprovalItems({ status: "PENDING" }),
@@ -105,6 +107,14 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
       take: 10,
       include: { lead: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } },
     }),
+    // Renovações da carteira: vencidas há até 30 dias e as dos próximos 60.
+    prisma.lead.findMany({
+      where: renewalWhere,
+      orderBy: { renewalAt: "asc" },
+      take: 8,
+      select: { id: true, firstName: true, lastName: true, avatarUrl: true, renewalAt: true, renewalNote: true },
+    }),
+    prisma.lead.count({ where: renewalWhere }),
   ]);
 
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
@@ -341,7 +351,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
             <section className="panel">
               <h2 className="panel-h">Resultado das reuniões</h2>
               <p className="small">
-                <b>{deals.total.proposals}</b> {deals.total.proposals === 1 ? "proposta" : "propostas"} ·<b>{deals.total.won}</b> {deals.total.won === 1 ? "venda" : "vendas"}
+                <b>{deals.total.proposals}</b> {deals.total.proposals === 1 ? "proposta" : "propostas"} · <b>{deals.total.won}</b> {deals.total.won === 1 ? "venda" : "vendas"}
                 {deals.total.wonCents > 0 && <> ({formatBRL(deals.total.wonCents)})</>} · <b>{deals.total.lost}</b> {deals.total.lost === 1 ? "perdida" : "perdidas"}
               </p>
               {deals.byCampaign.length > 1 && (
@@ -359,6 +369,32 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
                   ))}
                 </ul>
               )}
+            </section>
+          )}
+
+          {renewals.length > 0 && (
+            <section className="panel">
+              <h2 className="panel-h">Renovações{renewalsTotal > renewals.length ? ` (${renewalsTotal})` : ""}</h2>
+              <ul className="hot">
+                {renewals.map((c) => {
+                  const days = daysUntil(renewalISO(c.renewalAt!), todayISO(now));
+                  return (
+                    <li key={c.id}>
+                      <Link href={`/leads/${c.id}`}>
+                        <Avatar firstName={c.firstName} lastName={c.lastName} photoUrl={c.avatarUrl} size={32} />
+                        <span className="grow">
+                          {fullName(c)}
+                          <small>
+                            {renewalWhen(days)}
+                            {c.renewalNote && ` · ${c.renewalNote}`}
+                          </small>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              {renewalsTotal > renewals.length && <p className="muted small">Mostrando as 8 mais próximas.</p>}
             </section>
           )}
 

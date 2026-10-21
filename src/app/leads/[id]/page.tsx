@@ -30,6 +30,8 @@ import { loadApprovalItems } from "@/lib/approvalItems";
 import { ChannelDrafts } from "./ChannelDrafts";
 import { OnChannel } from "./OnChannel";
 import { LeadDeal } from "./LeadDeal";
+import { LeadRenewal } from "./LeadRenewal";
+import { renewalISO } from "@/lib/renewal";
 import { LeadChannels } from "./LeadChannels";
 import { LeadVoiceUpdate } from "./LeadVoiceUpdate";
 import { LeadTasks, type TaskRow } from "./LeadTasks";
@@ -174,6 +176,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
       <LeadTasks leadId={lead.id} tasks={taskRows} today={today} />
 
+      <LeadRenewal leadId={lead.id} dueISO={lead.renewalAt ? renewalISO(lead.renewalAt) : null} note={lead.renewalNote} />
+
       <LeadProfile
         leadId={lead.id}
         firstName={firstName}
@@ -282,7 +286,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             composer={
               <>
                 <ChannelDrafts items={drafts} />
-                <ReplyForm key="composer" leadId={lead.id} firstName={firstName} />
+                <ReplyForm key="composer" leadId={lead.id} firstName={firstName} hasRenewal={Boolean(lead.renewalAt)} />
               </>
             }
           />

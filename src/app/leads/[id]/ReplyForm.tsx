@@ -7,7 +7,7 @@ import { REMIND_OPTIONS, REPLY_INTENTS, type ReplyIntent } from "@/lib/replyInte
 import { useChannel } from "./ChannelContext";
 
 // A resposta sai pelo canal que está aberto na conversa (o seletor de cima); aqui só se mostra qual é.
-export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: string }) {
+export function ReplyForm({ leadId, firstName, hasRenewal = false }: { leadId: string; firstName: string; hasRenewal?: boolean }) {
   const [value, setValue] = useState("");
   const { channel, reply } = useChannel();
   const canUseChannel = reply.includes(channel);
@@ -87,7 +87,7 @@ export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: st
         </button>
       </div>
       <div className="composer-meta" style={{ flexWrap: "wrap", gap: 4 }}>
-        {(Object.keys(REPLY_INTENTS) as ReplyIntent[]).map((k) => (
+        {(Object.keys(REPLY_INTENTS) as ReplyIntent[]).filter((k) => k !== "renew" || hasRenewal).map((k) => (
           <button key={k} type="button" className="btn-text" onClick={() => suggest(k)} disabled={suggesting || !canUseChannel}>
             {REPLY_INTENTS[k].label}
           </button>

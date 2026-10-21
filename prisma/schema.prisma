@@ -133,11 +133,16 @@ model Lead {
   // Como a pessoa chegou ("FORMULARIO" = preencheu o formulário público) e quando concordou em receber mensagens.
   source            String?
   consentAt         DateTime?
+  // Carteira de clientes: quando vence o contrato (meia-noite de Brasília) e o que é (produto · seguradora · apólice).
+  renewalAt         DateTime?
+  renewalNote       String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
   drafts            Draft[]
   feedbacks         AgentFeedback[]
+
+  @@index([renewalAt])
 }
 
 // Campanha (opcional) = um público com uma oferta própria (ex.: "Saúde

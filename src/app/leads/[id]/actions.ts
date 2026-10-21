@@ -19,6 +19,7 @@ import { parseDealStage, parseMoneyCents } from "@/lib/deal";
 import { checkEmailDomain, domainOf, noMailMessage } from "@/lib/emailDomain";
 import { appendNote, appendPersonal, dueDate, sanitizeProposal, todaySP, validDue } from "@/lib/leadUpdate";
 import type { Prisma } from "@prisma/client";
+import { addYear, formatISO, parseRenewalDate, renewalDate, renewalISO, todayISO } from "@/lib/renewal";
 import { isReplyIntent, REMIND_OPTIONS, REPLY_INTENTS } from "@/lib/replyIntents";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
@@ -160,6 +161,30 @@ export async function setDeal(leadId: string, stage: string, value: string, reas
   return { ok: true };
 }
 
+// Renovação do contrato: vencimento (qualquer formato de data) e descrição. Vazio apaga.
+export async function setRenewal(leadId: string, date: string, note: string) {
+  await requireSession();
+  const day = date.trim() ? parseRenewalDate(date) : null;
+  if (date.trim() && !day) return { error: "Não entendi a data. Use, por exemplo, 15/03/2027." };
+  await prisma.lead.update({ where: { id: leadId }, data: { renewalAt: day ? renewalDate(day) : null, renewalNote: day ? note.trim().slice(0, 300) || null : null } });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// "Renovou": o vencimento anda um ano e a anotação registra o dia. "Não renova": tira da lista e anota.
+export async function resolveRenewal(leadId: string, renewed: boolean) {
+  await requireSession();
+  const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId }, select: { renewalAt: true, notes: true } });
+  if (!lead.renewalAt) return { error: "Esta pessoa não tem vencimento na ficha." };
+  const due = formatISO(renewalISO(lead.renewalAt));
+  const notes = appendNote(lead.notes, renewed ? `Renovou o contrato que vencia em ${due}.` : `Não vai renovar o contrato que vencia em ${due}.`);
+  await prisma.lead.update({ where: { id: leadId }, data: { notes, renewalAt: renewed ? renewalDate(addYear(renewalISO(lead.renewalAt) < todayISO() ? todayISO() : renewalISO(lead.renewalAt))) : null, ...(renewed ? {} : { renewalNote: null }) } });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // Lembretes da pessoa.
 export async function addLeadTask(leadId: string, title: string, due: string) {
   await requireSession();
@@ -275,7 +300,8 @@ export async function suggestLeadReply(leadId: string, channel: MessageChannel =
   try {
     const lead = await leadWithHistory(leadId);
     const settings = await prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } });
-    const goal = isReplyIntent(intent) ? REPLY_INTENTS[intent].goal : undefined;
+    const base = isReplyIntent(intent) ? REPLY_INTENTS[intent].goal : undefined;
+    const goal = base && intent === "renew" && lead.renewalAt ? `${base} Dados da ficha: ${lead.renewalNote ?? "contrato"}, vence em ${formatISO(renewalISO(lead.renewalAt))}.` : base;
     return { text: await suggestReply(await instructionsFor(lead, settings, { task: goal ? `escrever uma mensagem: ${goal}` : "sugerir a próxima resposta ao lead", history: lead.messages }), lead, lead.messages, channel === "EMAIL" || channel === "WHATSAPP" ? channel : "LINKEDIN", goal) };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível sugerir uma resposta." };
