@@ -1005,7 +1005,8 @@ export async function scoreProfiles(idealCustomer: string, profiles: ProfileToSc
 async function summarizeConversationImpl(lead: LeadContext, history: HistoryItem[]): Promise<string> {
   return writeMessage(
     `Você ajuda um corretor de seguros a retomar conversas do LinkedIn. Resuma a conversa abaixo em português do Brasil,
-em até 5 tópicos curtos começando com "• ": quem é o lead, o que ele quer ou perguntou, objeções ou dúvidas,
+em até 6 tópicos curtos começando com "• ": quem é o lead, o que ele quer ou perguntou, objeções ou dúvidas,
+compromissos assumidos (o que o corretor ou a pessoa ficaram de fazer, com o prazo se foi dito; omita o tópico se não houver),
 em que pé a conversa está e o próximo passo sugerido. Não invente nada que não esteja no histórico.
 Use a ferramenta write_message (o campo message recebe o resumo).`,
     `${leadBlock(lead)}\n\nConversa (mais antiga primeiro):\n${transcriptOf(history) || "(sem mensagens)"}`,
@@ -1032,13 +1033,15 @@ async function suggestReplyImpl(
   lead: LeadContext,
   history: HistoryItem[],
   channel: MessageChannel = "LINKEDIN",
+  goal?: string,
 ): Promise<string> {
   const persona = await assistantPersona();
   return writeMessage(
     proactiveSystemPrompt(
       instructions,
       lead,
-      "Escreva a PRÓXIMA mensagem do corretor nesta conversa, respondendo ao que o lead disse por último. " +
+      "Escreva a PRÓXIMA mensagem do corretor nesta conversa, " +
+        (goal ? `com este objetivo: ${goal} Leve em conta o que o lead disse por último. ` : "respondendo ao que o lead disse por último. ") +
         "O corretor vai revisar antes de enviar, então aqui você pode sugerir mesmo quando seria caso de handoff. Não repita frases do histórico.\n" +
         `Canal desta mensagem: ${CHANNEL_NAME[channel]}. ${channelStyle(channel, persona)}`,
       persona,

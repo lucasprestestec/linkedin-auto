@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { ChannelBadge, CHANNELS } from "@/components/ChannelBadge";
-import { sendReply, suggestLeadReply } from "./actions";
+import { remindLead, sendReply, suggestLeadReply } from "./actions";
+import { REMIND_OPTIONS, REPLY_INTENTS, type ReplyIntent } from "@/lib/replyIntents";
 import { useChannel } from "./ChannelContext";
 
 // A resposta sai pelo canal que está aberto na conversa (o seletor de cima); aqui só se mostra qual é.
@@ -12,6 +13,8 @@ export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: st
   const canUseChannel = reply.includes(channel);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [suggesting, startSuggest] = useTransition();
+  const [reminding, startRemind] = useTransition();
+  const [reminded, setReminded] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: { error?: string } | undefined, formData: FormData) => {
       const result = await sendReply(leadId, prev, formData);
@@ -40,10 +43,10 @@ export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: st
   }, [state]);
 
   // Rascunho do assistente: preenche o campo pra você revisar. Nada é enviado sozinho.
-  function suggest() {
+  function suggest(intent?: ReplyIntent) {
     setSuggestError(null);
     startSuggest(async () => {
-      const result = await suggestLeadReply(leadId, channel);
+      const result = await suggestLeadReply(leadId, channel, intent);
       if (result.text) {
         setValue(result.text);
         textareaRef.current?.focus();
@@ -79,9 +82,40 @@ export function ReplyForm({ leadId, firstName }: { leadId: string; firstName: st
           <ChannelBadge channel={channel} size={18} />
           {canUseChannel ? `Enviando por ${CHANNELS[channel].label}` : `Envio por ${CHANNELS[channel].label} indisponível para esta pessoa`}
         </span>
-        <button type="button" className="btn-text" style={{ marginLeft: "auto" }} onClick={suggest} disabled={suggesting || !canUseChannel}>
+        <button type="button" className="btn-text" style={{ marginLeft: "auto" }} onClick={() => suggest()} disabled={suggesting || !canUseChannel}>
           {suggesting ? "Escrevendo…" : "Sugerir resposta"}
         </button>
+      </div>
+      <div className="composer-meta" style={{ flexWrap: "wrap", gap: 4 }}>
+        {(Object.keys(REPLY_INTENTS) as ReplyIntent[]).map((k) => (
+          <button key={k} type="button" className="btn-text" onClick={() => suggest(k)} disabled={suggesting || !canUseChannel}>
+            {REPLY_INTENTS[k].label}
+          </button>
+        ))}
+        <span className="muted small" style={{ marginLeft: "auto" }}>
+          Lembrar de retornar:
+        </span>
+        {REMIND_OPTIONS.map((o) => (
+          <button
+            key={o.days}
+            type="button"
+            className="btn-text"
+            disabled={reminding}
+            onClick={() =>
+              startRemind(async () => {
+                const r = await remindLead(leadId, o.days);
+                setReminded("error" in r && r.error ? r.error : `Lembrete criado: ${o.label.toLowerCase()}.`);
+              })
+            }
+          >
+            {o.label}
+          </button>
+        ))}
+        {reminded && (
+          <span className="muted small" role="status">
+            {reminded}
+          </span>
+        )}
       </div>
     </form>
   );
