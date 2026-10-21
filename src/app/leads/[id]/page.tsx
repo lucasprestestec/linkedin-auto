@@ -31,6 +31,9 @@ import { ChannelDrafts } from "./ChannelDrafts";
 import { OnChannel } from "./OnChannel";
 import { LeadDeal } from "./LeadDeal";
 import { LeadChannels } from "./LeadChannels";
+import { LeadVoiceUpdate } from "./LeadVoiceUpdate";
+import { LeadTasks, type TaskRow } from "./LeadTasks";
+import { todaySP } from "@/lib/leadUpdate";
 import { DEAL_LABEL, formatBRL } from "@/lib/deal";
 import type { DealStage } from "@prisma/client";
 
@@ -43,7 +46,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const [lead, settings, campaigns, tagRows, conversations, drafts, team] = await Promise.all([
     prisma.lead.findUnique({
       where: { id },
-      include: { messages: { orderBy: { deliveredAt: "asc" } }, stageEvents: { orderBy: { createdAt: "asc" } }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
+      include: { messages: { orderBy: { deliveredAt: "asc" } }, stageEvents: { orderBy: { createdAt: "asc" } }, tasks: { orderBy: [{ doneAt: { sort: "asc", nulls: "first" } }, { dueAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }] }, campaign: { select: { name: true, followUpMaxCount: true, followUpDelayHours: true } } },
     }),
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     prisma.campaign.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, createdAt: true } }),
@@ -124,8 +127,22 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   // Se há rascunho esperando, a conversa abre no canal dele; senão, no canal da última mensagem.
   const lastChannel = drafts[0]?.channelKey ?? lead.messages.at(-1)?.channel ?? lastLeadChannel;
 
+  // Lembretes: vencido = dia anterior a hoje (em Brasília).
+  const today = todaySP();
+  const taskRows: TaskRow[] = lead.tasks.map((t) => {
+    const due = t.dueAt ? t.dueAt.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) : null;
+    return {
+      id: t.id,
+      title: t.title,
+      dueLabel: due ? `${due === today ? "hoje" : `${due.slice(8, 10)}/${due.slice(5, 7)}`}` : null,
+      overdue: Boolean(due && due < today),
+      done: Boolean(t.doneAt),
+    };
+  });
+
   const conversation = (
     <>
+      <LeadVoiceUpdate leadId={lead.id} />
       {lead.messages.length > 0 && <SummaryButton leadId={lead.id} />}
       {lead.status === "MEETING_SCHEDULED" && lead.meetingAt && <SummaryButton leadId={lead.id} kind="meeting" />}
       {lead.messages.length === 0 && (
@@ -154,6 +171,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       <section className="sec">
         <p className="status-text">{holdLabel ? `${statusLabel} · ${holdLabel}` : statusLabel}</p>
       </section>
+
+      <LeadTasks leadId={lead.id} tasks={taskRows} today={today} />
 
       <LeadProfile
         leadId={lead.id}

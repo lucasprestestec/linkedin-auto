@@ -21,6 +21,8 @@ import { linkedinDataCount } from "./settings/actions";
 import { dealBoard } from "@/lib/dealStats";
 import { getHotLeads } from "@/lib/hotLeads";
 import { syncAlerts } from "@/lib/syncReport";
+import { startOfDaySP } from "@/lib/mailboxPolicy";
+import { TaskDoneButton } from "./TaskDoneButton";
 import { formatBRL } from "@/lib/deal";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +84,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
   const now = new Date();
   const raw = (await searchParams).periodo;
   const period = PERIODS.find((p) => p.key === raw) ?? PERIODS[1];
-  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals, hot] = await Promise.all([
+  const [settings, conversations, drafts, report, nums, nextMeeting, emailOn, invitesLeft, liSent, emSent, waSent, deals, hot, dueTasks] = await Promise.all([
     prisma.settings.findUniqueOrThrow({ where: { id: "singleton" } }),
     getConversationItems(),
     loadApprovalItems({ status: "PENDING" }),
@@ -96,6 +98,13 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
     whatsappSentToday(),
     dealBoard(sinceOf(period.key, now)),
     getHotLeads(3, now),
+    // Lembretes que vencem hoje ou já venceram (os sem data só aparecem na ficha).
+    prisma.leadTask.findMany({
+      where: { doneAt: null, dueAt: { lt: new Date(startOfDaySP(now).getTime() + 86_400_000) } },
+      orderBy: { dueAt: "asc" },
+      take: 10,
+      include: { lead: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } },
+    }),
   ]);
 
   const linkedinOk = Boolean(settings.linkedinIdentityId) && !settings.linkedinNeedsReconnect;
@@ -130,7 +139,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
       .map((s) => ({ ...s, href: "/settings#canais", cta: "Ver", tag: "Aviso" })),
     voiceAlert && { key: "voice", title: voiceAlert.title, sub: voiceAlert.sub, href: "/assistente#voz", cta: "Ver", tag: voiceAlert.level === "acabou" ? "Parado" : "Aviso" },
   ].filter((a): a is { key: string; title: string; sub: string; href: string; cta: string; tag: string } => Boolean(a));
-  const waiting = alerts.length + needYou.length + drafts.length;
+  const waiting = alerts.length + needYou.length + dueTasks.length + drafts.length;
 
   const capacity = [
     linkedinOk && { key: "LINKEDIN" as ChannelKey, label: "Convites", used: settings.dailyInviteLimit - invitesLeft, limit: settings.dailyInviteLimit },
@@ -261,6 +270,29 @@ export default async function TodayPage({ searchParams }: PageProps<"/">) {
                   </div>
                 </article>
               ))}
+              {dueTasks.map((t) => {
+                const days = Math.floor((startOfDaySP(now).getTime() - startOfDaySP(t.dueAt!).getTime()) / 86_400_000);
+                return (
+                  <article key={t.id} className="q">
+                    <Avatar firstName={t.lead.firstName} lastName={t.lead.lastName} photoUrl={t.lead.avatarUrl} size={44} />
+                    <div className="q-body">
+                      <p className="q-title">
+                        {t.title} <span>· {fullName(t.lead)}</span>
+                      </p>
+                      <div className="q-act">
+                        <Link href={`/leads/${t.lead.id}`} className="btn-solid">
+                          Abrir conversa
+                        </Link>
+                        <TaskDoneButton taskId={t.id} />
+                      </div>
+                      <p className="q-meta">
+                        <span className={`tg ${days > 0 ? "tg-stop" : "tg-you"}`}>Lembrete</span>
+                        {days > 0 ? `atrasado há ${days} ${days === 1 ? "dia" : "dias"}` : "para hoje"}
+                      </p>
+                    </div>
+                  </article>
+                );
+              })}
               {drafts.map((d) => (
                 <ApprovalCard key={d.id} item={d} />
               ))}

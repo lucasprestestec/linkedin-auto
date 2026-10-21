@@ -5,7 +5,8 @@ import { startOfDaySP } from "@/lib/mailboxPolicy";
 
 // Registro de cada chamada à IA. Uma "interação com IA" (o que os planos limitam) é toda chamada que
 // decide ou escreve algo; a escolha de trechos do manual e as avaliações do banco de testes (custo do dono, não do cliente) não contam.
-export const NON_COUNTED_PURPOSES = ["trechos", "avaliacao"];
+// A atualização por voz é o corretor trabalhando, não a Helena conversando: não gasta o "uso justo" da pessoa.
+export const NON_COUNTED_PURPOSES = ["trechos", "avaliacao", "atualizacao_voz"];
 
 // Quem é a pessoa da conversa em andamento: quem chama a IA não precisa repassar isso a cada chamada.
 const leadScope = new AsyncLocalStorage<{ leadId: string | null }>();

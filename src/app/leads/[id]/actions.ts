@@ -17,6 +17,8 @@ import { requireSession } from "@/lib/session";
 import { sendNoShow } from "@/lib/meetingReminders";
 import { parseDealStage, parseMoneyCents } from "@/lib/deal";
 import { checkEmailDomain, domainOf, noMailMessage } from "@/lib/emailDomain";
+import { appendNote, appendPersonal, dueDate, sanitizeProposal, todaySP, validDue } from "@/lib/leadUpdate";
+import type { Prisma } from "@prisma/client";
 
 export async function sendReply(leadId: string, _prevState: { error?: string } | undefined, formData: FormData) {
   await requireSession();
@@ -152,6 +154,60 @@ export async function setDeal(leadId: string, stage: string, value: string, reas
     where: { id: leadId },
     data: { dealStage, dealValueCents: dealStage ? dealValueCents : null, dealReason: dealStage ? reason.trim().slice(0, 300) || null : null },
   });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// Lembretes da pessoa.
+export async function addLeadTask(leadId: string, title: string, due: string) {
+  await requireSession();
+  const t = title.trim().slice(0, 160);
+  if (!t) return { error: "Escreva o que lembrar." };
+  const day = due ? validDue(due, todaySP()) : null;
+  if (due && !day) return { error: "Data inválida. Use uma data de hoje em diante." };
+  await prisma.leadTask.create({ data: { leadId, title: t, dueAt: day ? dueDate(day) : null } });
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function setLeadTaskDone(taskId: string, done: boolean) {
+  await requireSession();
+  const task = await prisma.leadTask.update({ where: { id: taskId }, data: { doneAt: done ? new Date() : null }, select: { leadId: true } });
+  revalidatePath(`/leads/${task.leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function deleteLeadTask(taskId: string) {
+  await requireSession();
+  const task = await prisma.leadTask.delete({ where: { id: taskId }, select: { leadId: true } });
+  revalidatePath(`/leads/${task.leadId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// Aplica só o que o corretor marcou na prévia da atualização por voz. A proposta volta do navegador, então passa de novo pelas regras.
+export async function applyVoiceUpdate(leadId: string, rawProposal: unknown, picks: { note: boolean; personal: boolean; tasks: number[]; deal: boolean }) {
+  await requireSession();
+  const proposal = sanitizeProposal(rawProposal);
+  const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { notes: true, personal: true } });
+  if (!lead) return { error: "Contato não encontrado." };
+
+  const data: Prisma.LeadUpdateInput = {};
+  if (picks.note && proposal.note) data.notes = appendNote(lead.notes, proposal.note);
+  if (picks.personal && proposal.personal) data.personal = appendPersonal(lead.personal, proposal.personal).slice(0, 2000);
+  if (picks.deal && proposal.deal) {
+    data.dealStage = proposal.deal.stage;
+    data.dealValueCents = proposal.deal.valueCents;
+    data.dealReason = proposal.deal.reason;
+  }
+  const tasks = picks.tasks.filter((i) => Number.isInteger(i)).map((i) => proposal.tasks[i]).filter(Boolean);
+  await prisma.$transaction([
+    ...(Object.keys(data).length ? [prisma.lead.update({ where: { id: leadId }, data })] : []),
+    ...tasks.map((t) => prisma.leadTask.create({ data: { leadId, title: t.title, dueAt: t.due ? dueDate(t.due) : null, source: "AUDIO" } })),
+  ]);
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
   return { ok: true };
