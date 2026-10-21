@@ -129,6 +129,7 @@ model Lead {
   dealValueCents    Int?
   dealReason        String?
   stageEvents       LeadStageEvent[]
+  tasks             LeadTask[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
@@ -569,6 +570,23 @@ model LeadStageEvent {
   createdAt   DateTime  @default(now())
 
   @@index([kind, toValue, createdAt])
+  @@index([leadId])
+}
+
+// Lembrete de uma pessoa ("mandar a proposta na sexta"). Vencido ou do dia, aparece na tela Hoje.
+// source: MANUAL (digitado) ou AUDIO (proposto pela voz do corretor e confirmado por ele).
+model LeadTask {
+  id        String    @id @default(cuid())
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+  title     String
+  // Dia do lembrete (início do dia em Brasília); vazio = sem data, só aparece na ficha.
+  dueAt     DateTime?
+  doneAt    DateTime?
+  source    String    @default("MANUAL")
+  createdAt DateTime  @default(now())
+
+  @@index([doneAt, dueAt])
   @@index([leadId])
 }
 

@@ -121,19 +121,23 @@ export async function understandMedia(
 ): Promise<MediaResult> {
   const got = await download(input.url, input.kind, deps.fetchFn ?? fetch);
   if (typeof got === "string") return { ok: false, reason: got };
-  const mime = input.mime || got.mime;
-  const parts = buildParts(input.kind, got.bytes, mime);
+  return understandBytes(input.kind, got.bytes, input.mime || got.mime, deps);
+}
+
+// Mesmo entendimento, para um arquivo que já está em mãos (ex.: o áudio gravado pelo corretor no navegador).
+export async function understandBytes(kind: MediaKind, bytes: Buffer, mime: string | null | undefined, deps: MediaDeps = {}): Promise<MediaResult> {
+  const parts = buildParts(kind, bytes, mime);
   const ask = deps.ask ?? defaultAsk;
 
   let lastError = "";
   for (const model of [...new Set([mediaModel(), MEDIA_MODEL_FALLBACK])]) {
     try {
-      const text = (await ask(model, PROMPTS[input.kind], parts)).trim();
+      const text = (await ask(model, PROMPTS[kind], parts)).trim();
       if (!text) {
         lastError = "o modelo não devolveu texto";
         continue;
       }
-      if (NO_SPEECH.test(text)) return { ok: false, reason: input.kind === "audio" ? "o áudio não tem fala" : "não encontrei nada que dê pra entender" };
+      if (NO_SPEECH.test(text)) return { ok: false, reason: kind === "audio" ? "o áudio não tem fala" : "não encontrei nada que dê pra entender" };
       return { ok: true, text: text.slice(0, MAX_TEXT_CHARS), model };
     } catch (err) {
       lastError = err instanceof Error ? err.message.slice(0, 120) : "erro ao entender a mídia";
