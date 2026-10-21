@@ -453,6 +453,29 @@ enum KnowledgeMode {
   OFF
 }
 
+// Biblioteca de materiais: arquivo (PDF, imagem, Office) guardado no banco ou link externo. O corretor insere o endereço
+// na mensagem; quem abre passa por /m/<token> (o endereço não adivinha). A IA não manda link: só sabe que o material existe.
+model Material {
+  id        String   @id @default(cuid())
+  title     String
+  // Quando usar (ex.: "para quem pergunta de preço de saúde empresarial"). A assistente lê isso ao sugerir respostas.
+  whenToUse String?
+  // "FILE" (data guardado aqui) ou "LINK" (url externa).
+  kind      String
+  url       String?
+  fileName  String?
+  mimeType  String?
+  size      Int      @default(0)
+  data      Bytes?
+  token     String   @unique
+  active    Boolean  @default(true)
+  opens     Int      @default(0)
+  lastOpenAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([active, createdAt])
+}
+
 model KnowledgeSection {
   id        String        @id @default(cuid())
   position  Int

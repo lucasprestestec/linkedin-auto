@@ -253,6 +253,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <LimitsForm dailyInviteLimit={settings.dailyInviteLimit} dailyMessageLimit={settings.dailyMessageLimit} inviteMax={settings.dailyInviteMax} messageMax={settings.dailyMessageMax} />
           </Row>
           <LinkRow href="/assistente/conhecimento" title={`O que ${settings.assistantName?.trim() || "o assistente"} sabe`} sub="Produtos, regras e textos aprovados que ela usa nas respostas. Dá para corrigir e acrescentar" />
+          <LinkRow href="/assistente/materiais" title="Materiais" sub="PDFs, tabelas e links que você manda aos clientes, com contagem de aberturas" />
           <Row title="Lembretes da reunião" summary={settings.meetingRemindersEnabled ? "Na véspera, 5h e 1h antes, e aviso se a pessoa faltar" : "Desligados"}>
             <MeetingRemindersForm
               enabled={settings.meetingRemindersEnabled}

@@ -27,6 +27,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/audio/") ||
     // Formulário público de captação (link e QR Code de uma campanha): quem preenche não tem login.
     pathname.startsWith("/c/") ||
+    // Material do corretor (PDF, imagem ou link) enviado ao cliente: o código na rota é impossível de adivinhar.
+    pathname.startsWith("/m/") ||
     pathname === "/login" ||
     // Convite de acesso: a pessoa ainda não tem senha. O código é assinado e vale uma vez.
     pathname.startsWith("/convite/") ||
